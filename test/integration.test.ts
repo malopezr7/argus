@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +40,33 @@ function runArgus(args: string[]): number {
     const status = (e as { status?: number }).status;
     return typeof status === 'number' ? status : 1;
   }
+}
+
+/** Run argus and capture both stdout and stderr. Returns exit code, stdout, stderr. */
+function runArgusCapture(args: string[]): { status: number; stdout: string; stderr: string } {
+  const result = spawnSync('pnpm', ['argus', ...args], {
+    cwd: REPO,
+    encoding: 'utf8',
+  });
+  return {
+    status: result.status ?? 1,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+  };
+}
+
+/**
+ * Normalize volatile parts of CLI output so byte-identity can be asserted across runs.
+ * Removes:
+ *  - "NNN ms in Hermes" timing values
+ *  - pnpm command echo lines (e.g. "$ tsx packages/cli/src/cli.ts -c 1 ...")
+ *  - volatile temp directory paths in stack traces (e.g. /tmp/argus-XXXXX/run.argus-bundle.js)
+ */
+function normalize(s: string): string {
+  return s
+    .replace(/\d+ ms in Hermes/g, '<DURATION> ms in Hermes')
+    .replace(/^\$.+\n?/gm, '') // strip pnpm command-echo lines starting with $
+    .replace(/\/[^\s"']*argus-[A-Za-z0-9]+\/[^\s"')]+/g, '<TMPFILE>'); // strip volatile tmp paths
 }
 
 describe('argus CLI integration (needs .hermes/hermes)', () => {
@@ -142,5 +169,84 @@ describe('argus harness integration (needs .hermes/hermes)', () => {
       expect(runFixture('examples/push-hijack.test.ts')).not.toBe(0);
     },
     20_000,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Phase 3: Concurrency tests (tasks 5.1b, 5.5, 2.2b integration)
+// ---------------------------------------------------------------------------
+
+describe('argus CLI — concurrency (needs .hermes/hermes)', () => {
+  // Task 2.2b integration — exit 2 on invalid --concurrency
+  it('-c 0 → exit 2 (usage error, no hermes binary needed)', () => {
+    // This exits before even looking for hermes, so no gating needed
+    const result = runArgusCapture(['-c', '0', 'examples/math.test.ts']);
+    expect(result.status).toBe(2);
+    expect(result.stderr).toMatch(/concurrency/i);
+  }, 10_000);
+
+  it('-c foo → exit 2 (usage error)', () => {
+    const result = runArgusCapture(['-c', 'foo', 'examples/math.test.ts']);
+    expect(result.status).toBe(2);
+    expect(result.stderr).toMatch(/concurrency/i);
+  }, 10_000);
+
+  // Task 5.1b — -c 1 vs -c N byte-identity for stdout AND stderr (normalized for timing)
+  gated(
+    '5.1b: -c 1 and -c 4 produce identical stdout+stderr (after timing normalization)',
+    () => {
+      const c1 = runArgusCapture(['-c', '1', 'examples/math.test.ts']);
+      const cN = runArgusCapture(['-c', '4', 'examples/math.test.ts']);
+
+      expect(normalize(c1.stdout)).toBe(normalize(cN.stdout));
+      expect(normalize(c1.stderr)).toBe(normalize(cN.stderr));
+      expect(c1.status).toBe(cN.status);
+    },
+    60_000,
+  );
+
+  gated(
+    '5.1b: -c 1 and -c 2 on multiple files produce identical stdout+stderr',
+    () => {
+      const files = ['examples/math.test.ts', 'examples/robustness.test.ts'];
+      const c1 = runArgusCapture(['-c', '1', ...files]);
+      const cN = runArgusCapture(['-c', '2', ...files]);
+
+      expect(normalize(c1.stdout)).toBe(normalize(cN.stdout));
+      expect(normalize(c1.stderr)).toBe(normalize(cN.stderr));
+      expect(c1.status).toBe(cN.status);
+    },
+    60_000,
+  );
+
+  // Task 5.5 — -c 2 with mixed pass/fail/infra → discovery-ordered output + worst-case exit
+  gated(
+    '5.5: -c 2 mixed pass/fail/infra → exit 2 (infra worst-case)',
+    () => {
+      // examples/**/*.test.ts includes forge.test.ts (infra-failure) → worst-case = 2
+      const result = runArgusCapture(['-c', '2', 'examples/**/*.test.ts']);
+      expect(result.status).toBe(2);
+    },
+    90_000,
+  );
+
+  gated(
+    '5.5: -c 2 output is in discovery order (math before robustness)',
+    () => {
+      const result = runArgusCapture([
+        '-c',
+        '2',
+        'examples/math.test.ts',
+        'examples/robustness.test.ts',
+      ]);
+      const combined = result.stdout + result.stderr;
+      const mathIdx = combined.indexOf('math');
+      const robIdx = combined.indexOf('robustness');
+      // math.test.ts is discovered first → its output appears first in combined output
+      expect(mathIdx).toBeGreaterThanOrEqual(0);
+      expect(robIdx).toBeGreaterThanOrEqual(0);
+      expect(mathIdx).toBeLessThan(robIdx);
+    },
+    60_000,
   );
 });

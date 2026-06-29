@@ -1,6 +1,38 @@
 import type { Reporter, RunOutcome, RunResult, SessionResult, Suite } from '@argus/core';
 
 /**
+ * Render a single RunOutcome to the terminal. Extracted from CliReporter.report
+ * so cli.ts can call it directly in discovery order after mapPool resolves.
+ *
+ * Test output goes to stdout; failures and diagnostics go to stderr.
+ * Byte-identical to the original CliReporter.report switch body.
+ */
+export function renderFileOutcome(outcome: RunOutcome): void {
+  switch (outcome.kind) {
+    case 'passed':
+    case 'failed': {
+      renderResult(outcome.result);
+      if (outcome.userLogs.length > 0) {
+        process.stdout.write(`\n[user logs]\n${outcome.userLogs.join('\n')}\n`);
+      }
+      return;
+    }
+    case 'timeout':
+      process.stderr.write(`✗ TIMEOUT after ${outcome.timeoutMs} ms\n`);
+      return;
+    case 'infrastructure-failure':
+      process.stderr.write(`✗ INFRASTRUCTURE FAILURE [${outcome.stage}] ${outcome.message}\n`);
+      if (outcome.detail) process.stderr.write(`${outcome.detail}\n`);
+      return;
+    case 'protocol-failure':
+      process.stderr.write(
+        `✗ PROTOCOL FAILURE [${outcome.reason}]\n--- raw stdout ---\n${outcome.rawStdout}\n`,
+      );
+      return;
+  }
+}
+
+/**
  * CliReporter renders a RunOutcome to the terminal. It handles ALL outcome
  * kinds — test results AND infrastructure/timeout/protocol failures. Test
  * output goes to stdout; failures and diagnostics go to stderr so severity is
@@ -8,28 +40,7 @@ import type { Reporter, RunOutcome, RunResult, SessionResult, Suite } from '@arg
  */
 export class CliReporter implements Reporter {
   async report(outcome: RunOutcome): Promise<void> {
-    switch (outcome.kind) {
-      case 'passed':
-      case 'failed': {
-        renderResult(outcome.result);
-        if (outcome.userLogs.length > 0) {
-          process.stdout.write(`\n[user logs]\n${outcome.userLogs.join('\n')}\n`);
-        }
-        return;
-      }
-      case 'timeout':
-        process.stderr.write(`✗ TIMEOUT after ${outcome.timeoutMs} ms\n`);
-        return;
-      case 'infrastructure-failure':
-        process.stderr.write(`✗ INFRASTRUCTURE FAILURE [${outcome.stage}] ${outcome.message}\n`);
-        if (outcome.detail) process.stderr.write(`${outcome.detail}\n`);
-        return;
-      case 'protocol-failure':
-        process.stderr.write(
-          `✗ PROTOCOL FAILURE [${outcome.reason}]\n--- raw stdout ---\n${outcome.rawStdout}\n`,
-        );
-        return;
-    }
+    renderFileOutcome(outcome);
   }
 }
 
