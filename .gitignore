@@ -1,0 +1,14 @@
+node_modules
+dist
+*.tsbuildinfo
+.DS_Store
+/spike
+coverage
+.hermes/
+*.argus-bundle.js
+
+# Tooling artifacts (gentle-ai skill registry, etc.)
+.atl/
+
+# Working spec/planning docs — not committed (per project preference)
+docs/

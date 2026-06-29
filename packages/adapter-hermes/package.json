@@ -1,0 +1,23 @@
+{
+  "name": "@argus/hermes",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@argus/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.0"
+  }
+}

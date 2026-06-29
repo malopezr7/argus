@@ -1,0 +1,30 @@
+{
+  "name": "@argus/cli",
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
+  "bin": {
+    "argus": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/cli.js",
+      "types": "./dist/cli.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@argus/core": "workspace:*",
+    "@argus/esbuild": "workspace:*",
+    "@argus/framework": "workspace:*",
+    "@argus/hermes": "workspace:*",
+    "@argus/reporter-cli": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.0"
+  }
+}

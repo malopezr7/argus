@@ -1,0 +1,23 @@
+{
+  "name": "argus",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "check": "biome check .",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "phase1": "tsx scripts/run-phase1.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.1",
+    "@types/node": "^26.0.0",
+    "esbuild": "^0.28.0",
+    "tsx": "^4.22.0",
+    "typescript": "^6.0.0",
+    "vitest": "^4.0.0"
+  }
+}
