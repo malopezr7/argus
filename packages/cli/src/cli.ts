@@ -3,7 +3,7 @@
  * @argus/cli — composition root.
  *
  * Wiring: args → resolveFrameworkPaths → provision(LocalPath) → discover(globs)
- *         → per-file: bundle + run + parse → aggregate → report → exit code.
+ *         → mapPool(files, concurrency, runFile) → ordered render → aggregate → exit code.
  *
  * Runs via tsx (no build step). Add to root package.json:
  *   "argus": "tsx packages/cli/src/cli.ts"
@@ -15,11 +15,12 @@ import type { FileResult, RunOutcome } from '@argus/core';
 import { parseHermesOutput } from '@argus/core';
 import { DEFAULT_ENGINE_TARGET, EsbuildBundler } from '@argus/esbuild';
 import { HermesSpawnEngine, LocalPathAdapter } from '@argus/hermes';
-import { CliReporter, exitCodeForSession, renderSessionSummary } from '@argus/reporter-cli';
+import { exitCodeForSession, renderFileOutcome, renderSessionSummary } from '@argus/reporter-cli';
 import { foldOutcomes } from './aggregate.js';
-import { parseCliArgs, USAGE } from './args.js';
+import { parseCliArgs, USAGE, UsageError } from './args.js';
 import { resolveFiles } from './discover.js';
 import { resolveFrameworkPaths } from './paths.js';
+import { mapPool } from './pool.js';
 
 const errMsg = (e: unknown): string =>
   e && typeof e === 'object' && 'message' in e
@@ -28,7 +29,20 @@ const errMsg = (e: unknown): string =>
 
 async function main(): Promise<void> {
   // 1. Parse CLI arguments
-  const { patterns, timeoutMs, hermes: hermesFlagPath, help } = parseCliArgs(process.argv.slice(2));
+  let parsed: ReturnType<typeof parseCliArgs>;
+  try {
+    parsed = parseCliArgs(process.argv.slice(2));
+  } catch (e) {
+    if (e instanceof UsageError) {
+      process.stderr.write(`✗ Usage error: ${e.message}\n`);
+      process.exitCode = 2;
+      return;
+    }
+    throw e;
+  }
+
+  const { patterns, timeoutMs, hermes: hermesFlagPath, help, concurrency } = parsed;
+
   if (help) {
     process.stdout.write(USAGE);
     return;
@@ -59,15 +73,16 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
-  // 6. Per-file sequential run loop
+  // 6. Per-file concurrent run via bounded pool
   const bundler = new EsbuildBundler();
   const engine = new HermesSpawnEngine();
-  const reporter = new CliReporter();
 
-  const fileResults: FileResult[] = [];
-
-  for (const file of files) {
-    let outcome: RunOutcome;
+  /**
+   * runFile is TOTAL — every throw/timeout resolves to a RunOutcome.
+   * This is the isolation boundary that keeps mapPool from rejecting.
+   * ADR-5: a throwing worker is a caller bug; runFile never throws.
+   */
+  async function runFile(file: string): Promise<RunOutcome> {
     try {
       const bundle = await bundler
         .bundle({
@@ -82,22 +97,24 @@ async function main(): Promise<void> {
 
       const output = await engine.run(bundle, bin, { timeoutMs });
 
-      outcome = output.timedOut
+      return output.timedOut
         ? { kind: 'timeout', timeoutMs, output }
         : parseHermesOutput(output, bundle.resultNonce);
     } catch (e) {
       const stage = (e as { stage?: string }).stage === 'bundle' ? 'bundle' : 'spawn';
-      outcome = {
+      return {
         kind: 'infrastructure-failure',
         stage,
         message: errMsg(e),
       };
     }
-
-    // Report per-file as it completes
-    await reporter.report(outcome);
-    fileResults.push({ file, outcome });
   }
+
+  const outcomes = await mapPool(files, concurrency, runFile);
+
+  // Build FileResult[] in discovery order, then flush output in that order
+  const fileResults: FileResult[] = files.map((file, i) => ({ file, outcome: outcomes[i] }));
+  for (const { outcome } of fileResults) renderFileOutcome(outcome);
 
   // 7. Aggregate + session summary + exit code
   const session = foldOutcomes(fileResults);
