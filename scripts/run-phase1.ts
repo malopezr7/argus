@@ -36,7 +36,7 @@ async function main(): Promise<void> {
   let outcome: RunOutcome;
 
   try {
-    const bin = await provisioner.resolve({ rnVersion: '0.13.0', os: 'darwin', arch: 'arm64' });
+    const bin = await provisioner.resolve({ rnVersion: '0.86.0', os: 'darwin', arch: 'arm64' });
 
     const cliArgs = process.argv.slice(2);
     const testPaths =
