@@ -10,5 +10,6 @@ coverage
 # Tooling artifacts (gentle-ai skill registry, etc.)
 .atl/
 
-# Working spec/planning docs — not committed (per project preference)
+# Specs / SDD artifacts — kept LOCAL, never committed (per project preference)
 docs/
+openspec/

@@ -29,6 +29,56 @@ function runFixture(file: string): number {
   }
 }
 
+function runArgus(args: string[]): number {
+  try {
+    execFileSync('pnpm', ['argus', ...args], {
+      cwd: REPO,
+      stdio: 'ignore',
+    });
+    return 0;
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    return typeof status === 'number' ? status : 1;
+  }
+}
+
+describe('argus CLI integration (needs .hermes/hermes)', () => {
+  gated(
+    'single passing file -> exit 0',
+    () => {
+      expect(runArgus(['examples/math.test.ts'])).toBe(0);
+    },
+    30_000,
+  );
+
+  gated(
+    'multi-file glob with mixed results -> exit 1 (failure wins over pass)',
+    () => {
+      // robustness.test.ts has a failing test, math.test.ts passes → worst-case = 1
+      expect(runArgus(['examples/math.test.ts', 'examples/robustness.test.ts'])).toBe(1);
+    },
+    30_000,
+  );
+
+  gated(
+    'multi-file glob including infra-failure -> exit 2 (infra wins over test-failure)',
+    () => {
+      // forge.test.ts causes an infra-failure (Hermes exits 1, no valid frame)
+      // → worst-case code across all files = 2
+      expect(runArgus(['examples/**/*.test.ts'])).toBe(2);
+    },
+    60_000,
+  );
+
+  gated(
+    'zero-match pattern -> exit 2 (discover infrastructure-failure)',
+    () => {
+      expect(runArgus(['no-match-pattern/**/*.test.ts'])).toBe(2);
+    },
+    15_000,
+  );
+});
+
 describe('argus harness integration (needs .hermes/hermes)', () => {
   gated(
     'passing sample -> exit 0',

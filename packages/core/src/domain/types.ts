@@ -242,3 +242,35 @@ export type RunOutcome =
   | { kind: 'infrastructure-failure'; stage: InfraStage; message: string; detail?: string }
   | { kind: 'timeout'; timeoutMs: number; output: EngineOutput }
   | { kind: 'protocol-failure'; reason: ProtocolFailureReason; rawStdout: string };
+
+// ---------------------------------------------------------------------------
+// Session aggregate (host-side, pure — no adapter imports)
+// ---------------------------------------------------------------------------
+
+/** The outcome for a single discovered test file. Pure domain type. */
+export interface FileResult {
+  /** Absolute path of the test file. */
+  file: string;
+  /** The run outcome for this file. */
+  outcome: RunOutcome;
+}
+
+/**
+ * Aggregate result for a multi-file CLI session.
+ * Produced by folding FileResult[] after the per-file run loop.
+ * Pure domain type — no adapter or I/O imports allowed here.
+ */
+export interface SessionResult {
+  /** Per-file results in discovery order. */
+  files: FileResult[];
+  /**
+   * Rolled-up counts across all files. Infra/timeout/protocol files are
+   * NOT counted in passed/failed — only `kind: 'passed'` and `kind: 'failed'`.
+   */
+  totals: {
+    passed: number;
+    failed: number;
+    skipped: number;
+    total: number;
+  };
+}
