@@ -12,7 +12,8 @@
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_ENGINE_TARGET, EsbuildBundler } from '../packages/adapter-esbuild/src/index.js';
-import { HermesSpawnEngine, LocalPathAdapter } from '../packages/adapter-hermes/src/index.js';
+import { HermesSpawnEngine } from '../packages/adapter-hermes/src/hermes-spawn-engine.js';
+import { LocalPathAdapter } from '../packages/adapter-hermes/src/local-path-adapter.js';
 import type { RunOutcome } from '../packages/core/src/index.js';
 import { parseHermesOutput } from '../packages/core/src/result-protocol.js';
 import { CliReporter, exitCodeFor } from '../packages/reporter-cli/src/index.js';
