@@ -1,5 +1,5 @@
 {
-  "name": "@argus/esbuild",
+  "name": "@argus/sourcemap",
   "version": "0.0.0",
   "type": "module",
   "main": "./src/index.ts",
@@ -16,9 +16,10 @@
   },
   "dependencies": {
     "@argus/core": "workspace:*",
-    "esbuild": "^0.28.0"
+    "source-map": "0.7.4"
   },
   "devDependencies": {
+    "@argus/esbuild": "workspace:*",
     "typescript": "^6.0.0",
     "vitest": "^4.0.0"
   }
