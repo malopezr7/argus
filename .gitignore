@@ -13,3 +13,6 @@ coverage
 # Specs / SDD artifacts — kept LOCAL, never committed (per project preference)
 docs/
 openspec/
+
+# Agent handoff / working context — local only, never committed
+AGENTS.md
