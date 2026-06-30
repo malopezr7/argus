@@ -26,6 +26,7 @@
  * timers are NOT available, and a test MUST return/await any Promise it creates.
  */
 
+import { installArgusNamespace } from './argus-namespace.js';
 import { installGlobals, resetRegistry } from './jest-api.js';
 import { expect } from './matchers.js';
 import {
@@ -195,3 +196,4 @@ const g = (
 ) as Record<string, unknown>;
 g.expect = expect;
 installGlobals(g);
+installArgusNamespace(g);

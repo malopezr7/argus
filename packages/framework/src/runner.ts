@@ -34,6 +34,7 @@ import {
   subtreeHasOnly,
 } from './jest-api.js';
 import { resetAssertions, verifyAssertions } from './matchers.js';
+import { autoResetMocks } from './mock-fn.js';
 
 // ---------------------------------------------------------------------------
 // Result types — the runner's output contract.
@@ -110,6 +111,7 @@ export function createRunner(now: () => number): Runner {
 
     // --- normal execution ---
     resetAssertions();
+    autoResetMocks();
 
     const beErr = await runBeforeEachChain(chain);
     if (beErr !== undefined) {

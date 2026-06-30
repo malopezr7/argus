@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { dirname, join } from 'node:path';
 import type {
   BundleInput,
   Bundler,
@@ -46,6 +47,7 @@ export class EsbuildBundler implements Bundler {
   async bundle(input: BundleInput): Promise<SealedBundle> {
     const resultNonce = randomBytes(12).toString('hex');
     const entry = generateVirtualEntry(input, resultNonce);
+    const rnShim = join(dirname(input.frameworkPath), 'rn-shim');
     const result = await build({
       stdin: {
         contents: entry,
@@ -61,6 +63,7 @@ export class EsbuildBundler implements Bundler {
       write: false,
       outfile: 'run.argus-bundle.js',
       sourcemap: 'external',
+      alias: { 'react-native': rnShim },
       legalComments: 'none',
     });
     // D1: select by explicit suffix (esbuild output ordering is not contractual).

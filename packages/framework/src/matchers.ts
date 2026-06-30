@@ -42,6 +42,7 @@
  */
 
 import { makeAsyncMatchers, matchesThrow, thrownMessage } from './async-matchers.js';
+import { mixinCallMatchers } from './call-matchers.js';
 import { deepEqual, getByPath, matchObject, sameValueZero } from './deep-equal.js';
 import {
   type CustomMatcherFn,
@@ -49,69 +50,12 @@ import {
   installAssertionCounting,
   setExpectedAssertions,
 } from './expect-state.js';
+import type { AsyncMatchers, Matchers } from './matcher-types.js';
 import { show } from './show.js';
 
 export { resetAssertions, verifyAssertions } from './expect-state.js';
+export type { AsyncMatchers, Matchers } from './matcher-types.js';
 export { show } from './show.js';
-
-// ---------------------------------------------------------------------------
-// Matchers interface
-// ---------------------------------------------------------------------------
-
-export interface Matchers {
-  readonly not: Matchers;
-  readonly resolves: AsyncMatchers;
-  readonly rejects: AsyncMatchers;
-  toBe(expected: unknown): void;
-  toEqual(expected: unknown): void;
-  toStrictEqual(expected: unknown): void;
-  toBeTruthy(): void;
-  toBeFalsy(): void;
-  toBeNull(): void;
-  toBeUndefined(): void;
-  toBeDefined(): void;
-  toBeNaN(): void;
-  toBeGreaterThan(n: number): void;
-  toBeGreaterThanOrEqual(n: number): void;
-  toBeLessThan(n: number): void;
-  toBeLessThanOrEqual(n: number): void;
-  toBeCloseTo(expected: number, numDigits?: number): void;
-  toMatch(pattern: string | RegExp): void;
-  toContain(item: unknown): void;
-  toContainEqual(item: unknown): void;
-  toHaveLength(n: number): void;
-  toHaveProperty(keyPath: string | Array<string | number>, value?: unknown): void;
-  toMatchObject(subset: object): void;
-  toThrow(expected?: unknown): void;
-  [key: string]: unknown;
-}
-
-// Async matchers mirror the sync surface but return Promises.
-export interface AsyncMatchers {
-  readonly not: AsyncMatchers;
-  toBe(expected: unknown): Promise<void>;
-  toEqual(expected: unknown): Promise<void>;
-  toStrictEqual(expected: unknown): Promise<void>;
-  toBeTruthy(): Promise<void>;
-  toBeFalsy(): Promise<void>;
-  toBeNull(): Promise<void>;
-  toBeUndefined(): Promise<void>;
-  toBeDefined(): Promise<void>;
-  toBeNaN(): Promise<void>;
-  toBeGreaterThan(n: number): Promise<void>;
-  toBeGreaterThanOrEqual(n: number): Promise<void>;
-  toBeLessThan(n: number): Promise<void>;
-  toBeLessThanOrEqual(n: number): Promise<void>;
-  toBeCloseTo(expected: number, numDigits?: number): Promise<void>;
-  toMatch(pattern: string | RegExp): Promise<void>;
-  toContain(item: unknown): Promise<void>;
-  toContainEqual(item: unknown): Promise<void>;
-  toHaveLength(n: number): Promise<void>;
-  toHaveProperty(keyPath: string | Array<string | number>, value?: unknown): Promise<void>;
-  toMatchObject(subset: object): Promise<void>;
-  toThrow(expected?: unknown): Promise<void>;
-  [key: string]: unknown;
-}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -483,6 +427,8 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
       assert(pass, msg, msg);
     };
   }
+
+  mixinCallMatchers(m as unknown as Record<string, unknown>, actual, negated, assert);
 
   // D5/AC-98: count every matcher INVOCATION exactly once, at ENTRY — before any
   // matcher body can throw a usage/guard error. (See installAssertionCounting.)

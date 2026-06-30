@@ -21,7 +21,7 @@
  */
 
 import { incAssertionCount } from './expect-state.js';
-import type { AsyncMatchers, Matchers } from './matchers.js';
+import type { AsyncMatchers, Matchers } from './matcher-types.js';
 import { show } from './show.js';
 
 export type { AsyncMatchers };
@@ -263,6 +263,65 @@ export function makeAsyncMatchers(
         }
       }
       return runRejectsToThrow();
+    },
+    toHaveBeenCalled(): Promise<void> {
+      return build(function applySync(m) {
+        m.toHaveBeenCalled();
+      });
+    },
+    toHaveBeenCalledTimes(n: number): Promise<void> {
+      return build(function applySync(m) {
+        m.toHaveBeenCalledTimes(n);
+      });
+    },
+    toHaveBeenCalledWith(): Promise<void> {
+      // biome-ignore lint/complexity/noArguments: spread not allowed in Hermes 0.17
+      const args = arguments;
+      return build(function applySync(m) {
+        m.toHaveBeenCalledWith.apply(m, args as unknown as unknown[]);
+      });
+    },
+    toHaveBeenLastCalledWith(): Promise<void> {
+      // biome-ignore lint/complexity/noArguments: spread not allowed in Hermes 0.17
+      const args = arguments;
+      return build(function applySync(m) {
+        m.toHaveBeenLastCalledWith.apply(m, args as unknown as unknown[]);
+      });
+    },
+    toHaveBeenNthCalledWith(_n: number): Promise<void> {
+      // biome-ignore lint/complexity/noArguments: spread not allowed in Hermes 0.17
+      const args = arguments;
+      return build(function applySync(m) {
+        (m.toHaveBeenNthCalledWith as (...a: unknown[]) => void).apply(
+          m,
+          args as unknown as unknown[],
+        );
+      });
+    },
+    toHaveReturned(): Promise<void> {
+      return build(function applySync(m) {
+        m.toHaveReturned();
+      });
+    },
+    toHaveReturnedTimes(n: number): Promise<void> {
+      return build(function applySync(m) {
+        m.toHaveReturnedTimes(n);
+      });
+    },
+    toHaveReturnedWith(value: unknown): Promise<void> {
+      return build(function applySync(m) {
+        m.toHaveReturnedWith(value);
+      });
+    },
+    toHaveLastReturnedWith(value: unknown): Promise<void> {
+      return build(function applySync(m) {
+        m.toHaveLastReturnedWith(value);
+      });
+    },
+    toHaveNthReturnedWith(n: number, value: unknown): Promise<void> {
+      return build(function applySync(m) {
+        m.toHaveNthReturnedWith(n, value);
+      });
     },
   };
 
