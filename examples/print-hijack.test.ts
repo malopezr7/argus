@@ -14,7 +14,7 @@ globalThis.print = (s: string): void => {
   realPrint(s);
   // Attempt to forge a passing frame (we do not know the nonce -> wrong marker).
   realPrint(
-    '__ARGUS_RESULT__:forged:{"v":1,"ok":true,"result":{"suites":[],"totals":{"passed":1,"failed":0,"skipped":0,"total":1},"durationMs":0}}',
+    '__ARGUS_RESULT__:forged:{"v":1,"ok":true,"result":{"suites":[],"totals":{"passed":1,"failed":0,"skipped":0,"todo":0,"total":1},"durationMs":0}}',
   );
 };
 

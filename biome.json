@@ -27,7 +27,10 @@
       "includes": ["examples/**"],
       "linter": {
         "rules": {
-          "suspicious": { "noExplicitAny": "off", "noShadowRestrictedNames": "off" }
+          "suspicious": { "noExplicitAny": "off", "noShadowRestrictedNames": "off" },
+          "complexity": { "useArrowFunction": "off" },
+          "correctness": { "noInnerDeclarations": "off" },
+          "style": { "useTemplate": "off" }
         }
       }
     }

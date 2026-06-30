@@ -87,16 +87,21 @@ function isFiniteNonNegInt(v: unknown): v is number {
 
 function isTotals(x: unknown): boolean {
   if (!isObject(x)) return false;
-  const { passed, failed, skipped, total } = x;
-  if (![passed, failed, skipped, total].every(isFiniteNonNegInt)) return false;
+  const { passed, failed, skipped, todo, total } = x;
+  if (![passed, failed, skipped, todo, total].every(isFiniteNonNegInt)) return false;
   // Counts must be internally consistent.
-  return (passed as number) + (failed as number) + (skipped as number) === (total as number);
+  return (
+    (passed as number) + (failed as number) + (skipped as number) + (todo as number) ===
+    (total as number)
+  );
 }
 
 function isTestCaseShape(x: unknown): boolean {
   if (!isObject(x)) return false;
   if (typeof x.name !== 'string') return false;
-  return x.status === 'passed' || x.status === 'failed' || x.status === 'skipped';
+  return (
+    x.status === 'passed' || x.status === 'failed' || x.status === 'skipped' || x.status === 'todo'
+  );
 }
 
 function isSuiteShape(x: unknown): boolean {

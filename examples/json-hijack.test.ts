@@ -14,7 +14,11 @@ globalThis.JSON.stringify = (): string =>
   realStringify({
     v: 1,
     ok: true,
-    result: { suites: [], totals: { passed: 1, failed: 0, skipped: 0, total: 1 }, durationMs: 0 },
+    result: {
+      suites: [],
+      totals: { passed: 1, failed: 0, skipped: 0, todo: 0, total: 1 },
+      durationMs: 0,
+    },
   });
 
 describe('json-hijack', () => {

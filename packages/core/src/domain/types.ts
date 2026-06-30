@@ -181,8 +181,8 @@ export const ARGUS_RESULT_PREFIX = '__ARGUS_RESULT__:';
 export interface TestCase {
   /** Fully-qualified test name, e.g. 'math > add > returns the sum'. */
   name: string;
-  /** Pass, fail, or skip. */
-  status: 'passed' | 'failed' | 'skipped';
+  /** Pass, fail, skip, or todo. */
+  status: 'passed' | 'failed' | 'skipped' | 'todo';
   /** Failure message if status is 'failed'. */
   failureMessage?: string;
   /** Raw Error.stack captured inside Hermes (host maps it via source maps later). */
@@ -210,6 +210,7 @@ export interface RunResult {
     passed: number;
     failed: number;
     skipped: number;
+    todo: number;
     total: number;
   };
   /** Total duration measured inside Hermes. */

@@ -19,6 +19,6 @@ describe('forge', () => {
 console.log(
   '__ARGUS_RESULT__:' +
     __ARGUS_NONCE__ +
-    ':{"v":1,"ok":true,"result":{"suites":[],"totals":{"passed":1,"failed":0,"skipped":0,"total":1},"durationMs":0}}',
+    ':{"v":1,"ok":true,"result":{"suites":[],"totals":{"passed":1,"failed":0,"skipped":0,"todo":0,"total":1},"durationMs":0}}',
 );
 throw new Error('boom after forging');

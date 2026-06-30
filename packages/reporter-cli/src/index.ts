@@ -110,18 +110,20 @@ export function renderSessionSummary(session: SessionResult): void {
   // Aggregate test-level totals across the files that actually executed.
   let testsPassed = 0;
   let testsFailed = 0;
+  let testsTodo = 0;
   let testsTotal = 0;
   for (const { outcome } of session.files) {
     if (outcome.kind === 'passed' || outcome.kind === 'failed') {
       testsPassed += outcome.result.totals.passed;
       testsFailed += outcome.result.totals.failed;
+      testsTodo += outcome.result.totals.todo ?? 0;
       testsTotal += outcome.result.totals.total;
     }
   }
 
   process.stdout.write(
     `\n${total} files: ${fileParts.join(', ')}` +
-      `\n${testsTotal} tests: ${testsPassed} passed, ${testsFailed} failed\n`,
+      `\n${testsTotal} tests: ${testsPassed} passed, ${testsFailed} failed, ${testsTodo} todo\n`,
   );
 }
 
@@ -148,7 +150,8 @@ function renderResult(result: RunResult): void {
   const walk = (s: Suite, indent: string): void => {
     lines.push(indent + s.name);
     for (const t of s.tests) {
-      const mark = t.status === 'passed' ? '✓' : t.status === 'failed' ? '✗' : '○';
+      const mark =
+        t.status === 'passed' ? '✓' : t.status === 'failed' ? '✗' : t.status === 'todo' ? '✎' : '○';
       lines.push(
         `${indent}  ${mark} ${t.name}${t.failureMessage ? `  — ${t.failureMessage}` : ''}`,
       );
@@ -161,8 +164,9 @@ function renderResult(result: RunResult): void {
   };
   for (const s of result.suites) walk(s, '');
   const { passed, failed, total } = result.totals;
+  const testsTodo = result.totals.todo ?? 0;
   lines.push(
-    `\n${passed} passed, ${failed} failed, ${total} total (${result.durationMs} ms in Hermes)`,
+    `\n${passed} passed, ${failed} failed, ${testsTodo} todo, ${total} total (${result.durationMs} ms in Hermes)`,
   );
   process.stdout.write(`${lines.join('\n')}\n`);
 }
