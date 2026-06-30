@@ -62,10 +62,7 @@ function checkPrerequisites(): void {
   if (missing.length === 0) return;
 
   const isMac = process.platform === 'darwin';
-  const lines: string[] = [
-    `Missing build prerequisites: ${missing.join(', ')}`,
-    '',
-  ];
+  const lines: string[] = [`Missing build prerequisites: ${missing.join(', ')}`, ''];
   if (isMac) {
     lines.push('On macOS, install them with Homebrew:');
     lines.push('');

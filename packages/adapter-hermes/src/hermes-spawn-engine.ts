@@ -32,11 +32,7 @@ export class HermesSpawnEngine implements Engine {
   }
 }
 
-function spawnHermes(
-  binPath: string,
-  file: string,
-  opts: EngineRunOptions,
-): Promise<EngineOutput> {
+function spawnHermes(binPath: string, file: string, opts: EngineRunOptions): Promise<EngineOutput> {
   return new Promise((resolveOutput) => {
     const t0 = process.hrtime.bigint();
     const child = spawn(binPath, [file], {
