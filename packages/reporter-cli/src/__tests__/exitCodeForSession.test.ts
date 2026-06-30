@@ -5,13 +5,21 @@ import { exitCodeForSession } from '../index.js';
 // Synthetic RunOutcome builders
 const passed = (): RunOutcome => ({
   kind: 'passed',
-  result: { suites: [], totals: { passed: 1, failed: 0, skipped: 0, total: 1 }, durationMs: 1 },
+  result: {
+    suites: [],
+    totals: { passed: 1, failed: 0, skipped: 0, todo: 0, total: 1 },
+    durationMs: 1,
+  },
   userLogs: [],
 });
 
 const failed = (): RunOutcome => ({
   kind: 'failed',
-  result: { suites: [], totals: { passed: 0, failed: 1, skipped: 0, total: 1 }, durationMs: 1 },
+  result: {
+    suites: [],
+    totals: { passed: 0, failed: 1, skipped: 0, todo: 0, total: 1 },
+    durationMs: 1,
+  },
   userLogs: [],
 });
 

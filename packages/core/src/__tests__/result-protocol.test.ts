@@ -28,7 +28,7 @@ function okEnvelope(failed: number): unknown {
     ok: true,
     result: {
       suites: [],
-      totals: { passed, failed, skipped: 0, total: passed + failed },
+      totals: { passed, failed, skipped: 0, todo: 0, total: passed + failed },
       durationMs: 0,
     },
   };
@@ -96,5 +96,59 @@ describe('parseHermesOutput', () => {
   it('no frame on a clean exit -> missing-frame', () => {
     const o = parseHermesOutput(out({ stdout: 'just some output\n' }), NONCE);
     expect(o.kind === 'protocol-failure' && o.reason).toBe('missing-frame');
+  });
+
+  // AC-82: isTotals validates updated invariant with todo field
+  it('isTotals accepts {passed:1,failed:0,skipped:1,todo:1,total:3} (AC-82)', () => {
+    const payload = {
+      v: 1,
+      ok: true,
+      result: {
+        suites: [],
+        totals: { passed: 1, failed: 0, skipped: 1, todo: 1, total: 3 },
+        durationMs: 0,
+      },
+    };
+    const o = parseHermesOutput(out({ stdout: frame(NONCE, payload) }), NONCE);
+    // totals.failed === 0 → kind = 'passed'; important: it's not protocol-failure
+    expect(o.kind).toBe('passed');
+    expect(o.kind).not.toBe('protocol-failure');
+  });
+
+  // AC-82: isTestCaseShape accepts status:'todo'
+  it('isTestCaseShape accepts status:"todo" (AC-82)', () => {
+    const payload = {
+      v: 1,
+      ok: true,
+      result: {
+        suites: [
+          {
+            name: 's',
+            suites: [],
+            tests: [{ name: 'n', status: 'todo', durationMs: 0 }],
+          },
+        ],
+        totals: { passed: 0, failed: 0, skipped: 0, todo: 1, total: 1 },
+        durationMs: 0,
+      },
+    };
+    const o = parseHermesOutput(out({ stdout: frame(NONCE, payload) }), NONCE);
+    expect(o.kind).toBe('passed'); // totals.failed=0, all valid
+  });
+
+  // AC-84: isTotals rejects totals missing todo field
+  it('isTotals rejects totals object missing todo field (AC-84)', () => {
+    const payload = {
+      v: 1,
+      ok: true,
+      result: {
+        suites: [],
+        totals: { passed: 1, failed: 0, skipped: 0, total: 1 }, // no todo
+        durationMs: 0,
+      },
+    };
+    const o = parseHermesOutput(out({ stdout: frame(NONCE, payload) }), NONCE);
+    expect(o.kind).toBe('protocol-failure');
+    expect((o as Extract<typeof o, { kind: 'protocol-failure' }>).reason).toBe('malformed-json');
   });
 });

@@ -5,7 +5,7 @@ import { renderSessionSummary } from '../index.js';
 function result(passed: number, failed: number): RunResult {
   return {
     suites: [],
-    totals: { passed, failed, skipped: 0, total: passed + failed },
+    totals: { passed, failed, skipped: 0, todo: 0, total: passed + failed },
     durationMs: 0,
   };
 }

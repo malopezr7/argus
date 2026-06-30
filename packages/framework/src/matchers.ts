@@ -41,9 +41,17 @@
  *            RegExp.prototype.test, try/catch, constructor reads.
  */
 
+import { makeAsyncMatchers, matchesThrow, thrownMessage } from './async-matchers.js';
 import { deepEqual, getByPath, matchObject, sameValueZero } from './deep-equal.js';
+import {
+  type CustomMatcherFn,
+  customMatchers,
+  installAssertionCounting,
+  setExpectedAssertions,
+} from './expect-state.js';
 import { show } from './show.js';
 
+export { resetAssertions, verifyAssertions } from './expect-state.js';
 export { show } from './show.js';
 
 // ---------------------------------------------------------------------------
@@ -52,6 +60,8 @@ export { show } from './show.js';
 
 export interface Matchers {
   readonly not: Matchers;
+  readonly resolves: AsyncMatchers;
+  readonly rejects: AsyncMatchers;
   toBe(expected: unknown): void;
   toEqual(expected: unknown): void;
   toStrictEqual(expected: unknown): void;
@@ -73,6 +83,34 @@ export interface Matchers {
   toHaveProperty(keyPath: string | Array<string | number>, value?: unknown): void;
   toMatchObject(subset: object): void;
   toThrow(expected?: unknown): void;
+  [key: string]: unknown;
+}
+
+// Async matchers mirror the sync surface but return Promises.
+export interface AsyncMatchers {
+  readonly not: AsyncMatchers;
+  toBe(expected: unknown): Promise<void>;
+  toEqual(expected: unknown): Promise<void>;
+  toStrictEqual(expected: unknown): Promise<void>;
+  toBeTruthy(): Promise<void>;
+  toBeFalsy(): Promise<void>;
+  toBeNull(): Promise<void>;
+  toBeUndefined(): Promise<void>;
+  toBeDefined(): Promise<void>;
+  toBeNaN(): Promise<void>;
+  toBeGreaterThan(n: number): Promise<void>;
+  toBeGreaterThanOrEqual(n: number): Promise<void>;
+  toBeLessThan(n: number): Promise<void>;
+  toBeLessThanOrEqual(n: number): Promise<void>;
+  toBeCloseTo(expected: number, numDigits?: number): Promise<void>;
+  toMatch(pattern: string | RegExp): Promise<void>;
+  toContain(item: unknown): Promise<void>;
+  toContainEqual(item: unknown): Promise<void>;
+  toHaveLength(n: number): Promise<void>;
+  toHaveProperty(keyPath: string | Array<string | number>, value?: unknown): Promise<void>;
+  toMatchObject(subset: object): Promise<void>;
+  toThrow(expected?: unknown): Promise<void>;
+  [key: string]: unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,11 +121,36 @@ export function expect(actual: unknown): Matchers {
   return makeMatchers(actual, false);
 }
 
+// Assertion count expectation setters (ADR-6 / REQ-17)
+(expect as unknown as Record<string, unknown>).assertions = function assertions(n: number): void {
+  setExpectedAssertions('exact', n);
+};
+(expect as unknown as Record<string, unknown>).hasAssertions = function hasAssertions(): void {
+  setExpectedAssertions('min', 1);
+};
+
+// expect.extend — merges custom matchers (ADR-6 / REQ-16 / design D4)
+(expect as unknown as Record<string, unknown>).extend = function extend(
+  table: Record<string, CustomMatcherFn>,
+): void {
+  const ks = Object.keys(table);
+  for (let i = 0; i < ks.length; i++) {
+    customMatchers[ks[i]] = table[ks[i]];
+  }
+};
+
 // ---------------------------------------------------------------------------
 // Core factory
 // ---------------------------------------------------------------------------
 
-/** R9: makeAssert takes only negated (no actual param). */
+/**
+ * R9: makeAssert takes only negated (no actual param).
+ *
+ * NOTE: assertion counting is NOT done here. It is done once per matcher
+ * INVOCATION by the entry wrapper installed in makeMatchers (D5/AC-98), so that
+ * matchers which throw a usage/guard error BEFORE reaching assert (e.g. toThrow
+ * on a non-function, toEqual on a Map) still count exactly once.
+ */
 function makeAssert(negated: boolean) {
   return function assert(pass: boolean, buildMsg: () => string, buildNotMsg: () => string): void {
     const effective = negated ? !pass : pass;
@@ -97,12 +160,20 @@ function makeAssert(negated: boolean) {
   };
 }
 
-function makeMatchers(actual: unknown, negated: boolean): Matchers {
+export function makeMatchers(actual: unknown, negated: boolean): Matchers {
   const assert = makeAssert(negated);
 
-  const m: Matchers = {
+  const m = {
     get not(): Matchers {
       return makeMatchers(actual, true);
+    },
+
+    get resolves(): AsyncMatchers {
+      return makeAsyncMatchers(actual, negated, false, makeMatchers, customMatchers);
+    },
+
+    get rejects(): AsyncMatchers {
+      return makeAsyncMatchers(actual, negated, true, makeMatchers, customMatchers);
     },
 
     // --- Equality ---
@@ -382,42 +453,40 @@ function makeMatchers(actual: unknown, negated: boolean): Matchers {
           `expect(fn).not.toThrow(${show(expected)}) — but it threw ${show(thrownMessage(thrown))}`,
       );
     },
-  };
+  } as Matchers;
+
+  // Install custom matchers (ADR-6 / design D4)
+  const ck = Object.keys(customMatchers);
+  for (let i = 0; i < ck.length; i++) {
+    const name = ck[i];
+    const fn = customMatchers[name];
+    (m as Record<string, unknown>)[name] = function customMatcher(): void {
+      // biome-ignore lint/complexity/noArguments: spread not allowed in Hermes 0.17; arguments is intentional
+      const args = arguments;
+      const ctx = {
+        isNot: negated,
+        equals: function equals(a: unknown, b: unknown): boolean {
+          return deepEqual(a, b, false);
+        },
+      };
+      const r = fn.apply(
+        ctx,
+        [actual].concat(Array.prototype.slice.call(args)) as Parameters<typeof fn>,
+      );
+      const pass = r.pass;
+      const msg =
+        typeof r.message === 'function'
+          ? r.message
+          : function msgFn(): string {
+              return String(r.message);
+            };
+      assert(pass, msg, msg);
+    };
+  }
+
+  // D5/AC-98: count every matcher INVOCATION exactly once, at ENTRY — before any
+  // matcher body can throw a usage/guard error. (See installAssertionCounting.)
+  installAssertionCounting(m as unknown as Record<string, unknown>);
 
   return m;
-}
-
-// ---------------------------------------------------------------------------
-// toThrow helpers (ADR-6, R8)
-// ---------------------------------------------------------------------------
-
-function thrownMessage(thrown: unknown): string {
-  if (
-    thrown !== null &&
-    typeof thrown === 'object' &&
-    typeof (thrown as { message?: unknown }).message === 'string'
-  ) {
-    return (thrown as { message: string }).message;
-  }
-  return String(thrown);
-}
-
-function matchesThrow(thrown: unknown, expected: unknown): boolean {
-  if (expected === undefined) return true;
-  if (typeof expected === 'string') {
-    return thrownMessage(thrown).indexOf(expected) !== -1;
-  }
-  if (expected instanceof RegExp) {
-    return RegExp.prototype.test.call(expected, thrownMessage(thrown));
-  }
-  if (typeof expected === 'function') {
-    return thrown instanceof (expected as new (...args: unknown[]) => unknown);
-  }
-  if (expected instanceof Error) {
-    // R8 / AC-39: Error instance — match on message substring
-    return thrownMessage(thrown).indexOf(expected.message) !== -1;
-  }
-  throw new Error(
-    `toThrow expected a string, RegExp, Error class, or Error instance; received ${show(expected)}`,
-  );
 }

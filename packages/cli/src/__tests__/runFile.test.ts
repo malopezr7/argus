@@ -52,7 +52,11 @@ async function makeToatalWorker(
     // Simplified: treat non-timed-out as passed for totality testing
     return {
       kind: 'passed',
-      result: { suites: [], totals: { passed: 1, failed: 0, skipped: 0, total: 1 }, durationMs: 0 },
+      result: {
+        suites: [],
+        totals: { passed: 1, failed: 0, skipped: 0, todo: 0, total: 1 },
+        durationMs: 0,
+      },
       userLogs: [],
     };
   } catch (e) {
