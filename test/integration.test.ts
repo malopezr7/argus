@@ -173,6 +173,20 @@ describe('argus harness integration (needs .hermes/hermes)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Phase 3 (item 3): Matcher integration tests (task 5.10)
+// ---------------------------------------------------------------------------
+
+describe('argus matchers integration (needs .hermes/hermes)', () => {
+  gated(
+    'matchers.test.ts — all matcher assertions pass on real Hermes → exit 0',
+    () => {
+      expect(runArgus(['examples/matchers.test.ts'])).toBe(0);
+    },
+    30_000,
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Phase 3: Concurrency tests (tasks 5.1b, 5.5, 2.2b integration)
 // ---------------------------------------------------------------------------
 

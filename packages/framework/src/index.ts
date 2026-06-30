@@ -11,7 +11,8 @@
  * test code runs in the SAME realm, so it can override globals and pollute
  * prototypes. The result channel therefore:
  *  1. Captures the function primordials it needs at module-eval time (BEFORE any
- *     user code runs): `safePrint`, `safeDateNow`, `safeObjectIs`.
+ *     user code runs): `safePrint`, `safeDateNow`. Matcher equality uses
+ *     `Object.is` directly in `matchers.ts` (outside the result channel).
  *  2. Serializes the result with a HAND-WRITTEN serializer that uses ONLY
  *     un-pollutable language primitives — own-property access (`.length`,
  *     indices), operators, and string/array literals. It never calls
@@ -25,12 +26,15 @@
  * timers are NOT available, and a test MUST return/await any Promise it creates.
  */
 
+import { expect } from './matchers.js';
+
+export { expect, show } from './matchers.js';
+
 declare function print(message: string): void;
 
 // Captured primordials — taken NOW, before user code can replace the globals.
 const safePrint = print;
 const safeDateNow = Date.now;
-const safeObjectIs = Object.is;
 
 // MUST stay in sync with ARGUS_RESULT_PREFIX in @argus/core.
 const ARGUS_RESULT_PREFIX = '__ARGUS_RESULT__:';
@@ -92,25 +96,6 @@ export function test(name: string, fn: TestFn): void {
     throw new Error(`test("${name}") called outside of describe()`);
   }
   append(currentSuite.children, { kind: 'test', name, fn });
-}
-
-interface Matchers {
-  toBe(expected: unknown): void;
-}
-export function expect(actual: unknown): Matchers {
-  return {
-    toBe(expected: unknown): void {
-      if (!safeObjectIs(actual, expected)) {
-        throw new Error(`expect(${show(actual)}).toBe(${show(expected)})`);
-      }
-    },
-  };
-}
-
-function show(value: unknown): string {
-  if (value === null) return 'null';
-  if (typeof value === 'object') return '[object]';
-  return `${value as never}`;
 }
 
 // Date.now() exists in standalone Hermes; performance.now() does not.
