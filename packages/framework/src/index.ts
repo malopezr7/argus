@@ -26,25 +26,15 @@
  * timers are NOT available, and a test MUST return/await any Promise it creates.
  */
 
+import { installGlobals, resetRegistry } from './jest-api.js';
+import { expect } from './matchers.js';
 import {
-  type IdempotentGuard,
-  runAfterAll,
-  runAfterEachChain,
-  runBeforeAll,
-  runBeforeEachChain,
-} from './hooks.js';
-import {
-  computeHasOnly,
-  effectivelySkipped,
-  getRootChildren,
-  included,
-  installGlobals,
-  type PendingSuite,
-  type PendingTest,
-  resetRegistry,
-  subtreeHasOnly,
-} from './jest-api.js';
-import { expect, resetAssertions, verifyAssertions } from './matchers.js';
+  createRunner,
+  type RunResult,
+  type SuiteResult,
+  type TestCaseResult,
+  type Totals,
+} from './runner.js';
 
 export { expect, show } from './matchers.js';
 
@@ -57,293 +47,22 @@ const safeDateNow = Date.now;
 // MUST stay in sync with ARGUS_RESULT_PREFIX in @argus/core.
 const ARGUS_RESULT_PREFIX = '__ARGUS_RESULT__:';
 
-interface TestCaseResult {
-  name: string;
-  status: 'passed' | 'failed' | 'skipped' | 'todo';
-  failureMessage?: string;
-  failureStack?: string;
-  durationMs: number;
-}
-interface SuiteResult {
-  name: string;
-  suites: SuiteResult[];
-  tests: TestCaseResult[];
-}
-interface RunResult {
-  suites: SuiteResult[];
-  totals: Totals;
-  durationMs: number;
-}
-type Totals = { passed: number; failed: number; skipped: number; todo: number; total: number };
-
 // Date.now() exists in standalone Hermes; performance.now() does not.
 function now(): number {
   return safeDateNow();
 }
 
-// ---------------------------------------------------------------------------
-// Test runner
-// ---------------------------------------------------------------------------
-
-async function runTest(
-  t: PendingTest,
-  totals: Totals,
-  chain: PendingSuite[],
-  beforeAllError?: Error,
-): Promise<TestCaseResult> {
-  const t0 = now();
-  totals.total++;
-
-  // --- todo ---
-  if (t.mode === 'todo') {
-    totals.todo++;
-    return { name: t.name, status: 'todo', durationMs: now() - t0 };
-  }
-
-  // --- skipped (by .skip mode or .only focus silencing) ---
-  if (t.mode === 'skip') {
-    totals.skipped++;
-    return { name: t.name, status: 'skipped', durationMs: now() - t0 };
-  }
-
-  // --- beforeAll inherited error: all tests in this block fail, no hooks ---
-  if (beforeAllError !== undefined) {
-    totals.failed++;
-    return {
-      name: t.name,
-      status: 'failed',
-      failureMessage: beforeAllError.message,
-      failureStack: beforeAllError.stack,
-      durationMs: now() - t0,
-    };
-  }
-
-  // --- normal execution ---
-  resetAssertions();
-
-  const beErr = await runBeforeEachChain(chain);
-  if (beErr !== undefined) {
-    // beforeEach threw: fail the test, skip body, still run afterEach
-    const aeErr = await runAfterEachChain(chain);
-    totals.failed++;
-    const msg =
-      aeErr !== undefined ? `${beErr.message}; afterEach: ${aeErr.message}` : beErr.message;
-    return {
-      name: t.name,
-      status: 'failed',
-      failureMessage: msg,
-      durationMs: now() - t0,
-    };
-  }
-
-  let testErr: Error | undefined;
-  try {
-    await t.fn?.();
-  } catch (e) {
-    testErr = e instanceof Error ? e : new Error(String(e));
-  }
-
-  const aeErr = await runAfterEachChain(chain);
-
-  // Verify assertion count after body + afterEach resolve
-  const assertErr = verifyAssertions();
-
-  if (testErr !== undefined) {
-    totals.failed++;
-    const extra = aeErr !== undefined ? ` (afterEach: ${aeErr.message})` : '';
-    return {
-      name: t.name,
-      status: 'failed',
-      failureMessage: testErr.message + extra,
-      failureStack: testErr.stack,
-      durationMs: now() - t0,
-    };
-  }
-  if (aeErr !== undefined) {
-    totals.failed++;
-    return {
-      name: t.name,
-      status: 'failed',
-      failureMessage: aeErr.message,
-      failureStack: aeErr.stack,
-      durationMs: now() - t0,
-    };
-  }
-  if (assertErr !== undefined) {
-    totals.failed++;
-    return {
-      name: t.name,
-      status: 'failed',
-      failureMessage: assertErr.message,
-      durationMs: now() - t0,
-    };
-  }
-
-  totals.passed++;
-  return { name: t.name, status: 'passed', durationMs: now() - t0 };
-}
-
-function suiteHasIncludedDescendant(
-  suite: PendingSuite,
-  selfSkipped: boolean,
-  ancestorsHaveOnly: boolean,
-  hasOnly: boolean,
-): boolean {
-  for (let i = 0; i < suite.children.length; i++) {
-    const child = suite.children[i];
-    if (child.kind === 'test') {
-      // todo placeholders are reported but never executed → NOT a hook-triggering
-      // descendant (REQ-14): a todo-only suite must not run beforeAll/afterAll.
-      if (child.mode !== 'todo' && included(child, selfSkipped, ancestorsHaveOnly, hasOnly)) {
-        return true;
-      }
-    } else {
-      const childSkipped = effectivelySkipped(child, selfSkipped);
-      const childIncluded = included(child, selfSkipped, ancestorsHaveOnly, hasOnly);
-      if (
-        childIncluded &&
-        suiteHasIncludedDescendant(
-          child,
-          childSkipped,
-          ancestorsHaveOnly || suite.mode === 'only',
-          hasOnly,
-        )
-      ) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-async function runSuite(
-  suite: PendingSuite,
-  totals: Totals,
-  chain: PendingSuite[],
-  hasOnly: boolean,
-  ancestorsHaveOnly: boolean,
-  ancestorSkipped: boolean,
-  inheritedBeforeAllError?: Error,
-): Promise<SuiteResult> {
-  const tests: TestCaseResult[] = [];
-  const suites: SuiteResult[] = [];
-
-  const selfSkipped = effectivelySkipped(suite, ancestorSkipped);
-  const selfHasOnly = suite.mode === 'only';
-  // D2: ancestorsHaveOnly propagates "select-all" only when the .only block
-  // has NO deeper .only that re-narrows it. If this suite is .only AND its
-  // subtree has a deeper .only, children must match .only themselves.
-  const selfSelectsAll = selfHasOnly && !subtreeHasOnly(suite, selfSkipped);
-  const childAncestorsHaveOnly = ancestorsHaveOnly || selfSelectsAll;
-
-  // Build chain for this suite's descendants (without spread, without push)
-  const nextChain: PendingSuite[] = [];
-  for (let k = 0; k < chain.length; k++) {
-    nextChain[k] = chain[k];
-  }
-  nextChain[nextChain.length] = suite;
-
-  const guard: IdempotentGuard = { ran: false };
-  let suiteBeforeAllError: Error | undefined = inheritedBeforeAllError;
-
-  const hasDescendants = suiteHasIncludedDescendant(
-    suite,
-    selfSkipped,
-    childAncestorsHaveOnly,
-    hasOnly,
-  );
-
-  for (let i = 0; i < suite.children.length; i++) {
-    const child = suite.children[i];
-    const childIncluded = included(child, selfSkipped, childAncestorsHaveOnly, hasOnly);
-
-    if (child.kind === 'test') {
-      if (!childIncluded) {
-        // Silenced by focus — report as skipped
-        totals.total++;
-        totals.skipped++;
-        tests[tests.length] = { name: child.name, status: 'skipped', durationMs: 0 };
-        continue;
-      }
-
-      // Run beforeAll once before the first EXECUTABLE test. A todo placeholder
-      // is reported (via runTest) but MUST NOT trigger lifecycle hooks (REQ-14).
-      if (child.mode !== 'todo' && suiteBeforeAllError === undefined) {
-        const baErr = await runBeforeAll(suite, guard);
-        if (baErr !== undefined) {
-          suiteBeforeAllError = baErr;
-        }
-      }
-
-      tests[tests.length] = await runTest(child, totals, nextChain, suiteBeforeAllError);
-    } else {
-      // child is a suite — run this suite's beforeAll before descending, but ONLY
-      // if the child subtree has an executable (non-todo) descendant (REQ-14).
-      const childHasExecutable = suiteHasIncludedDescendant(
-        child,
-        effectivelySkipped(child, selfSkipped),
-        childAncestorsHaveOnly,
-        hasOnly,
-      );
-      if (childIncluded && childHasExecutable && suiteBeforeAllError === undefined) {
-        const baErr = await runBeforeAll(suite, guard);
-        if (baErr !== undefined) {
-          suiteBeforeAllError = baErr;
-        }
-      }
-      const sub = await runSuite(
-        child,
-        totals,
-        nextChain,
-        hasOnly,
-        childAncestorsHaveOnly,
-        selfSkipped,
-        suiteBeforeAllError,
-      );
-      suites[suites.length] = sub;
-    }
-  }
-
-  // Run afterAll after all children drain
-  if (hasDescendants || inheritedBeforeAllError !== undefined) {
-    const aaErr = await runAfterAll(suite);
-    if (aaErr !== undefined) {
-      // Synthetic failed test for afterAll throw (D3)
-      totals.total++;
-      totals.failed++;
-      tests[tests.length] = {
-        name: 'afterAll hook',
-        status: 'failed',
-        failureMessage: aaErr.message,
-        failureStack: aaErr.stack,
-        durationMs: 0,
-      };
-    }
-  }
-
-  return { name: suite.name, suites, tests };
-}
+// The real runner lives in runner.ts (no print/serializer/primordials there).
+// Inject the captured-primordial-backed time source so it stays portable.
+const runner = createRunner(now);
 
 /**
  * Execute all registered suites and print the single framed result line.
  * @param nonce - per-run secret, passed privately by the virtual entry.
  */
 export async function run(nonce: string): Promise<void> {
-  const start = now();
-  const totals: Totals = { passed: 0, failed: 0, skipped: 0, todo: 0, total: 0 };
   try {
-    const rootNodes = getRootChildren();
-    // Pass-1: compute file-global hasOnly (skipping effectively-skipped subtrees)
-    const hasOnly = computeHasOnly(rootNodes, false);
-
-    const suites: SuiteResult[] = [];
-    for (let i = 0; i < rootNodes.length; i++) {
-      const node = rootNodes[i];
-      if (node.kind === 'suite') {
-        suites[suites.length] = await runSuite(node, totals, [], hasOnly, false, false);
-      }
-    }
-    const result: RunResult = { suites, totals, durationMs: now() - start };
+    const result = await runner.runRoot();
     safePrint(`${ARGUS_RESULT_PREFIX + nonce}:${serOkEnvelope(result)}`);
   } catch (err: unknown) {
     const e = err as { message?: string; stack?: string };
