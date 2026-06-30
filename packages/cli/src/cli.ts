@@ -16,6 +16,7 @@ import { parseHermesOutput } from '@argus/core';
 import { DEFAULT_ENGINE_TARGET, EsbuildBundler } from '@argus/esbuild';
 import { HermesSpawnEngine, LocalPathAdapter } from '@argus/hermes';
 import { exitCodeForSession, renderFileOutcome, renderSessionSummary } from '@argus/reporter-cli';
+import { remapStacks } from '@argus/sourcemap';
 import { foldOutcomes } from './aggregate.js';
 import { parseCliArgs, USAGE, UsageError } from './args.js';
 import { resolveFiles } from './discover.js';
@@ -97,9 +98,14 @@ async function main(): Promise<void> {
 
       const output = await engine.run(bundle, bin, { timeoutMs });
 
-      return output.timedOut
-        ? { kind: 'timeout', timeoutMs, output }
-        : parseHermesOutput(output, bundle.resultNonce);
+      if (output.timedOut) return { kind: 'timeout', timeoutMs, output };
+
+      const outcome = parseHermesOutput(output, bundle.resultNonce);
+      if (outcome.kind === 'passed' || outcome.kind === 'failed') {
+        const result = await remapStacks(outcome.result, bundle.map);
+        return { ...outcome, result };
+      }
+      return outcome;
     } catch (e) {
       const stage = (e as { stage?: string }).stage === 'bundle' ? 'bundle' : 'spawn';
       return {

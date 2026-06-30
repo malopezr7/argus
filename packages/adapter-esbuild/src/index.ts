@@ -59,10 +59,21 @@ export class EsbuildBundler implements Bundler {
       supported: HERMES_SUPPORTED,
       platform: 'neutral',
       write: false,
+      outfile: 'run.argus-bundle.js',
+      sourcemap: 'external',
       legalComments: 'none',
     });
-    const code = result.outputFiles[0].text;
-    return { code, sizeBytes: Buffer.byteLength(code, 'utf8'), resultNonce };
+    // D1: select by explicit suffix (esbuild output ordering is not contractual).
+    const jsFile = result.outputFiles.find((f) => f.path.endsWith('.js'));
+    const mapFile = result.outputFiles.find((f) => f.path.endsWith('.js.map'));
+    if (!jsFile) throw new Error('EsbuildBundler: esbuild produced no JS output file');
+    const code = jsFile.text;
+    return {
+      code,
+      map: mapFile?.text,
+      sizeBytes: Buffer.byteLength(code, 'utf8'),
+      resultNonce,
+    };
   }
 }
 

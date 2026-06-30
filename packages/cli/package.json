@@ -22,7 +22,8 @@
     "@argus/esbuild": "workspace:*",
     "@argus/framework": "workspace:*",
     "@argus/hermes": "workspace:*",
-    "@argus/reporter-cli": "workspace:*"
+    "@argus/reporter-cli": "workspace:*",
+    "@argus/sourcemap": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^6.0.0"

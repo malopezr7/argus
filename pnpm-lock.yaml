@@ -39,6 +39,9 @@ importers:
       typescript:
         specifier: ^6.0.0
         version: 6.0.3
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.9(@types/node@26.0.1)(vite@8.1.0(@types/node@26.0.1)(esbuild@0.28.1)(tsx@4.22.4))
 
   packages/adapter-hermes:
     dependencies:
@@ -49,6 +52,25 @@ importers:
       typescript:
         specifier: ^6.0.0
         version: 6.0.3
+
+  packages/adapter-sourcemap:
+    dependencies:
+      '@argus/core':
+        specifier: workspace:*
+        version: link:../core
+      source-map:
+        specifier: 0.7.4
+        version: 0.7.4
+    devDependencies:
+      '@argus/esbuild':
+        specifier: workspace:*
+        version: link:../adapter-esbuild
+      typescript:
+        specifier: ^6.0.0
+        version: 6.0.3
+      vitest:
+        specifier: ^4.0.0
+        version: 4.1.9(@types/node@26.0.1)(vite@8.1.0(@types/node@26.0.1)(esbuild@0.28.1)(tsx@4.22.4))
 
   packages/cli:
     dependencies:
@@ -67,6 +89,9 @@ importers:
       '@argus/reporter-cli':
         specifier: workspace:*
         version: link:../reporter-cli
+      '@argus/sourcemap':
+        specifier: workspace:*
+        version: link:../adapter-sourcemap
     devDependencies:
       typescript:
         specifier: ^6.0.0
@@ -634,6 +659,10 @@ packages:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
 
+  source-map@0.7.4:
+    resolution: {integrity: sha512-l3BikUxvPOcn5E74dZiq5BGsTb5yEwhaTSzccU6t4sDOH8NWJCstKO5QT2CvtFoK6F0saL7p9xHAqHOlCPJygA==}
+    engines: {node: '>= 8'}
+
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
 
@@ -1159,6 +1188,8 @@ snapshots:
   siginfo@2.0.0: {}
 
   source-map-js@1.2.1: {}
+
+  source-map@0.7.4: {}
 
   stackback@0.0.2: {}
 
