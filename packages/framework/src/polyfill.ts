@@ -21,6 +21,12 @@ declare function print(message: string): void;
     g.global = g;
   }
 
+  if (typeof g.queueMicrotask === 'undefined') {
+    g.queueMicrotask = (callback: () => void): void => {
+      Promise.resolve().then(callback);
+    };
+  }
+
   // Minimal `console` built from `print`. Joins args with a space like Node.
   if (typeof g.console === 'undefined') {
     const write = (...args: unknown[]): void => {

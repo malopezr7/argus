@@ -10,6 +10,7 @@ import type {
   TransformOptions,
 } from '@argus/core';
 import { build, transform } from 'esbuild';
+import { hermesClassLowering } from './hermes-class-lowering.js';
 
 /**
  * Default esbuild target.
@@ -35,6 +36,13 @@ const HERMES_SUPPORTED: Record<string, boolean> = {
   'async-generator': false,
 };
 
+const ESBUILD_LIVE_BINDING_GETTER = 'get: () => from[key]';
+const HERMES_SAFE_LIVE_BINDING_GETTER = 'get: ((capturedKey) => () => from[capturedKey])(key)';
+
+function captureCommonJsLiveBindingKeys(code: string): string {
+  return code.replaceAll(ESBUILD_LIVE_BINDING_GETTER, HERMES_SAFE_LIVE_BINDING_GETTER);
+}
+
 function targetFor(engineTarget: string[]): string[] {
   return engineTarget.length > 0 ? engineTarget : DEFAULT_ENGINE_TARGET;
 }
@@ -47,7 +55,11 @@ export class EsbuildBundler implements Bundler {
   async bundle(input: BundleInput): Promise<SealedBundle> {
     const resultNonce = randomBytes(12).toString('hex');
     const entry = generateVirtualEntry(input, resultNonce);
-    const rnShim = join(dirname(input.frameworkPath), 'rn-shim');
+    const frameworkSourceDir = dirname(input.frameworkPath);
+    const frameworkPackageDir = dirname(frameworkSourceDir);
+    const rnShim = join(frameworkSourceDir, 'rn-shim');
+    const componentFacade = join(frameworkSourceDir, 'component', 'index');
+    const reactPackage = join(frameworkPackageDir, 'node_modules', 'react');
     const result = await build({
       stdin: {
         contents: entry,
@@ -63,14 +75,25 @@ export class EsbuildBundler implements Bundler {
       write: false,
       outfile: 'run.argus-bundle.js',
       sourcemap: 'external',
-      alias: { 'react-native': rnShim },
+      jsx: 'automatic',
+      jsxImportSource: 'react',
+      jsxDev: true,
+      define: {
+        __DEV__: 'true',
+        'process.env.NODE_ENV': '"development"',
+      },
+      alias: { argus: componentFacade, react: reactPackage, 'react-native': rnShim },
+      plugins: [hermesClassLowering()],
       legalComments: 'none',
     });
     // D1: select by explicit suffix (esbuild output ordering is not contractual).
     const jsFile = result.outputFiles.find((f) => f.path.endsWith('.js'));
     const mapFile = result.outputFiles.find((f) => f.path.endsWith('.js.map'));
     if (!jsFile) throw new Error('EsbuildBundler: esbuild produced no JS output file');
-    const code = jsFile.text;
+    // Hermes does not preserve per-iteration bindings for esbuild's generated
+    // CommonJS getter loop. Capture the key through a function parameter so
+    // named imports do not all resolve to the final export.
+    const code = captureCommonJsLiveBindingKeys(jsFile.text);
     return {
       code,
       map: mapFile?.text,
@@ -112,6 +135,13 @@ export class EsbuildTransformer implements Transformer {
       target: targetFor(opts.engineTarget),
       supported: HERMES_SUPPORTED,
       sourcefile: input.path,
+      jsx: 'automatic',
+      jsxImportSource: 'react',
+      jsxDev: true,
+      define: {
+        __DEV__: 'true',
+        'process.env.NODE_ENV': '"development"',
+      },
     });
     return { code: result.code };
   }

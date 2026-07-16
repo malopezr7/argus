@@ -1,5 +1,8 @@
 node_modules
+# Test fixtures simulating a dependency tree must be tracked
+!packages/adapter-esbuild/src/__tests__/fixtures/node_modules/
 dist
+.codegraph/
 *.tsbuildinfo
 .DS_Store
 /spike
