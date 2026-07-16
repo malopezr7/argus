@@ -4,7 +4,7 @@ Argus runs React Native unit tests on the **standalone Hermes VM**: the same Jav
 
 The goal is simple: keep the feedback loop close to unit-test speed while catching bugs that only appear on Hermes and would be invisible in Node/V8-based runners.
 
-> **Status:** draft / pre-release. The walking skeleton and core runner are working; RN native mocks are the current active SDD iteration.
+> **Status:** draft / pre-release. The walking skeleton, core runner, RN native mocks, and synchronous component testing are working.
 
 ---
 
@@ -16,6 +16,7 @@ pnpm typecheck
 pnpm exec biome check .
 pnpm test
 pnpm argus "examples/**/*.test.ts"
+pnpm argus "examples/**/*.test.tsx"
 ```
 
 Argus currently expects a runnable Hermes binary at one of these locations:
@@ -57,6 +58,7 @@ Current verified baseline:
 - Richer matcher set: equality, truthiness, numeric, object, collection, `toThrow`, `.resolves`, `.rejects`, custom `expect.extend`, assertion counting.
 - Source-map based stack remapping from `run.argus-bundle.js` back to user source files.
 - Hardened result protocol between Hermes and the host process.
+- Synchronous React component testing through the isolated `argus` facade: render lifecycle, queries, scoped queries, events, `act`, and automatic cleanup.
 
 Verified locally on 2026-06-30:
 
@@ -73,28 +75,37 @@ pnpm argus examples/math.test.ts examples/matchers.test.ts examples/jest-api.tes
 
 The active iteration is:
 
-> **Phase 3 · item 6 — RN native mocks (infra-only) + assertable mock functions**
+> **Phase 3 · item 7 — synchronous component testing on real Hermes**
 
-The intent is to let tests exercise code that touches React Native native-module boundaries without requiring a real RN runtime.
+Component tests import the facade explicitly; plain unit tests remain React-free:
 
-Planned scope for this iteration:
+```tsx
+import { fireEvent, render, screen, within } from 'argus';
+import { Pressable, Text, View } from 'react-native';
 
-- Add an `argus` global namespace.
-- Add `argus.fn()` mock functions.
-- Add `argus.spyOn()` spies.
-- Add call/return matchers such as `toHaveBeenCalled`, `toHaveBeenCalledWith`, `toHaveReturnedWith`, and nth/last variants.
-- Add a minimal `NativeModules` / `TurboModuleRegistry` shim.
-- Add `argus.mockNativeModule(name, factory)` and reset APIs.
-- Alias `react-native` imports to the Argus shim for native-module access.
+render(
+  <View testID="panel">
+    <Pressable onPress={() => console.log('pressed')}>
+      <Text>Submit</Text>
+    </Pressable>
+  </View>,
+);
 
-Non-goals for this iteration:
+const panel = screen.getByTestId('panel');
+fireEvent.press(within(panel).getByText('Submit'));
+```
 
-- No curated built-in RN module mocks yet.
-- No React Native Testing Library yet.
-- No component rendering, view tree, layout, or real UIManager behavior.
-- No `jest` global and no `jest.fn()` API. The namespace is intentionally `argus`.
+Held node references and `within(scope)` are snapshots of the tree at query time. After an
+update, re-query through `screen` and create a fresh `within` scope before making assertions or
+dispatching another event.
 
-Current state: the SDD plan exists locally under `openspec/changes/phase3-rn-mocks/`, and the pre-code review has identified refinements to resolve before implementation. No code for this iteration should be considered shipped until the apply + verify + archive cycle is complete.
+Supported synchronous surface:
+
+- `render`, `rerender`, `unmount`, `screen`, and `within`.
+- `getBy*`, `getAllBy*`, `queryBy*`, and `queryAllBy*` for text, test ID, role, placeholder text, and display value.
+- `fireEvent`, `fireEvent.press`, `fireEvent.changeText`, synchronous `act`, and automatic root cleanup.
+
+Async query APIs (`waitFor`, `findBy*`), `userEvent`, fake timers, Suspense guarantees, layout, and native-platform fidelity remain out of scope.
 
 ---
 
@@ -225,8 +236,8 @@ These constraints are intentional and protect the project from subtle runtime bu
 | Richer `expect` matchers | Done |
 | Jest-like runner API: hooks, `it`, `.skip`, `.only`, `.todo`, async, `expect.extend`, assertion counting | Done |
 | Source-map stack remapping | Done |
-| RN native mocks + `argus.fn()` / spies / call matchers | In progress |
-| Component testing / React Native Testing Library support | Pending |
+| RN native mocks + `argus.fn()` / spies / call matchers | Done |
+| Argus-owned synchronous component testing | Done |
 | Snapshots | Pending |
 | Coverage | Pending |
 | Watch mode | Pending |

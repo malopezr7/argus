@@ -104,6 +104,25 @@ describe('argus CLI integration (needs .hermes/hermes)', () => {
     },
     15_000,
   );
+
+  gated(
+    'component query failure -> exit 1',
+    () => {
+      expect(runArgus(['examples/component-query-failing.test.tsx'])).toBe(1);
+    },
+    30_000,
+  );
+
+  gated(
+    'TSX glob discovers component fixtures and preserves test-failure exit 1',
+    () => {
+      const result = runArgusCapture(['examples/**/*.test.tsx']);
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain('component-query-failing.test.tsx');
+      expect(result.stdout).toContain('component-api.test.tsx');
+    },
+    60_000,
+  );
 });
 
 describe('argus harness integration (needs .hermes/hermes)', () => {

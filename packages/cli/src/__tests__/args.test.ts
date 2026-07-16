@@ -1,6 +1,13 @@
 import { availableParallelism } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_MAX_CONCURRENCY, parseCliArgs, UsageError } from '../args.js';
+import { DEFAULT_MAX_CONCURRENCY, parseCliArgs, USAGE, UsageError } from '../args.js';
+
+describe('usage', () => {
+  it('documents both default test extensions', () => {
+    expect(USAGE).toContain('**/*.test.ts');
+    expect(USAGE).toContain('**/*.test.tsx');
+  });
+});
 
 describe('parseCliArgs — --concurrency / -c', () => {
   it('-c 3 → concurrency === 3', () => {

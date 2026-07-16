@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util';
 export const USAGE = `argus — run React Native tests on the standalone Hermes engine
 
 Usage:
-  argus [globs...]           Discover and run test files (default: **/*.test.ts)
+  argus [globs...]           Discover and run test files (defaults: **/*.test.ts, **/*.test.tsx)
 
 Options:
   -t, --timeout <ms>         Per-file Hermes timeout in ms (default: 10000)

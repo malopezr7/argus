@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r typecheck && tsc -p tsconfig.examples.json",
     "check": "biome check .",
     "lint": "biome lint .",
     "format": "biome format --write .",

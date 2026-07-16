@@ -15,15 +15,15 @@ describe('resolveFiles', () => {
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  it('(a) default pattern matches .test.ts files when no patterns given', async () => {
+  it('(a) default patterns match .test.ts and .test.tsx in lexicographic order', async () => {
     writeFileSync(join(tmp, 'foo.test.ts'), '');
-    writeFileSync(join(tmp, 'bar.test.ts'), '');
+    writeFileSync(join(tmp, 'bar.test.tsx'), '');
     writeFileSync(join(tmp, 'baz.ts'), ''); // should not match
 
     const result = await resolveFiles([], tmp);
 
     expect(result).toHaveLength(2);
-    expect(result.every((f) => f.endsWith('.test.ts'))).toBe(true);
+    expect(result).toEqual([join(tmp, 'bar.test.tsx'), join(tmp, 'foo.test.ts')]);
   });
 
   it('(b) node_modules files are excluded', async () => {
@@ -70,11 +70,13 @@ describe('resolveFiles', () => {
   it('explicit pattern discovers matching files', async () => {
     mkdirSync(join(tmp, 'examples'), { recursive: true });
     writeFileSync(join(tmp, 'examples', 'math.test.ts'), '');
+    writeFileSync(join(tmp, 'examples', 'component.test.tsx'), '');
     writeFileSync(join(tmp, 'examples', 'other.ts'), '');
 
     const result = await resolveFiles(['examples/**/*.test.ts'], tmp);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toMatch(/math\.test\.ts$/);
+    expect(result[0]).not.toMatch(/\.tsx$/);
   });
 });

@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "jsx": "react-jsxdev",
+    "jsxImportSource": "react",
+    "noEmit": true,
+    "paths": {
+      "argus": ["./packages/framework/src/component/index.ts"],
+      "react": ["./packages/framework/node_modules/@types/react/index.d.ts"],
+      "react/jsx-dev-runtime": [
+        "./packages/framework/node_modules/@types/react/jsx-dev-runtime.d.ts"
+      ],
+      "react/jsx-runtime": ["./packages/framework/node_modules/@types/react/jsx-runtime.d.ts"],
+      "react-native": ["./packages/framework/src/rn-shim.ts"]
+    },
+    "typeRoots": ["./packages/framework/node_modules/@types", "./node_modules/@types"],
+    "types": ["node", "react"]
+  },
+  "include": ["examples/**/*.test.tsx", "packages/framework/src/test-globals.d.ts"]
+}
