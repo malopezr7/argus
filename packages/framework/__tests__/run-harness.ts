@@ -57,5 +57,6 @@ export {
   it,
   test,
 } from '../src/jest-api.js';
+export { registerInternalAfterEach } from '../src/lifecycle.js';
 export { expect as argusExpect } from '../src/matchers.js';
 export type { RunResult, SuiteResult, TestCaseResult } from '../src/runner.js';

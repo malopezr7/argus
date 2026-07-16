@@ -33,6 +33,7 @@ import {
   type PendingTest,
   subtreeHasOnly,
 } from './jest-api.js';
+import { runInternalAfterEach } from './lifecycle.js';
 import { resetAssertions, verifyAssertions } from './matchers.js';
 import { autoResetMocks } from './mock-fn.js';
 
@@ -99,11 +100,14 @@ export function createRunner(now: () => number): Runner {
 
     // --- beforeAll inherited error: all tests in this block fail, no hooks ---
     if (beforeAllError !== undefined) {
+      const internalErr = await runInternalAfterEach();
       totals.failed++;
       return {
         name: t.name,
         status: 'failed',
-        failureMessage: beforeAllError.message,
+        failureMessage:
+          beforeAllError.message +
+          (internalErr === undefined ? '' : `; internal afterEach: ${internalErr.message}`),
         failureStack: beforeAllError.stack,
         durationMs: now() - t0,
       };
@@ -117,9 +121,11 @@ export function createRunner(now: () => number): Runner {
     if (beErr !== undefined) {
       // beforeEach threw: fail the test, skip body, still run afterEach
       const aeErr = await runAfterEachChain(chain);
+      const internalErr = await runInternalAfterEach();
       totals.failed++;
-      const msg =
+      let msg =
         aeErr !== undefined ? `${beErr.message}; afterEach: ${aeErr.message}` : beErr.message;
+      if (internalErr !== undefined) msg += `; internal afterEach: ${internalErr.message}`;
       return {
         name: t.name,
         status: 'failed',
@@ -136,6 +142,7 @@ export function createRunner(now: () => number): Runner {
     }
 
     const aeErr = await runAfterEachChain(chain);
+    const internalErr = await runInternalAfterEach();
 
     // Verify assertion count after body + afterEach resolve
     const assertErr = verifyAssertions();
@@ -143,10 +150,12 @@ export function createRunner(now: () => number): Runner {
     if (testErr !== undefined) {
       totals.failed++;
       const extra = aeErr !== undefined ? ` (afterEach: ${aeErr.message})` : '';
+      const internalExtra =
+        internalErr !== undefined ? ` (internal afterEach: ${internalErr.message})` : '';
       return {
         name: t.name,
         status: 'failed',
-        failureMessage: testErr.message + extra,
+        failureMessage: testErr.message + extra + internalExtra,
         failureStack: testErr.stack,
         durationMs: now() - t0,
       };
@@ -156,8 +165,20 @@ export function createRunner(now: () => number): Runner {
       return {
         name: t.name,
         status: 'failed',
-        failureMessage: aeErr.message,
+        failureMessage:
+          aeErr.message +
+          (internalErr === undefined ? '' : `; internal afterEach: ${internalErr.message}`),
         failureStack: aeErr.stack,
+        durationMs: now() - t0,
+      };
+    }
+    if (internalErr !== undefined) {
+      totals.failed++;
+      return {
+        name: t.name,
+        status: 'failed',
+        failureMessage: internalErr.message,
+        failureStack: internalErr.stack,
         durationMs: now() - t0,
       };
     }
