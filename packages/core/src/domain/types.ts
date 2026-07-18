@@ -73,6 +73,8 @@ export interface BundleInput {
   testPaths: string[];
   /** Absolute path to the in-Hermes framework module (describe/test/expect/run). */
   frameworkPath: string;
+  /** Absolute path to the component-testing facade exposed through the `argus` alias. */
+  componentPath: string;
   /** Absolute paths to env polyfill modules, evaluated before anything else. */
   polyfillPaths: string[];
   /** esbuild target forwarded to the bundler, e.g. ['es2020'] (see SPEC §3.4). */

@@ -20,6 +20,7 @@ import { EsbuildBundler } from '../index.js';
 const HERE = fileURLToPath(new URL('../', import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..', '..'); // src -> adapter-esbuild -> packages -> root
 const FRAMEWORK_PATH = resolve(REPO_ROOT, 'packages', 'framework', 'src', 'index');
+const COMPONENT_PATH = resolve(REPO_ROOT, 'packages', 'rntl', 'src', 'index');
 const POLYFILL_PATH = resolve(REPO_ROOT, 'packages', 'framework', 'src', 'polyfill');
 const FIXTURE_PATH = resolve(REPO_ROOT, 'examples', 'math.test.ts');
 
@@ -29,6 +30,7 @@ describe('EsbuildBundler source-map generation (ADR-1)', () => {
     const bundle = await bundler.bundle({
       testPaths: [FIXTURE_PATH],
       frameworkPath: FRAMEWORK_PATH,
+      componentPath: COMPONENT_PATH,
       polyfillPaths: [POLYFILL_PATH],
       engineTarget: ['es2020'],
     });
@@ -52,6 +54,7 @@ describe('EsbuildBundler source-map generation (ADR-1)', () => {
     const bundle = await bundler.bundle({
       testPaths: [FIXTURE_PATH],
       frameworkPath: FRAMEWORK_PATH,
+      componentPath: COMPONENT_PATH,
       polyfillPaths: [POLYFILL_PATH],
       engineTarget: ['es2020'],
     });
@@ -64,6 +67,7 @@ describe('EsbuildBundler source-map generation (ADR-1)', () => {
     const bundle = await bundler.bundle({
       testPaths: [FIXTURE_PATH],
       frameworkPath: FRAMEWORK_PATH,
+      componentPath: COMPONENT_PATH,
       polyfillPaths: [POLYFILL_PATH],
       engineTarget: ['es2020'],
     });

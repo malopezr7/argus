@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 export interface FrameworkPaths {
   /** Absolute path to packages/framework/src/index (without extension). */
   frameworkPath: string;
+  /** Absolute path to packages/rntl/src/index (without extension). */
+  componentPath: string;
   /** Absolute paths to polyfill modules (without extension). */
   polyfillPaths: string[];
 }
@@ -29,6 +31,7 @@ export function resolveFrameworkPaths(): FrameworkPaths {
 
   return {
     frameworkPath: join(frameworkSrc, 'index'),
+    componentPath: join(repoRoot, 'packages', 'rntl', 'src', 'index'),
     polyfillPaths: [join(frameworkSrc, 'polyfill')],
   };
 }

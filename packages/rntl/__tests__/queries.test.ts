@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import { screen, within } from '../../src/component/queries.js';
-import { render } from '../../src/component/render.js';
+import { screen, within } from '../src/queries.js';
+import { render } from '../src/render.js';
 
 describe('component queries', () => {
   it('supports every predicate and collection variant', () => {

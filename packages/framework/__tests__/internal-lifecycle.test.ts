@@ -1,6 +1,4 @@
-import React from 'react';
 import { expect, it, describe as vDescribe } from 'vitest';
-import { cleanupActiveRenders, render, screen } from '../src/component/render.js';
 import {
   afterEach,
   beforeEach,
@@ -81,24 +79,5 @@ vDescribe('internal afterEach lifecycle', () => {
     }
 
     expect(calls).toBe(0);
-  });
-
-  it('cleans active component roots after a failed test', async () => {
-    const unregister = registerInternalAfterEach(cleanupActiveRenders);
-    try {
-      const result = await runWith(() => {
-        describe('component failure', () => {
-          test('case', () => {
-            render(React.createElement('Text', null, 'leaked'));
-            throw new Error('failed after render');
-          });
-        });
-      });
-
-      expect(flattenTests(result.suites)[0].status).toBe('failed');
-      expect(() => screen.root).toThrow('No active component render');
-    } finally {
-      unregister();
-    }
   });
 });

@@ -1,7 +1,12 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import { act, fireEvent, render, screen, within } from '../../src/component/index.js';
-import { describe as argusDescribe, flattenTests, runWith, test } from '../run-harness.js';
+import {
+  describe as argusDescribe,
+  flattenTests,
+  runWith,
+  test,
+} from '../../framework/__tests__/run-harness.js';
+import { act, fireEvent, render, screen, within } from '../src/index.js';
 
 describe('component facade entry', () => {
   it('exposes the synchronous facade through one entry', () => {
@@ -34,5 +39,19 @@ describe('component facade entry', () => {
     });
 
     expect(flattenTests(result.suites).map((item) => item.status)).toEqual(['passed', 'passed']);
+  });
+
+  it('cleans active component roots after a failed test', async () => {
+    const result = await runWith(() => {
+      argusDescribe('component failure', () => {
+        test('case', () => {
+          render(React.createElement('Text', null, 'leaked'));
+          throw new Error('failed after render');
+        });
+      });
+    });
+
+    expect(flattenTests(result.suites)[0].status).toBe('failed');
+    expect(() => screen.root).toThrow('No active component render');
   });
 });

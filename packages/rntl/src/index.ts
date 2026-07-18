@@ -1,5 +1,6 @@
 import React from 'react';
-import { registerInternalAfterEach } from '../lifecycle.js';
+// Sanctioned cross-package seam: the React-agnostic lifecycle registry remains framework-owned.
+import { registerInternalAfterEach } from '../../framework/src/lifecycle.js';
 import { fireEvent } from './events.js';
 import { screen, within } from './queries.js';
 import { cleanupActiveRenders, refreshActiveRenders, render } from './render.js';

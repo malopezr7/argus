@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 const HERE = fileURLToPath(new URL('../', import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..', '..'); // src -> adapter-sourcemap -> packages -> root
 const FRAMEWORK_PATH = resolve(REPO_ROOT, 'packages', 'framework', 'src', 'index');
+const COMPONENT_PATH = resolve(REPO_ROOT, 'packages', 'rntl', 'src', 'index');
 const POLYFILL_PATH = resolve(REPO_ROOT, 'packages', 'framework', 'src', 'polyfill');
 
 // Use the real math.test.ts fixture — it has a known statement at line 10
@@ -29,6 +30,7 @@ describe('EsbuildBundler map → SourceMapConsumer position resolution (REQ-13-C
     const bundle = await bundler.bundle({
       testPaths: [FIXTURE_PATH],
       frameworkPath: FRAMEWORK_PATH,
+      componentPath: COMPONENT_PATH,
       polyfillPaths: [POLYFILL_PATH],
       engineTarget: ['es2020'],
     });

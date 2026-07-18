@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'test-renderer';
 import { describe, expect, it } from 'vitest';
-import { materializeTree } from '../../src/component/tree.js';
+import { materializeTree } from '../src/tree.js';
 
 describe('materializeTree', () => {
   it('creates linked host-only nodes through composite components', () => {

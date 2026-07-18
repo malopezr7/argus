@@ -56,10 +56,10 @@ export class EsbuildBundler implements Bundler {
     const resultNonce = randomBytes(12).toString('hex');
     const entry = generateVirtualEntry(input, resultNonce);
     const frameworkSourceDir = dirname(input.frameworkPath);
-    const frameworkPackageDir = dirname(frameworkSourceDir);
+    const rntlSourceDir = dirname(input.componentPath);
+    const rntlPackageDir = dirname(rntlSourceDir);
     const rnShim = join(frameworkSourceDir, 'rn-shim');
-    const componentFacade = join(frameworkSourceDir, 'component', 'index');
-    const reactPackage = join(frameworkPackageDir, 'node_modules', 'react');
+    const reactPackage = join(rntlPackageDir, 'node_modules', 'react');
     const result = await build({
       stdin: {
         contents: entry,
@@ -82,7 +82,7 @@ export class EsbuildBundler implements Bundler {
         __DEV__: 'true',
         'process.env.NODE_ENV': '"development"',
       },
-      alias: { argus: componentFacade, react: reactPackage, 'react-native': rnShim },
+      alias: { argus: input.componentPath, react: reactPackage, 'react-native': rnShim },
       plugins: [hermesClassLowering()],
       legalComments: 'none',
     });

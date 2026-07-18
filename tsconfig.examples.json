@@ -8,15 +8,13 @@
     "jsxImportSource": "react",
     "noEmit": true,
     "paths": {
-      "argus": ["./packages/framework/src/component/index.ts"],
-      "react": ["./packages/framework/node_modules/@types/react/index.d.ts"],
-      "react/jsx-dev-runtime": [
-        "./packages/framework/node_modules/@types/react/jsx-dev-runtime.d.ts"
-      ],
-      "react/jsx-runtime": ["./packages/framework/node_modules/@types/react/jsx-runtime.d.ts"],
+      "argus": ["./packages/rntl/src/index.ts"],
+      "react": ["./packages/rntl/node_modules/@types/react/index.d.ts"],
+      "react/jsx-dev-runtime": ["./packages/rntl/node_modules/@types/react/jsx-dev-runtime.d.ts"],
+      "react/jsx-runtime": ["./packages/rntl/node_modules/@types/react/jsx-runtime.d.ts"],
       "react-native": ["./packages/framework/src/rn-shim.ts"]
     },
-    "typeRoots": ["./packages/framework/node_modules/@types", "./node_modules/@types"],
+    "typeRoots": ["./packages/rntl/node_modules/@types", "./node_modules/@types"],
     "types": ["node", "react"]
   },
   "include": ["examples/**/*.test.tsx", "packages/framework/src/test-globals.d.ts"]

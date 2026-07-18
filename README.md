@@ -107,6 +107,13 @@ Supported synchronous surface:
 
 Async query APIs (`waitFor`, `findBy*`), `userEvent`, fake timers, Suspense guarantees, layout, and native-platform fidelity remain out of scope.
 
+### `@argus/rntl`
+
+The synchronous component-testing facade is maintained separately in `@argus/rntl` as a
+stopgap. Test code continues to import its public surface from `'argus'`; the bundler maps that
+specifier to the dedicated package. When upstream RNTL v14 on `test-renderer` becomes bundleable
+on the supported Hermes envelope, this package can be deprecated without expanding framework core.
+
 ---
 
 ## Architecture in one screen
@@ -149,6 +156,7 @@ The important design decision: **Hermes cannot ask the host for modules at runti
 |---|---|---|
 | `@argus/core` | Pure domain types, ports, result protocol parser | No adapter/runtime imports |
 | `@argus/framework` | Runs inside Hermes: globals, runner, matchers, result emission | Protect the result channel |
+| `@argus/rntl` | Synchronous component-testing facade exposed through the `argus` alias | Maintained separately as a replaceable stopgap |
 | `@argus/esbuild` | Bundles polyfills + framework + tests into one IIFE | Owns syntax lowering and virtual entry |
 | `@argus/hermes` | Spawns the standalone Hermes VM on a temp file | Never use stdin; stdin triggers Hermes REPL mode |
 | `@argus/sourcemap` | Remaps Hermes bundle stack frames to original source files | Must be total: never throw during reporting |

@@ -6,6 +6,7 @@ import { EsbuildBundler } from '../index.js';
 const HERE = fileURLToPath(new URL('../', import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..', '..');
 const FRAMEWORK_PATH = resolve(REPO_ROOT, 'packages', 'framework', 'src', 'index');
+const COMPONENT_PATH = resolve(REPO_ROOT, 'packages', 'rntl', 'src', 'index');
 const POLYFILL_PATH = resolve(REPO_ROOT, 'packages', 'framework', 'src', 'polyfill');
 const FIXTURE_PATH = resolve(
   REPO_ROOT,
@@ -24,6 +25,7 @@ describe('EsbuildBundler react-native alias', () => {
     const bundle = await bundler.bundle({
       testPaths: [FIXTURE_PATH],
       frameworkPath: FRAMEWORK_PATH,
+      componentPath: COMPONENT_PATH,
       polyfillPaths: [POLYFILL_PATH],
       engineTarget: ['es2020'],
     });

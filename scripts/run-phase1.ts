@@ -49,6 +49,7 @@ async function main(): Promise<void> {
       .bundle({
         polyfillPaths: [join(REPO, 'packages/framework/src/polyfill')],
         frameworkPath: join(REPO, 'packages/framework/src/index'),
+        componentPath: join(REPO, 'packages/rntl/src/index'),
         testPaths,
         engineTarget: DEFAULT_ENGINE_TARGET,
       })

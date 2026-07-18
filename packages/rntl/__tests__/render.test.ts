@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '../../src/component/render.js';
+import { render, screen } from '../src/render.js';
 
 function textContent(): string {
   const host = screen.root.children[0];

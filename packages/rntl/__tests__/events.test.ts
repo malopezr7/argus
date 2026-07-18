@@ -1,8 +1,8 @@
 import React from 'react';
 import { describe, expect, it } from 'vitest';
-import { fireEvent } from '../../src/component/events.js';
-import { screen } from '../../src/component/queries.js';
-import { render } from '../../src/component/render.js';
+import { fireEvent } from '../src/events.js';
+import { screen } from '../src/queries.js';
+import { render } from '../src/render.js';
 
 describe('component events', () => {
   it('finds an ancestor press handler and flushes state synchronously', () => {

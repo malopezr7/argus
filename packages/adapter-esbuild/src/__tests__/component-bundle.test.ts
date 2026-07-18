@@ -6,6 +6,7 @@ import { EsbuildBundler } from '../index.js';
 const HERE = fileURLToPath(new URL('../', import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..', '..');
 const FRAMEWORK_PATH = resolve(REPO_ROOT, 'packages', 'framework', 'src', 'index');
+const COMPONENT_PATH = resolve(REPO_ROOT, 'packages', 'rntl', 'src', 'index');
 const POLYFILL_PATH = resolve(REPO_ROOT, 'packages', 'framework', 'src', 'polyfill');
 const FIXTURES = resolve(REPO_ROOT, 'packages', 'adapter-esbuild', 'src', '__tests__', 'fixtures');
 
@@ -13,6 +14,7 @@ function bundleFixture(name: string) {
   return new EsbuildBundler().bundle({
     testPaths: [resolve(FIXTURES, name)],
     frameworkPath: FRAMEWORK_PATH,
+    componentPath: COMPONENT_PATH,
     polyfillPaths: [POLYFILL_PATH],
     engineTarget: ['es2020'],
   });
@@ -22,6 +24,7 @@ function bundleAliasFixture() {
   return new EsbuildBundler().bundle({
     testPaths: [resolve(FIXTURES, 'argus-alias-fixture.ts')],
     frameworkPath: resolve(FIXTURES, 'framework', 'index'),
+    componentPath: COMPONENT_PATH,
     polyfillPaths: [],
     engineTarget: ['es2020'],
   });

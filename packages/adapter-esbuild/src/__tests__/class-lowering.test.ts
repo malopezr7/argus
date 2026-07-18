@@ -7,6 +7,7 @@ import { EsbuildBundler } from '../index.js';
 const HERE = fileURLToPath(new URL('../', import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..', '..');
 const FRAMEWORK_PATH = resolve(REPO_ROOT, 'packages', 'framework', 'src', 'index');
+const COMPONENT_PATH = resolve(REPO_ROOT, 'packages', 'rntl', 'src', 'index');
 const POLYFILL_PATH = resolve(REPO_ROOT, 'packages', 'framework', 'src', 'polyfill');
 const FIXTURE_PATH = resolve(
   REPO_ROOT,
@@ -29,6 +30,7 @@ async function bundleFixture(name: string) {
       resolve(REPO_ROOT, 'packages', 'adapter-esbuild', 'src', '__tests__', 'fixtures', name),
     ],
     frameworkPath: FRAMEWORK_PATH,
+    componentPath: COMPONENT_PATH,
     polyfillPaths: [POLYFILL_PATH],
     engineTarget: ['es2020'],
   });
@@ -44,6 +46,7 @@ describe('Hermes dependency class lowering', () => {
     const bundle = await new EsbuildBundler().bundle({
       testPaths: [FIXTURE_PATH],
       frameworkPath: FRAMEWORK_PATH,
+      componentPath: COMPONENT_PATH,
       polyfillPaths: [POLYFILL_PATH],
       engineTarget: ['es2020'],
     });

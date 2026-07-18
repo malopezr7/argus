@@ -51,7 +51,7 @@ async function main(): Promise<void> {
   }
 
   // 2. Resolve framework / polyfill source paths (keyed off import.meta.url)
-  const { frameworkPath, polyfillPaths } = resolveFrameworkPaths();
+  const { componentPath, frameworkPath, polyfillPaths } = resolveFrameworkPaths();
 
   // 3. Resolve Hermes binary: --hermes flag → ARGUS_HERMES env → .hermes/hermes
   const cwd = process.cwd();
@@ -90,6 +90,7 @@ async function main(): Promise<void> {
         .bundle({
           testPaths: [file],
           frameworkPath,
+          componentPath,
           polyfillPaths,
           engineTarget: DEFAULT_ENGINE_TARGET,
         })
