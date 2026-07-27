@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { HermesRef, PinnedRefs } from '../domain/hermes-version.js';
 import {
   parseHermesTag,
+  parseHermesVersionOutput,
   parseVersionProperties,
+  releaseVersionForRef,
   selectHermesEngine,
 } from '../domain/hermes-version.js';
 
@@ -278,5 +280,122 @@ describe('selectHermesEngine', () => {
         available: [],
       });
     });
+  });
+});
+
+/**
+ * Captured verbatim from a real Hermes V1 binary. The LLVM preamble matters:
+ * its `LLVH version 8.0.0svn` line is the trap a naive `/version (\S+)/` walks
+ * into, so it must stay in the fixture.
+ */
+const V1_VERSION_OUTPUT = `LLVM (http://llvm.org/):
+  LLVH version 8.0.0svn
+  Optimized build
+
+Hermes JavaScript compiler and Virtual Machine.
+  Hermes release version: 1.0.0
+  HBC bytecode version: 98
+
+  Features:
+    Debugger
+    Unicode RegExp Property Escapes
+    Zip file input
+`;
+
+/** Same shape from the legacy engine — note bytecode 96 rather than 98. */
+const LEGACY_VERSION_OUTPUT = V1_VERSION_OUTPUT.replace(
+  'Hermes release version: 1.0.0\n  HBC bytecode version: 98',
+  'Hermes release version: 0.12.0\n  HBC bytecode version: 96',
+);
+
+describe('parseHermesVersionOutput', () => {
+  it('reads both fields from real Hermes V1 output', () => {
+    expect(parseHermesVersionOutput(V1_VERSION_OUTPUT)).toEqual({
+      releaseVersion: '1.0.0',
+      bytecodeVersion: 98,
+    });
+  });
+
+  it('reads bytecode 96 from real legacy output', () => {
+    expect(parseHermesVersionOutput(LEGACY_VERSION_OUTPUT)).toEqual({
+      releaseVersion: '0.12.0',
+      bytecodeVersion: 96,
+    });
+  });
+
+  it('does not mistake the LLVM preamble for the release version', () => {
+    const info = parseHermesVersionOutput(V1_VERSION_OUTPUT);
+    expect(info.releaseVersion).not.toBe('8.0.0svn');
+  });
+
+  it('returns a partial result when the bytecode line is absent', () => {
+    const output = V1_VERSION_OUTPUT.replace('  HBC bytecode version: 98\n', '');
+    expect(parseHermesVersionOutput(output)).toEqual({ releaseVersion: '1.0.0' });
+  });
+
+  it('returns a partial result when the release line is absent', () => {
+    const output = V1_VERSION_OUTPUT.replace('  Hermes release version: 1.0.0\n', '');
+    expect(parseHermesVersionOutput(output)).toEqual({ bytecodeVersion: 98 });
+  });
+
+  it('tolerates CRLF line endings', () => {
+    expect(parseHermesVersionOutput(V1_VERSION_OUTPUT.replace(/\n/g, '\r\n'))).toEqual({
+      releaseVersion: '1.0.0',
+      bytecodeVersion: 98,
+    });
+  });
+
+  it('returns an empty result for an empty string', () => {
+    expect(parseHermesVersionOutput('')).toEqual({});
+  });
+
+  it('returns an empty result for garbage', () => {
+    expect(parseHermesVersionOutput('dyld: symbol not found\nzsh: killed\n')).toEqual({});
+  });
+
+  it('ignores a non-numeric bytecode value rather than reporting NaN', () => {
+    const output = V1_VERSION_OUTPUT.replace('HBC bytecode version: 98', 'HBC bytecode version: ?');
+    expect(parseHermesVersionOutput(output)).toEqual({ releaseVersion: '1.0.0' });
+  });
+
+  it('ignores an empty release value', () => {
+    const output = V1_VERSION_OUTPUT.replace(
+      'Hermes release version: 1.0.0',
+      'Hermes release version:',
+    );
+    expect(parseHermesVersionOutput(output)).toEqual({ bytecodeVersion: 98 });
+  });
+
+  it('keeps the first occurrence when a field is repeated', () => {
+    const output = `${V1_VERSION_OUTPUT}  Hermes release version: 9.9.9\n`;
+    expect(parseHermesVersionOutput(output).releaseVersion).toBe('1.0.0');
+  });
+});
+
+describe('releaseVersionForRef', () => {
+  it.each([
+    ['hermes-v0.17.0', '0.17.0'],
+    ['hermes-v250829098.0.16', '250829098.0.16'],
+    ['v0.17.0', '0.17.0'],
+    ['0.17.0', '0.17.0'],
+    ['hermes-2025-07-24-RNv0.80.2-abcdef', '2025-07-24-RNv0.80.2-abcdef'],
+  ])('derives the bare version from %s', (raw, expected) => {
+    expect(releaseVersionForRef(raw)).toBe(expected);
+  });
+
+  it.each([
+    ['b2f9f5a1c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8'],
+    ['abc1234'],
+    ['hermes-abc1234'],
+  ])('returns undefined for the commit SHA %s', (raw) => {
+    expect(releaseVersionForRef(raw)).toBeUndefined();
+  });
+
+  it('returns undefined for a ref that parses as nothing', () => {
+    expect(releaseVersionForRef('not a ref')).toBeUndefined();
+  });
+
+  it('returns undefined for an empty ref', () => {
+    expect(releaseVersionForRef('')).toBeUndefined();
   });
 });

@@ -1,15 +1,23 @@
 import { execFileSync } from 'node:child_process';
 import { accessSync, constants, existsSync, mkdirSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { availableParallelism, homedir } from 'node:os';
 import { join } from 'node:path';
-import type { EngineTarget, HermesBinary, HermesProvisioner } from '@argus/core';
+import {
+  buildCmakeBuildArgs,
+  buildCmakeConfigureArgs,
+  type EngineTarget,
+  type HermesBinary,
+  type HermesProvisioner,
+  releaseVersionForRef,
+} from '@argus/core';
 import { resolveHermesEngine } from './engine-resolver.js';
-import { detectArch } from './utils.js';
+import { detectArch, readHermesVersionInfo } from './utils.js';
 
 /**
- * SourceBuildAdapter (fallback) — builds the Hermes VM from facebook/hermes
- * source, pinned to the tag/commit the target React Native install declares
- * (see `engine-resolver.ts` for the source precedence). The result is cached at
+ * SourceBuildAdapter (fallback) — builds the Hermes VM (plus `hermesc` and
+ * `hvm`) from facebook/hermes source, pinned to the tag/commit the target React
+ * Native install declares (see `engine-resolver.ts` for the source precedence),
+ * using RN's own build configuration. The result is cached at
  * `~/.argus/cache/hermes-<ref>/build/bin/hermes`, so the (slow) build runs once.
  * Used by CI and by users on a (RN × OS × arch) combo without a published prebuilt.
  *
@@ -28,7 +36,14 @@ export class SourceBuildAdapter implements HermesProvisioner {
       buildHermesFromSource(ref, root);
     }
     accessSync(binary, constants.X_OK);
-    return { path: binary, version: ref, arch: detectArch(binary) };
+    return {
+      path: binary,
+      version: ref,
+      arch: detectArch(binary),
+      // Read back what we just built rather than assuming the flags took: this
+      // is what proves the binary is the engine the project pinned.
+      ...readHermesVersionInfo(binary),
+    };
   }
 }
 
@@ -75,21 +90,37 @@ function checkPrerequisites(): void {
   throw new Error(lines.join('\n'));
 }
 
-/** Clone facebook/hermes at `ref` and build the `hermes` VM target (Release). */
+const HERMES_REPO_URL = 'https://github.com/facebook/hermes.git';
+
+/**
+ * Clone facebook/hermes at `ref` and build the VM, the compiler, and the
+ * bytecode runner with the configuration React Native itself uses.
+ *
+ * The argument vectors are built by pure helpers in `@argus/core` so the flag
+ * set is asserted by unit tests instead of only by a 95-second build.
+ */
 function buildHermesFromSource(ref: string, root: string): void {
   checkPrerequisites();
   mkdirSync(root, { recursive: true });
   const src = join(root, 'hermes-src');
   const build = join(root, 'build');
   if (!existsSync(src)) {
-    execFileSync(
-      'git',
-      ['clone', '--depth', '1', '--branch', ref, 'https://github.com/facebook/hermes.git', src],
-      { stdio: 'inherit' },
-    );
+    execFileSync('git', ['clone', '--depth', '1', '--branch', ref, HERMES_REPO_URL, src], {
+      stdio: 'inherit',
+    });
   }
-  execFileSync('cmake', ['-S', src, '-B', build, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release'], {
-    stdio: 'inherit',
+
+  const configureArgs = buildCmakeConfigureArgs({
+    sourceDir: src,
+    buildDir: build,
+    platform: process.platform,
+    releaseVersion: releaseVersionForRef(ref),
   });
-  execFileSync('cmake', ['--build', build, '--target', 'hermes'], { stdio: 'inherit' });
+  execFileSync('cmake', configureArgs, { stdio: 'inherit' });
+
+  const buildArgs = buildCmakeBuildArgs({
+    buildDir: build,
+    parallelism: availableParallelism(),
+  });
+  execFileSync('cmake', buildArgs, { stdio: 'inherit' });
 }

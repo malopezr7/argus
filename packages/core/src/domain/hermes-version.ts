@@ -120,6 +120,87 @@ export function parseHermesTag(raw: string, engineHint?: HermesEngine): HermesRe
   return undefined;
 }
 
+/**
+ * Derive the release version to bake into a source build of `raw`.
+ *
+ * facebook/hermes `CMakeLists.txt` declares `project(Hermes VERSION 1.0.0)` and
+ * defaults `HERMES_RELEASE_VERSION` to it, so a plain clone of ANY tag reports
+ * `1.0.0` unless the real version is injected at configure time. That default is
+ * why the legacy binary vendored in this repo reports `0.12.0` for what is
+ * actually `hermes-v0.17.0`. The publish pipeline injects the version; a source
+ * build has to do the same or its `--version` output is fiction.
+ *
+ * Returns `undefined` when the ref carries no release version: a bare commit SHA
+ * (how RN 0.82 pins its V1 engine) is a git ref, not a version, and baking one
+ * in would make the binary misreport itself.
+ */
+export function releaseVersionForRef(raw: string): string | undefined {
+  const ref = parseHermesTag(raw);
+  if (ref === undefined) return undefined;
+
+  const trimmed = raw.trim();
+  const body = trimmed.startsWith(TAG_PREFIX) ? trimmed.slice(TAG_PREFIX.length) : trimmed;
+  if (SHA_RE.test(body)) return undefined;
+
+  return ref.version;
+}
+
+// ---------------------------------------------------------------------------
+// `hermes --version` output
+// ---------------------------------------------------------------------------
+
+/** What a Hermes binary reports about itself via `--version`. */
+export interface HermesVersionInfo {
+  /** `Hermes release version` value, e.g. '1.0.0'. Absent when not reported. */
+  releaseVersion?: string;
+  /**
+   * `HBC bytecode version` value: 96 for the legacy engine, 98 for Hermes V1.
+   * This is what distinguishes the two engines at runtime — a V1 VM refuses
+   * legacy bytecode outright ('Wrong bytecode version. Expected 98 but got 96'),
+   * so a mismatch always fails loudly rather than misbehaving silently.
+   */
+  bytecodeVersion?: number;
+}
+
+const RELEASE_VERSION_LABEL = 'Hermes release version:';
+const BYTECODE_VERSION_LABEL = 'HBC bytecode version:';
+
+/** Bytecode versions are plain integers; anything else is not one. */
+const DIGITS_RE = /^\d+$/;
+
+/**
+ * Parse the output of `hermes --version`.
+ *
+ * The output is more than a version string: it opens with an LLVM preamble whose
+ * own `LLVH version 8.0.0svn` line is NOT the Hermes version, and closes with a
+ * `Features:` block. Both fields are therefore matched on their exact labels,
+ * line by line, so the preamble cannot be mistaken for an answer.
+ *
+ * Missing or malformed fields are omitted rather than throwing — a binary that
+ * reports nothing recognisable is 'version unknown', not a crash.
+ */
+export function parseHermesVersionOutput(output: string): HermesVersionInfo {
+  const info: HermesVersionInfo = {};
+
+  // Splitting on '\n' and trimming each line makes CRLF input fall out for free.
+  for (const rawLine of output.split('\n')) {
+    const line = rawLine.trim();
+
+    if (info.releaseVersion === undefined && line.startsWith(RELEASE_VERSION_LABEL)) {
+      const value = line.slice(RELEASE_VERSION_LABEL.length).trim();
+      if (value.length > 0) info.releaseVersion = value;
+      continue;
+    }
+
+    if (info.bytecodeVersion === undefined && line.startsWith(BYTECODE_VERSION_LABEL)) {
+      const value = line.slice(BYTECODE_VERSION_LABEL.length).trim();
+      if (DIGITS_RE.test(value)) info.bytecodeVersion = Number.parseInt(value, 10);
+    }
+  }
+
+  return info;
+}
+
 const LEGACY_PROPERTY_KEY = 'HERMES_VERSION_NAME';
 const V1_PROPERTY_KEY = 'HERMES_V1_VERSION_NAME';
 

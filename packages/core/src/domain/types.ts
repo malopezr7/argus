@@ -134,6 +134,19 @@ export interface HermesBinary {
   version: string;
   /** Architecture this binary was compiled for. */
   arch: 'arm64' | 'x64';
+  /**
+   * Release version the binary reports via `--version`, e.g. '1.0.0'.
+   *
+   * Optional because it is only known once the binary has been executed, and a
+   * binary that cannot be run or does not report one is still usable.
+   */
+  releaseVersion?: string;
+  /**
+   * HBC bytecode version the binary reports: 96 for the legacy engine, 98 for
+   * Hermes V1. This is the field to assert engine fidelity against, since the
+   * release version alone cannot distinguish the two engines.
+   */
+  bytecodeVersion?: number;
 }
 
 /** Options controlling a single Hermes subprocess invocation. */

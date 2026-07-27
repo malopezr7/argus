@@ -1,6 +1,6 @@
 import { accessSync, constants, existsSync } from 'node:fs';
 import type { EngineTarget, HermesBinary, HermesProvisioner } from '@argus/core';
-import { detectArch, detectVersion } from './utils.js';
+import { detectArch, readHermesVersionInfo } from './utils.js';
 
 /**
  * LocalPathAdapter (BYO) — resolves a user-supplied `hermes` binary.
@@ -17,10 +17,15 @@ export class LocalPathAdapter implements HermesProvisioner {
       );
     }
     accessSync(this.binaryPath, constants.X_OK);
+    // A BYO binary is the one case where nothing pinned it, so its self-report
+    // is the only evidence of which engine the user actually handed us. One read
+    // serves both the legacy `version` field and the structured info.
+    const info = readHermesVersionInfo(this.binaryPath);
     return {
       path: this.binaryPath,
-      version: detectVersion(this.binaryPath),
+      version: info.releaseVersion ?? 'unknown',
       arch: detectArch(this.binaryPath),
+      ...info,
     };
   }
 }

@@ -1,3 +1,13 @@
+// Hermes source-build configuration (pure)
+export type {
+  CmakeBuildOptions,
+  CmakeConfigureOptions,
+} from './domain/hermes-build-config.js';
+export {
+  buildCmakeBuildArgs,
+  buildCmakeConfigureArgs,
+  HERMES_BUILD_TARGETS,
+} from './domain/hermes-build-config.js';
 // Hermes engine/version domain (pure)
 export { HERMES_PINS_BY_RN_MINOR, lookupPinnedRefs, rnMinor } from './domain/hermes-pins.js';
 export type {
@@ -6,11 +16,14 @@ export type {
   HermesEngine,
   HermesPinSource,
   HermesRef,
+  HermesVersionInfo,
   PinnedRefs,
 } from './domain/hermes-version.js';
 export {
   parseHermesTag,
+  parseHermesVersionOutput,
   parseVersionProperties,
+  releaseVersionForRef,
   selectHermesEngine,
 } from './domain/hermes-version.js';
 // Domain types
