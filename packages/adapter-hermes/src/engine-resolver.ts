@@ -59,7 +59,17 @@ export interface ResolveEngineOptions {
  * `unavailable` are values. Genuine I/O errors (permissions, etc.) still throw.
  */
 export type EngineResolutionOutcome =
-  | { kind: 'resolved'; resolution: EngineResolution }
+  | {
+      kind: 'resolved';
+      resolution: EngineResolution;
+      /**
+       * The install the pin was read from, when one was found. Callers need it
+       * to locate files that ship INSIDE the tarball (the vendored legacy VM)
+       * without repeating the upward walk. Absent when the offline table
+       * answered without an install on disk.
+       */
+      reactNativeDir?: string;
+    }
   | {
       kind: 'unavailable';
       requested: HermesEngine;
@@ -109,6 +119,7 @@ export function resolveHermesEngine(options: ResolveEngineOptions = {}): EngineR
       return {
         kind: 'resolved',
         resolution: { ref: chosen.ref, source: chosen.source, rnVersion },
+        reactNativeDir,
       };
     }
   }
@@ -146,6 +157,7 @@ function fromFallbackTable(
     return {
       kind: 'resolved',
       resolution: { ref: selection.ref, source: 'fallback-table', rnVersion },
+      ...(reactNativeDir === undefined ? {} : { reactNativeDir }),
     };
   }
   if (selection.kind === 'unavailable') {

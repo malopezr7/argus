@@ -2,32 +2,27 @@
 /**
  * @argus/cli — composition root.
  *
- * Wiring: args → resolveFrameworkPaths → provision(LocalPath) → discover(globs)
+ * Wiring: args → resolveFrameworkPaths → provisionHermes → discover(globs)
  *         → mapPool(files, concurrency, runFile) → ordered render → aggregate → exit code.
  *
  * Runs via tsx (no build step). Add to root package.json:
  *   "argus": "tsx packages/cli/src/cli.ts"
  */
 
-import { accessSync, constants } from 'node:fs';
-import { resolve } from 'node:path';
+import { homedir } from 'node:os';
 import type { FileResult, RunOutcome } from '@argus/core';
 import { parseHermesOutput } from '@argus/core';
 import { DEFAULT_ENGINE_TARGET, EsbuildBundler } from '@argus/esbuild';
 import { HermesSpawnEngine } from '@argus/hermes/hermes-spawn-engine.js';
-import { LocalPathAdapter } from '@argus/hermes/local-path-adapter.js';
 import { exitCodeForSession, renderFileOutcome, renderSessionSummary } from '@argus/reporter-cli';
 import { remapStacks } from '@argus/sourcemap';
 import { foldOutcomes } from './aggregate.js';
 import { parseCliArgs, USAGE, UsageError } from './args.js';
 import { resolveFiles } from './discover.js';
+import { errMsg } from './errors.js';
 import { resolveFrameworkPaths } from './paths.js';
 import { mapPool } from './pool.js';
-
-const errMsg = (e: unknown): string =>
-  e && typeof e === 'object' && 'message' in e
-    ? String((e as { message: unknown }).message)
-    : String(e);
+import { provisionHermes } from './provision/provision.js';
 
 async function main(): Promise<void> {
   // 1. Parse CLI arguments
@@ -43,7 +38,15 @@ async function main(): Promise<void> {
     throw e;
   }
 
-  const { patterns, timeoutMs, hermes: hermesFlagPath, help, concurrency } = parsed;
+  const {
+    patterns,
+    timeoutMs,
+    hermes: hermesFlagPath,
+    engine,
+    provision,
+    help,
+    concurrency,
+  } = parsed;
 
   if (help) {
     process.stdout.write(USAGE);
@@ -53,20 +56,38 @@ async function main(): Promise<void> {
   // 2. Resolve framework / polyfill source paths (keyed off import.meta.url)
   const { componentPath, frameworkPath, polyfillPaths } = resolveFrameworkPaths();
 
-  // 3. Resolve Hermes binary: --hermes flag → ARGUS_HERMES env → .hermes/hermes
+  // 3. Provision Hermes: resolve the engine this project targets, then walk the
+  //    source chain (explicit → cache → bundled → prebuilt → source build).
   const cwd = process.cwd();
-  const hermesBin = resolveHermesBinary(hermesFlagPath, frameworkPath);
+  const provisioned = await provisionHermes({
+    ...(hermesFlagPath === undefined ? {} : { hermesFlagPath }),
+    ...(process.env.ARGUS_HERMES === undefined ? {} : { hermesEnvPath: process.env.ARGUS_HERMES }),
+    ...(engine === undefined ? {} : { engine }),
+    allowSourceBuild: provision,
+    startDir: cwd,
+    homeDir: homedir(),
+    platform: process.platform,
+    arch: process.arch,
+  });
 
-  // 4. Provision the binary
-  const provisioner = new LocalPathAdapter(hermesBin);
-  const bin = await provisioner
-    .resolve({ rnVersion: '0.86.0', os: 'darwin', arch: 'arm64' })
-    .catch((e) => {
-      process.stderr.write(`✗ INFRASTRUCTURE FAILURE [provision] ${errMsg(e)}\n`);
-      process.exit(2);
-    });
+  if (provisioned.kind === 'usage-error') {
+    process.stderr.write(`✗ Usage error: ${provisioned.message}\n`);
+    process.exitCode = 2;
+    return;
+  }
+  if (provisioned.kind === 'failed') {
+    process.stderr.write(provisioned.message);
+    process.exitCode = 2;
+    return;
+  }
 
-  // 5. Discover test files
+  // The engine identity is written before any test output so a CI log records
+  // which engine the results below actually came from.
+  process.stdout.write(provisioned.summary);
+  if (provisioned.warning !== undefined) process.stderr.write(provisioned.warning);
+  const bin = provisioned.binary;
+
+  // 4. Discover test files
   const files = await resolveFiles(patterns, cwd);
   if (files.length === 0) {
     process.stderr.write(
@@ -75,9 +96,9 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
-  // 6. Per-file concurrent run via bounded pool
+  // 5. Per-file concurrent run via bounded pool
   const bundler = new EsbuildBundler();
-  const engine = new HermesSpawnEngine();
+  const spawnEngine = new HermesSpawnEngine();
 
   /**
    * runFile is TOTAL — every throw/timeout resolves to a RunOutcome.
@@ -98,7 +119,7 @@ async function main(): Promise<void> {
           throw Object.assign(new Error(errMsg(e)), { stage: 'bundle' });
         });
 
-      const output = await engine.run(bundle, bin, { timeoutMs });
+      const output = await spawnEngine.run(bundle, bin, { timeoutMs });
 
       if (output.timedOut) return { kind: 'timeout', timeoutMs, output };
 
@@ -124,51 +145,10 @@ async function main(): Promise<void> {
   const fileResults: FileResult[] = files.map((file, i) => ({ file, outcome: outcomes[i] }));
   for (const { outcome } of fileResults) renderFileOutcome(outcome);
 
-  // 7. Aggregate + session summary + exit code
+  // 6. Aggregate + session summary + exit code
   const session = foldOutcomes(fileResults);
   renderSessionSummary(session);
   process.exitCode = exitCodeForSession(session);
-}
-
-/**
- * Resolves the Hermes binary path using the precedence order:
- *   --hermes flag → ARGUS_HERMES env var → {repoRoot}/.hermes/hermes
- *
- * Exits with code 2 if no readable binary is found.
- *
- * @param hermesFlagPath  Value of the --hermes CLI flag (undefined if not passed)
- * @param frameworkPath   Used to derive the repo root for the fallback path
- */
-function resolveHermesBinary(hermesFlagPath: string | undefined, frameworkPath: string): string {
-  // Derive repo root from frameworkPath:
-  //   frameworkPath = {repoRoot}/packages/framework/src/index
-  //   → join(frameworkPath, '../../../../..') would overshoot — use resolve approach
-  //   frameworkPath has no extension; dirname gives packages/framework/src
-  //   then ../../.. = repo root
-  const frameworkDir = frameworkPath.replace(/[/\\][^/\\]+$/, ''); // dirname without path module
-  const repoRoot = resolve(frameworkDir, '..', '..', '..');
-
-  const candidates: string[] = [];
-  if (hermesFlagPath) candidates.push(hermesFlagPath);
-  if (process.env.ARGUS_HERMES) candidates.push(process.env.ARGUS_HERMES);
-  candidates.push(resolve(repoRoot, '.hermes', 'hermes'));
-
-  for (const candidate of candidates) {
-    try {
-      accessSync(candidate, constants.R_OK);
-      return candidate;
-    } catch {
-      // not readable — try next
-    }
-  }
-
-  const tried = candidates.join(', ');
-  process.stderr.write(
-    `✗ INFRASTRUCTURE FAILURE [provision] No readable Hermes binary found.\n` +
-      `  Tried: ${tried}\n` +
-      `  Set ARGUS_HERMES or pass --hermes <path>.\n`,
-  );
-  process.exit(2);
 }
 
 main().catch((e) => {

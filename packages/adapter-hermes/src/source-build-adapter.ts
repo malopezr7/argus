@@ -8,6 +8,8 @@ import {
   type EngineTarget,
   type HermesBinary,
   type HermesProvisioner,
+  hermesCacheBinarySegments,
+  hermesCacheRootSegments,
   releaseVersionForRef,
 } from '@argus/core';
 import { resolveHermesEngine } from './engine-resolver.js';
@@ -30,8 +32,11 @@ export class SourceBuildAdapter implements HermesProvisioner {
 
   async resolve(target: EngineTarget): Promise<HermesBinary> {
     const ref = this.hermesRef ?? resolveHermesRef(target.rnVersion);
-    const root = join(homedir(), '.argus', 'cache', `hermes-${ref}`);
-    const binary = join(root, 'build', 'bin', 'hermes');
+    // Layout comes from @argus/core so the CLI's cache lookup and this writer
+    // can never disagree about where a built binary lives.
+    const home = homedir();
+    const root = join(home, ...hermesCacheRootSegments(ref));
+    const binary = join(home, ...hermesCacheBinarySegments(ref));
     if (!existsSync(binary)) {
       buildHermesFromSource(ref, root);
     }

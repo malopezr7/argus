@@ -87,7 +87,22 @@ describe('resolveHermesEngine', () => {
           source: 'version.properties',
           rnVersion: '0.86.2',
         },
+        reactNativeDir: join(startDir, 'node_modules', 'react-native'),
       });
+    });
+
+    it('reports the install directory so callers can reach files inside it', () => {
+      const startDir = createProject({
+        versionProperties: RN_086_PROPERTIES,
+        packageJson: { version: '0.86.2' },
+      });
+
+      const outcome = resolveHermesEngine({ startDir });
+
+      expect(outcome.kind).toBe('resolved');
+      expect(outcome.kind === 'resolved' && outcome.reactNativeDir).toBe(
+        join(startDir, 'node_modules', 'react-native'),
+      );
     });
 
     it('serves the legacy engine from the same file on request', () => {
@@ -121,7 +136,7 @@ describe('resolveHermesEngine', () => {
     it('resolves v1 from the file alone', () => {
       const startDir = createProject({ hermesV1Version: 'hermes-v250829098.0.16\n' });
 
-      expect(resolveHermesEngine({ startDir })).toEqual({
+      expect(resolveHermesEngine({ startDir })).toMatchObject({
         kind: 'resolved',
         resolution: {
           ref: { engine: 'v1', tag: 'hermes-v250829098.0.16', version: '250829098.0.16' },

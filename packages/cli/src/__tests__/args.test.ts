@@ -1,6 +1,12 @@
 import { availableParallelism } from 'node:os';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_MAX_CONCURRENCY, parseCliArgs, USAGE, UsageError } from '../args.js';
+import {
+  DEFAULT_MAX_CONCURRENCY,
+  ENGINE_VALUES,
+  parseCliArgs,
+  USAGE,
+  UsageError,
+} from '../args.js';
 
 describe('usage', () => {
   it('documents both default test extensions', () => {
@@ -77,5 +83,75 @@ describe('parseCliArgs — other options unaffected', () => {
 
   it('--help sets help flag', () => {
     expect(parseCliArgs(['--help']).help).toBe(true);
+  });
+});
+
+describe('parseCliArgs — --engine', () => {
+  it('--engine legacy is accepted', () => {
+    expect(parseCliArgs(['--engine', 'legacy']).engine).toBe('legacy');
+  });
+
+  it('--engine v1 is accepted', () => {
+    expect(parseCliArgs(['--engine', 'v1']).engine).toBe('v1');
+  });
+
+  it('is absent by default, leaving the project to decide', () => {
+    expect(parseCliArgs([]).engine).toBeUndefined();
+  });
+
+  it('rejects an unknown engine rather than silently ignoring it', () => {
+    expect(() => parseCliArgs(['--engine', 'hermes'])).toThrow(UsageError);
+    expect(() => parseCliArgs(['--engine', ''])).toThrow(UsageError);
+  });
+
+  it('rejects a near-miss spelling', () => {
+    expect(() => parseCliArgs(['--engine', 'V1'])).toThrow(UsageError);
+    expect(() => parseCliArgs(['--engine', 'static-hermes'])).toThrow(UsageError);
+  });
+
+  it('names the accepted values in the error', () => {
+    try {
+      parseCliArgs(['--engine', 'nope']);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(UsageError);
+      expect((e as UsageError).message).toContain('legacy');
+      expect((e as UsageError).message).toContain('v1');
+    }
+  });
+
+  it('lists exactly the two engines it accepts', () => {
+    expect(ENGINE_VALUES).toEqual(['legacy', 'v1']);
+  });
+});
+
+describe('parseCliArgs — --provision', () => {
+  it('defaults to false so a source build is never silent', () => {
+    expect(parseCliArgs([]).provision).toBe(false);
+  });
+
+  it('--provision sets the flag', () => {
+    expect(parseCliArgs(['--provision']).provision).toBe(true);
+  });
+
+  it('combines with globs and other options', () => {
+    const args = parseCliArgs(['--provision', '--engine', 'v1', '-c', '2', 'a.test.ts']);
+
+    expect(args.provision).toBe(true);
+    expect(args.engine).toBe('v1');
+    expect(args.concurrency).toBe(2);
+    expect(args.patterns).toEqual(['a.test.ts']);
+  });
+});
+
+describe('usage documents the provisioning surface', () => {
+  it('mentions --engine and --provision', () => {
+    expect(USAGE).toContain('--engine');
+    expect(USAGE).toContain('--provision');
+  });
+
+  it('describes the chain order', () => {
+    expect(USAGE).toContain('ARGUS_HERMES');
+    expect(USAGE).toContain('~/.argus/cache');
   });
 });
