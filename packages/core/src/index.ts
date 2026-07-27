@@ -1,3 +1,18 @@
+// Hermes engine/version domain (pure)
+export { HERMES_PINS_BY_RN_MINOR, lookupPinnedRefs, rnMinor } from './domain/hermes-pins.js';
+export type {
+  EngineResolution,
+  EngineSelection,
+  HermesEngine,
+  HermesPinSource,
+  HermesRef,
+  PinnedRefs,
+} from './domain/hermes-version.js';
+export {
+  parseHermesTag,
+  parseVersionProperties,
+  selectHermesEngine,
+} from './domain/hermes-version.js';
 // Domain types
 export type {
   BundleInput,

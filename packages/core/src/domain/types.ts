@@ -122,7 +122,7 @@ export interface EngineTarget {
   os: 'darwin' | 'linux' | 'win32';
   /** CPU architecture. */
   arch: 'arm64' | 'x64';
-  /** Exact Hermes version/tag this RN pins (from .hermesV1version). */
+  /** Exact Hermes version/tag this RN pins (from .hermesv1version). */
   hermesVersion?: string;
 }
 

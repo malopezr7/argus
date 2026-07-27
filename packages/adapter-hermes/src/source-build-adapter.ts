@@ -1,14 +1,15 @@
 import { execFileSync } from 'node:child_process';
-import { accessSync, constants, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import type { EngineTarget, HermesBinary, HermesProvisioner } from '@argus/core';
+import { resolveHermesEngine } from './engine-resolver.js';
 import { detectArch } from './utils.js';
 
 /**
  * SourceBuildAdapter (fallback) — builds the Hermes VM from facebook/hermes
- * source, pinned to the tag/commit in the target React Native install's
- * `.hermesversion` (or `.hermesV1version`). The result is cached at
+ * source, pinned to the tag/commit the target React Native install declares
+ * (see `engine-resolver.ts` for the source precedence). The result is cached at
  * `~/.argus/cache/hermes-<ref>/build/bin/hermes`, so the (slow) build runs once.
  * Used by CI and by users on a (RN × OS × arch) combo without a published prebuilt.
  *
@@ -19,8 +20,8 @@ export class SourceBuildAdapter implements HermesProvisioner {
   /** @param hermesRef explicit facebook/hermes ref; if omitted, read from the RN install. */
   constructor(private readonly hermesRef?: string) {}
 
-  async resolve(_target: EngineTarget): Promise<HermesBinary> {
-    const ref = this.hermesRef ?? resolveHermesRef();
+  async resolve(target: EngineTarget): Promise<HermesBinary> {
+    const ref = this.hermesRef ?? resolveHermesRef(target.rnVersion);
     const root = join(homedir(), '.argus', 'cache', `hermes-${ref}`);
     const binary = join(root, 'build', 'bin', 'hermes');
     if (!existsSync(binary)) {
@@ -31,21 +32,18 @@ export class SourceBuildAdapter implements HermesProvisioner {
   }
 }
 
-/** Read the Hermes ref pinned by the nearest React Native install. */
-function resolveHermesRef(): string {
-  let dir = process.cwd();
-  for (;;) {
-    for (const file of ['.hermesV1version', '.hermesversion']) {
-      const p = join(dir, 'node_modules', 'react-native', 'sdks', file);
-      if (existsSync(p)) return readFileSync(p, 'utf8').trim();
-    }
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
+/**
+ * Read the Hermes ref pinned by the nearest React Native install, falling back
+ * to the offline RN-to-Hermes table when the install cannot be read.
+ */
+function resolveHermesRef(rnVersion?: string): string {
+  const outcome = resolveHermesEngine({ rnVersion });
+  if (outcome.kind === 'resolved') return outcome.resolution.ref.tag;
+
   throw new Error(
     'SourceBuildAdapter: no React Native install found to read the pinned Hermes version ' +
-      '(node_modules/react-native/sdks/.hermesversion). Pass an explicit ref to SourceBuildAdapter.',
+      '(node_modules/react-native/sdks/hermes-engine/version.properties, .hermesv1version, ' +
+      'or .hermesversion). Pass an explicit ref to SourceBuildAdapter.',
   );
 }
 

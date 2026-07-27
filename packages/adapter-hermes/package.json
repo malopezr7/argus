@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "type": "module",
   "exports": {
+    "./engine-resolver.js": {
+      "types": "./src/engine-resolver.ts",
+      "import": "./src/engine-resolver.ts"
+    },
     "./hermes-spawn-engine.js": {
       "types": "./src/hermes-spawn-engine.ts",
       "import": "./src/hermes-spawn-engine.ts"
@@ -28,6 +32,7 @@
     "@argus/core": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^6.0.0"
+    "typescript": "^6.0.0",
+    "vitest": "^4.0.0"
   }
 }
