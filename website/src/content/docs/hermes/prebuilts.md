@@ -104,9 +104,15 @@ once that happens.
 Hermes is MIT licensed. These builds statically link `llvh`, a fork of LLVM vendored in the
 Hermes tree, covered by Apache-2.0 WITH LLVM-exception. Argus itself is MIT.
 
-:::caution[Not published yet]
-The build-and-publish pipeline exists and is wired end to end, but no `hermes-bin-v*`
-release has been cut yet. Until the first one lands, the prebuilt step reports a 404 and
-the chain falls through to the bundled VM or `--provision`. Tracked on the
-[roadmap](/reference/roadmap/).
-:::
+## What is published today
+
+One release so far:
+
+| Release | Engine | Covers | Platforms |
+|---|---|---|---|
+| [`hermes-bin-v250829098.0.16`](https://github.com/malopezr7/argus/releases/tag/hermes-bin-v250829098.0.16) | V1 | React Native 0.86 and 0.87 | all four |
+
+Every other pinned version is publishable but not yet cut. Until its release exists, the
+prebuilt step reports a 404 and the chain falls through to the bundled VM or
+`--provision` — see the [version table](/hermes/versions/) for which React Native releases
+that affects and the [roadmap](/reference/roadmap/) for the rest of the matrix.

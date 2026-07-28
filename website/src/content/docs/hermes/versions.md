@@ -12,13 +12,13 @@ Source of truth: [reactnative.dev/releases/branches](https://reactnative.dev/rel
 
 ## The table
 
-| React Native | Legacy pin | V1 pin | RN default engine | Prebuilt published |
+| React Native | Legacy pin | V1 pin | RN default engine | Prebuilt |
 |---|---|---|---|---|
-| **0.87** | *removed* | `hermes-v250829098.0.16` | V1 | V1 |
-| **0.86** | `hermes-v0.17.0` | `hermes-v250829098.0.16` | V1 | both |
-| **0.85** | `hermes-v0.16.0` | `hermes-v250829098.0.10` | V1 | both |
-| **0.84** | `hermes-v0.15.1` | `hermes-v250829098.0.9` | V1 | both |
-| **0.83** | `hermes-v0.14.1` | `hermes-v250829098.0.4` | legacy | both |
+| **0.87** | *removed* | `hermes-v250829098.0.16` | V1 | **V1 published** |
+| **0.86** | `hermes-v0.17.0` | `hermes-v250829098.0.16` | V1 | **V1 published**, legacy publishable |
+| **0.85** | `hermes-v0.16.0` | `hermes-v250829098.0.10` | V1 | both publishable |
+| **0.84** | `hermes-v0.15.1` | `hermes-v250829098.0.9` | V1 | both publishable |
+| **0.83** | `hermes-v0.14.1` | `hermes-v250829098.0.4` | legacy | both publishable |
 | **0.82** | `hermes-2025-09-01-RNv0.82.0` | `76dc3793` | legacy | neither |
 | **0.81** | `hermes-2025-07-07-RNv0.81.0` | — | legacy | no |
 | **0.80** | `hermes-2025-07-24-RNv0.80.2` | — | legacy | no |
@@ -27,6 +27,11 @@ Source of truth: [reactnative.dev/releases/branches](https://reactnative.dev/rel
 
 Only the `major.minor` part of your React Native version is used as the key: `0.86.2` and
 `0.86.0` resolve identically.
+
+**Published** means a release exists and Argus can download it right now. **Publishable**
+means the ref can name a release version, so the pipeline can cut one — it just has not
+been cut yet, and the chain falls through to the bundled VM or `--provision` in the
+meantime. See [Prebuilt binaries](/hermes/prebuilts/).
 
 ### Why some rows have no prebuilt
 

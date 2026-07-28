@@ -26,7 +26,9 @@ The runner works. What is missing is distribution.
 - Engine and version resolution from the project's own React Native install, with the
   offline [lookup table](/hermes/versions/) as fallback.
 - The Hermes build-and-publish pipeline, gated on bytecode parity with the official
-  `hermes-compiler`.
+  `hermes-compiler` — with the first release cut:
+  [`hermes-bin-v250829098.0.16`](https://github.com/malopezr7/argus/releases/tag/hermes-bin-v250829098.0.16),
+  V1, all four platforms, covering React Native 0.86 and 0.87.
 - 372 host-side unit tests, plus 15 Hermes fixtures — 6 passing, 2 intentionally failing,
   7 adversarial.
 
@@ -42,7 +44,8 @@ The only milestone that matters right now. No new test-authoring features ship b
 - A working `argus` bin entry.
 - Publish flow with complete package metadata: `license`, `repository`, `description`,
   `files`, `engines`, `publishConfig.access`.
-- Cut the first `hermes-bin-v*` releases so the prebuilt step stops reporting a 404.
+- Cut the remaining `hermes-bin-v*` releases so the prebuilt step stops reporting a 404 on
+  React Native 0.83 through 0.85 and on the legacy engine.
 
 ### Engine target
 
