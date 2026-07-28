@@ -5,7 +5,7 @@ import { defineConfig } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://argus.pages.dev',
+	site: 'https://argus-hermes.pages.dev',
 	integrations: [
 		starlight({
 			title: 'Argus',

@@ -1,6 +1,6 @@
 # Argus documentation site
 
-The docs at [argus.pages.dev](https://argus.pages.dev), built with
+The docs at [argus-hermes.pages.dev](https://argus-hermes.pages.dev), built with
 [Astro](https://astro.build) + [Starlight](https://starlight.astro.build).
 
 This directory is **outside** the pnpm workspace (`pnpm-workspace.yaml` only covers
@@ -41,5 +41,5 @@ Or from a local machine:
 ```bash
 cd website
 pnpm build
-pnpm dlx wrangler pages deploy dist --project-name argus
+wrangler pages deploy dist --project-name argus-hermes
 ```
