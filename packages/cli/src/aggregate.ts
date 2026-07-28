@@ -1,4 +1,4 @@
-import type { FileResult, SessionResult } from '@argus/core';
+import type { FileResult, SessionResult } from '@arguslab/core';
 
 /**
  * Folds an array of per-file results into a SessionResult.

@@ -1,5 +1,5 @@
 /**
- * @argus/framework — pure test-tree runner.
+ * @arguslab/framework — pure test-tree runner.
  *
  * Extracted from index.ts so the SAME runner is exercised by BOTH execution
  * paths instead of being re-implemented per path:

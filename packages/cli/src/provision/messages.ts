@@ -1,5 +1,5 @@
-import type { EngineFidelity, HermesBinary, HermesEngine, HermesPinSource } from '@argus/core';
-import { engineForBytecodeVersion } from '@argus/core';
+import type { EngineFidelity, HermesBinary, HermesEngine, HermesPinSource } from '@arguslab/core';
+import { engineForBytecodeVersion } from '@arguslab/core';
 import type { AttemptedSource, SelectedSource } from './chain.js';
 
 /**

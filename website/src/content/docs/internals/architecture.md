@@ -76,17 +76,17 @@ global `define`, which would expose it to user code and make the result frame fo
 
 ## Ports and adapters
 
-The domain in `@argus/core` is pure — no filesystem, no process, no adapter imports, not
+The domain in `@arguslab/core` is pure — no filesystem, no process, no adapter imports, not
 even `node:path`. On-disk layout is expressed as path *segments* that callers join.
 
 Four ports, four adapters:
 
 | Port | Adapter | Responsibility |
 |---|---|---|
-| `Bundler` | `@argus/esbuild` | Virtual entry → sealed IIFE, syntax lowering, source map |
-| `Engine` | `@argus/hermes` | Spawn `hermes` on a temp file, capture stdout |
-| `Transformer` | `@argus/esbuild` | Single-file transform, same syntax policy |
-| `Reporter` | `@argus/reporter-cli` | Terminal rendering, exit-code policy |
+| `Bundler` | `@arguslab/esbuild` | Virtual entry → sealed IIFE, syntax lowering, source map |
+| `Engine` | `@arguslab/hermes` | Spawn `hermes` on a temp file, capture stdout |
+| `Transformer` | `@arguslab/esbuild` | Single-file transform, same syntax policy |
+| `Reporter` | `@arguslab/reporter-cli` | Terminal rendering, exit-code policy |
 
 Plus `HermesProvisioner`, which turns a pin into a binary.
 

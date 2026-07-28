@@ -97,9 +97,9 @@ real fixture exercising it.
 These are load-bearing. A change that breaks one of them will be sent back even
 if it works.
 
-**`@argus/core` stays pure.** No `node:*` imports, no adapters, no I/O. It holds
+**`@arguslab/core` stays pure.** No `node:*` imports, no adapters, no I/O. It holds
 domain types, ports, and pure functions. Everything that touches the world is an
-adapter, and `@argus/cli` is the only composition root that wires them together.
+adapter, and `@arguslab/cli` is the only composition root that wires them together.
 If something in core needs the filesystem, the design is wrong, not core.
 
 **The result channel is a high-integrity boundary.** `packages/framework/src/index.ts`

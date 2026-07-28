@@ -89,11 +89,11 @@ so this needs no dependency and no bundler.
 
 Testing plain TypeScript should not require the component facade. The runtime already
 behaves correctly; what remains is packaging plus one genuine design fix — React is
-currently located relative to the `@argus/rntl` install directory, which makes it
+currently located relative to the `@arguslab/rntl` install directory, which makes it
 structurally mandatory for any JSX.
 
 - Optional `componentPath` in the bundler input and the CLI path resolver.
-- Resolve React from the user's project, independent of `@argus/rntl`.
+- Resolve React from the user's project, independent of `@arguslab/rntl`.
 - Conditional alias map, with a clear diagnostic when `argus` is imported without the
   package installed.
 - Regression test: bundle a pure-TypeScript suite with no React installed.

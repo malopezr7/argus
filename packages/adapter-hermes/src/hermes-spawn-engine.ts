@@ -8,7 +8,7 @@ import type {
   EngineRunOptions,
   HermesBinary,
   SealedBundle,
-} from '@argus/core';
+} from '@arguslab/core';
 
 /**
  * HermesSpawnEngine writes the sealed bundle to a temp FILE and spawns `hermes`

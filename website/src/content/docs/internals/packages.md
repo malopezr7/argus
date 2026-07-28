@@ -9,18 +9,18 @@ Argus is a pnpm workspace. Each package has one job and one rule.
 
 | Package | Role | Rule |
 |---|---|---|
-| `@argus/core` | Pure domain types, ports, result-protocol parser, Hermes version/pin/asset logic | No adapter or runtime imports — not even `node:path` |
-| `@argus/framework` | Runs **inside Hermes**: globals, runner, matchers, mocks, result emission | Protect the result channel |
-| `@argus/rntl` | Synchronous component-testing facade, exposed through the `argus` alias | A replaceable stopgap, maintained separately |
-| `@argus/esbuild` | Bundles polyfills + framework + tests into one IIFE | Owns syntax lowering and the virtual entry |
-| `@argus/hermes` | Spawns the standalone VM, resolves engines, downloads prebuilts, builds from source | Never use stdin — stdin puts Hermes in REPL mode |
-| `@argus/sourcemap` | Remaps Hermes stack frames back to original sources | Must be total: never throw during reporting |
-| `@argus/reporter-cli` | Terminal output and exit-code policy | Report test failures separately from infra failures |
-| `@argus/cli` | Composition root | Wires adapters; keeps the domain pure |
+| `@arguslab/core` | Pure domain types, ports, result-protocol parser, Hermes version/pin/asset logic | No adapter or runtime imports — not even `node:path` |
+| `@arguslab/framework` | Runs **inside Hermes**: globals, runner, matchers, mocks, result emission | Protect the result channel |
+| `@arguslab/rntl` | Synchronous component-testing facade, exposed through the `argus` alias | A replaceable stopgap, maintained separately |
+| `@arguslab/esbuild` | Bundles polyfills + framework + tests into one IIFE | Owns syntax lowering and the virtual entry |
+| `@arguslab/hermes` | Spawns the standalone VM, resolves engines, downloads prebuilts, builds from source | Never use stdin — stdin puts Hermes in REPL mode |
+| `@arguslab/sourcemap` | Remaps Hermes stack frames back to original sources | Must be total: never throw during reporting |
+| `@arguslab/reporter-cli` | Terminal output and exit-code policy | Report test failures separately from infra failures |
+| `@arguslab/cli` | Composition root | Wires adapters; keeps the domain pure |
 
 ## Why core is *this* pure
 
-`@argus/core` holds things two sides must agree on exactly:
+`@arguslab/core` holds things two sides must agree on exactly:
 
 - **Hermes tag parsing.** The provisioning chain and the release pipeline must derive the
   same identity from the same ref, or a release is published under one name and downloaded
@@ -37,7 +37,7 @@ Paths are expressed as **segments**, not joined strings, because core may not im
 
 ## The framework is a different world
 
-`@argus/framework` is the only package that runs inside Hermes. Everything about it follows
+`@arguslab/framework` is the only package that runs inside Hermes. Everything about it follows
 from that:
 
 - Bundled, never resolved at run time.
@@ -50,7 +50,7 @@ framework discipline into the CLI, and do not carry CLI habits into the framewor
 
 ## Dependency policy
 
-`@argus/cli` and `@argus/reporter-cli` have **zero external runtime dependencies**. That is
+`@arguslab/cli` and `@arguslab/reporter-cli` have **zero external runtime dependencies**. That is
 deliberate: for a tool whose pitch is engine fidelity at unit-test cost, a small install is
 part of the argument.
 
@@ -64,7 +64,7 @@ Node's built-ins cover more than they used to:
 | Loading a TypeScript config | Native type stripping |
 
 The only external runtime dependencies in the whole workspace are `esbuild` (the bundler),
-`source-map` (isolated in `@argus/sourcemap`), Babel (legacy class lowering only), and
+`source-map` (isolated in `@arguslab/sourcemap`), Babel (legacy class lowering only), and
 React plus `test-renderer` inside the optional component-testing package.
 
 Every added dependency needs a reason a built-in cannot satisfy.

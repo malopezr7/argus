@@ -1,5 +1,5 @@
 /**
- * @argus/framework — async matchers (.resolves / .rejects)
+ * @arguslab/framework — async matchers (.resolves / .rejects)
  *
  * Extracted from matchers.ts to keep each module under ~500 LOC.
  *

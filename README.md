@@ -299,8 +299,8 @@ provisioning step can never look like a red test.
 
 ## Architecture
 
-Hexagonal. `@argus/core` is pure and adapter-free; adapters do the I/O;
-`@argus/cli` is the only composition root.
+Hexagonal. `@arguslab/core` is pure and adapter-free; adapters do the I/O;
+`@arguslab/cli` is the only composition root.
 
 ```
 Host (Node)
@@ -326,14 +326,14 @@ isolated per file, and trivially parallel.
 
 | Package | Role |
 | --- | --- |
-| `@argus/core` | Domain types, ports, result-protocol parser. No I/O |
-| `@argus/framework` | Runs *inside* Hermes: globals, runner, matchers, result emission |
-| `@argus/esbuild` | Bundles polyfills + framework + test into one IIFE |
-| `@argus/hermes` | Engine resolution, provisioning adapters, subprocess spawn |
-| `@argus/sourcemap` | Remaps Hermes frames to original sources |
-| `@argus/rntl` | The synchronous component-testing surface behind `'argus'` |
-| `@argus/cli` | Composition root |
-| `@argus/reporter-cli` | Terminal output and exit-code policy |
+| `@arguslab/core` | Domain types, ports, result-protocol parser. No I/O |
+| `@arguslab/framework` | Runs *inside* Hermes: globals, runner, matchers, result emission |
+| `@arguslab/esbuild` | Bundles polyfills + framework + test into one IIFE |
+| `@arguslab/hermes` | Engine resolution, provisioning adapters, subprocess spawn |
+| `@arguslab/sourcemap` | Remaps Hermes frames to original sources |
+| `@arguslab/rntl` | The synchronous component-testing surface behind `'argus'` |
+| `@arguslab/cli` | Composition root |
+| `@arguslab/reporter-cli` | Terminal output and exit-code policy |
 
 The result channel is treated as a high-integrity boundary. A test file can
 pollute prototypes and override globals, so the framework captures primordials

@@ -1,5 +1,5 @@
 {
-  "name": "@argus/hermes",
+  "name": "@arguslab/hermes",
   "version": "0.0.0",
   "type": "module",
   "license": "MIT",
@@ -38,7 +38,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@argus/core": "workspace:*"
+    "@arguslab/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^6.0.0",

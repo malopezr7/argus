@@ -1,13 +1,13 @@
 /**
  * Task 5.2 — Bundler emits a map that SourceMapConsumer can load and resolve (REQ-13-C, AC-01).
  *
- * This test lives in @argus/sourcemap (where source-map is confined per AC-14/REQ-19-C).
- * It imports EsbuildBundler from @argus/esbuild (workspace devDep) and verifies that
+ * This test lives in @arguslab/sourcemap (where source-map is confined per AC-14/REQ-19-C).
+ * It imports EsbuildBundler from @arguslab/esbuild (workspace devDep) and verifies that
  * the emitted bundle.map resolves a known user-source position via SourceMapConsumer.
  */
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EsbuildBundler } from '@argus/esbuild';
+import { EsbuildBundler } from '@arguslab/esbuild';
 import { SourceMapConsumer } from 'source-map';
 import { describe, expect, it } from 'vitest';
 

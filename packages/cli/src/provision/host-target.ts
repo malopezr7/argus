@@ -1,4 +1,4 @@
-import type { EngineTarget } from '@argus/core';
+import type { EngineTarget } from '@arguslab/core';
 
 /** The subset of `process` this module reads, injected so it is testable. */
 export interface HostInfo {

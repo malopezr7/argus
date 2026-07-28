@@ -1,14 +1,14 @@
 import { accessSync, constants, statSync } from 'node:fs';
-import type { EngineTarget, HermesBinary, HermesEngine, HermesProvisioner } from '@argus/core';
-import { checkEngineFidelity } from '@argus/core';
+import type { EngineTarget, HermesBinary, HermesEngine, HermesProvisioner } from '@arguslab/core';
+import { checkEngineFidelity } from '@arguslab/core';
 import {
   type EngineResolutionOutcome,
   resolveHermesEngine,
-} from '@argus/hermes/engine-resolver.js';
-import { LocalPathAdapter } from '@argus/hermes/local-path-adapter.js';
-import { PrebuiltAdapter, PrebuiltUnavailableError } from '@argus/hermes/prebuilt-adapter.js';
-import type { AssetFetcher } from '@argus/hermes/prebuilt-assets.js';
-import { SourceBuildAdapter } from '@argus/hermes/source-build-adapter.js';
+} from '@arguslab/hermes/engine-resolver.js';
+import { LocalPathAdapter } from '@arguslab/hermes/local-path-adapter.js';
+import { PrebuiltAdapter, PrebuiltUnavailableError } from '@arguslab/hermes/prebuilt-adapter.js';
+import type { AssetFetcher } from '@arguslab/hermes/prebuilt-assets.js';
+import { SourceBuildAdapter } from '@arguslab/hermes/source-build-adapter.js';
 import { errMsg } from '../errors.js';
 import {
   type AttemptedSource,

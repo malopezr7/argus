@@ -1,6 +1,6 @@
 /**
  * Hermes engine/version domain logic — PURE. No filesystem, no process, no
- * adapter imports. The I/O that feeds these parsers lives in `@argus/hermes`.
+ * adapter imports. The I/O that feeds these parsers lives in `@arguslab/hermes`.
  *
  * React Native pins TWO Hermes engines from RN 0.83 onward: the legacy engine
  * and Hermes V1 (Static Hermes). RN 0.84 made V1 the default; RN 0.87 dropped

@@ -184,7 +184,7 @@ export interface EngineOutput {
  * `__ARGUS_RESULT__:<nonce>:<json-envelope>`. The <nonce> is a per-run secret
  * passed PRIVATELY to run(nonce) (NOT a global/define), so user output cannot
  * forge it. Every OTHER stdout line is user output (console.log → print()).
- * See @argus/core's parseHermesOutput for the host-side parsing rules.
+ * See @arguslab/core's parseHermesOutput for the host-side parsing rules.
  */
 export const ARGUS_RESULT_PREFIX = '__ARGUS_RESULT__:';
 

@@ -1,5 +1,5 @@
 {
-  "name": "@argus/cli",
+  "name": "@arguslab/cli",
   "version": "0.0.0",
   "type": "module",
   "license": "MIT",
@@ -19,12 +19,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@argus/core": "workspace:*",
-    "@argus/esbuild": "workspace:*",
-    "@argus/framework": "workspace:*",
-    "@argus/hermes": "workspace:*",
-    "@argus/reporter-cli": "workspace:*",
-    "@argus/sourcemap": "workspace:*"
+    "@arguslab/core": "workspace:*",
+    "@arguslab/esbuild": "workspace:*",
+    "@arguslab/framework": "workspace:*",
+    "@arguslab/hermes": "workspace:*",
+    "@arguslab/reporter-cli": "workspace:*",
+    "@arguslab/sourcemap": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^6.0.0"

@@ -7,7 +7,7 @@ import {
   hermesReleasePlatform,
   hermesReleaseTag,
   PROJECT_VENDORED_VM_SEGMENTS,
-} from '@argus/core';
+} from '@arguslab/core';
 
 /**
  * The provisioning chain: decide WHERE the Hermes binary comes from.

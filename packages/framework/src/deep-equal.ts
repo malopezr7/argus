@@ -1,5 +1,5 @@
 /**
- * @argus/framework — deep equality helpers
+ * @arguslab/framework — deep equality helpers
  *
  * Moved from matchers.ts (ADR-1). Runs IN-REALM alongside user test code.
  * Follows Hermes 0.17 envelope rules: index loops, no for..of/spread,

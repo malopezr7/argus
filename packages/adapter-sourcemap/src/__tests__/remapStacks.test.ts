@@ -20,7 +20,7 @@
  * Each line resets genCol difference (starts from 0 each line); src/line/col
  * diffs are cumulative across all segments.
  */
-import type { RunResult, TestCase } from '@argus/core';
+import type { RunResult, TestCase } from '@arguslab/core';
 import { describe, expect, it, vi } from 'vitest';
 import { remapStacks } from '../index.js';
 

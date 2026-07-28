@@ -6,7 +6,7 @@
  *   timeout) -> core protocol parse -> CLI report -> exit code.
  *
  * Imports adapters/core by relative source path so tsx runs them without a
- * build; the adapters' only `@argus/core` imports are type-only (erased).
+ * build; the adapters' only `@arguslab/core` imports are type-only (erased).
  */
 
 import { dirname, join, resolve } from 'node:path';

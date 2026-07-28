@@ -10,12 +10,12 @@ import {
   parseHermesTag,
   parseVersionProperties,
   selectHermesEngine,
-} from '@argus/core';
+} from '@arguslab/core';
 
 /**
  * Reads the Hermes engine pinned by the user's React Native install.
  *
- * All parsing lives in `@argus/core` (pure); this module is the I/O half — the
+ * All parsing lives in `@arguslab/core` (pure); this module is the I/O half — the
  * upward walk to `node_modules/react-native/`, the four file reads, and the
  * fallback to the offline lookup table.
  *

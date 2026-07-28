@@ -1,4 +1,4 @@
-import type { Reporter, RunOutcome, RunResult, SessionResult, Suite } from '@argus/core';
+import type { Reporter, RunOutcome, RunResult, SessionResult, Suite } from '@arguslab/core';
 
 /**
  * Render a single RunOutcome to the terminal. Extracted from CliReporter.report

@@ -1,7 +1,7 @@
 /**
  * On-disk layout knowledge for Hermes binaries — PURE.
  *
- * Expressed as path SEGMENTS rather than joined strings because `@argus/core`
+ * Expressed as path SEGMENTS rather than joined strings because `@arguslab/core`
  * must never import `node:path`. Callers join them against a root with their
  * platform's separator.
  *

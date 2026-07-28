@@ -1,5 +1,5 @@
 /**
- * @argus/framework — in-realm mock functions.
+ * @arguslab/framework — in-realm mock functions.
  *
  * Hermes envelope: no async arrows, no async generators, no WeakRef/Intl.
  * Runtime record operations use index loops and direct length mutation.

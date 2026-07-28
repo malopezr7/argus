@@ -1,5 +1,5 @@
-import type { HermesBinary } from '@argus/core';
-import { checkEngineFidelity } from '@argus/core';
+import type { HermesBinary } from '@arguslab/core';
+import { checkEngineFidelity } from '@arguslab/core';
 import { describe, expect, it } from 'vitest';
 import type { AttemptedSource } from '../provision/chain.js';
 import {

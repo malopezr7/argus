@@ -86,7 +86,7 @@ shape, number formatting, JSON key ordering, regex semantics, typed arrays.
 `Intl` is a build flag, not an engine difference. React Native builds with it on,
 so Argus does too.
 
-Consequence: the Babel class-lowering plugin in `@argus/esbuild` exists only to
+Consequence: the Babel class-lowering plugin in `@arguslab/esbuild` exists only to
 work around a V0 parser limitation. On V1 it is unnecessary. It stays as part of
 the legacy compatibility target, which the adapter layer already models.
 
@@ -205,14 +205,14 @@ Loading uses native `import()`. Node type-strips `argus.config.ts` directly, so
 this needs no dependency and no bundler. `defineConfig` is an identity function
 exported for the type hint.
 
-- [ ] `ArgusConfig` type and documented defaults in `@argus/core`.
+- [ ] `ArgusConfig` type and documented defaults in `@arguslab/core`.
 - [ ] Config loader and merge layer.
 - [ ] Wire config through discovery, bundling, and provisioning.
 - [ ] `include` / `exclude` replacing the hardcoded globs and the single
       hardcoded `node_modules` substring check.
 - [ ] `passWithNoTests` — a zero-match run currently exits 2.
 
-### Make `@argus/rntl` optional
+### Make `@arguslab/rntl` optional
 
 Component testing is an add-on, not part of the runner. Testing plain TypeScript
 or plain React should not require it.
@@ -220,18 +220,18 @@ or plain React should not require it.
 The runtime already behaves correctly — a pure-TypeScript test bundles
 identically whether or not the component facade resolves, because aliases are
 lazy. What remains is contract and packaging work, plus one genuine design fix:
-React is currently located relative to the `@argus/rntl` install directory, which
+React is currently located relative to the `@arguslab/rntl` install directory, which
 makes it structurally mandatory for any JSX.
 
 - [ ] `componentPath` optional in `BundleInput` and in the CLI path resolver.
-- [ ] Resolve React from the user's project, independent of `@argus/rntl`.
+- [ ] Resolve React from the user's project, independent of `@arguslab/rntl`.
 - [ ] Conditional alias map; clear diagnostic when `argus` is imported without
       the package installed.
-- [ ] Export the lifecycle registry from `@argus/framework` so `@argus/rntl`
+- [ ] Export the lifecycle registry from `@arguslab/framework` so `@arguslab/rntl`
       depends on the package rather than a relative cross-package path.
-- [ ] Drop `private: true` from `@argus/rntl`.
-- [ ] Remove the React type mapping that points `@argus/framework` at
-      `@argus/rntl`'s `node_modules`.
+- [ ] Drop `private: true` from `@arguslab/rntl`.
+- [ ] Remove the React type mapping that points `@arguslab/framework` at
+      `@arguslab/rntl`'s `node_modules`.
 - [ ] Regression test: bundle a pure-TypeScript suite with no React installed.
 
 ### Documentation
@@ -292,7 +292,7 @@ Deferred until v0.1.0 ships. These are valuable but none of them block adoption.
 
 ## Dependency policy
 
-`@argus/cli` and `@argus/reporter-cli` currently have zero external runtime
+`@arguslab/cli` and `@arguslab/reporter-cli` currently have zero external runtime
 dependencies. That is intentional. For a tool whose pitch is engine fidelity at
 unit-test cost, a small install is part of the argument.
 

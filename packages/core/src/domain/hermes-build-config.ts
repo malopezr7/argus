@@ -1,7 +1,7 @@
 /**
  * Hermes source-build configuration — PURE. Produces the argument vectors for
  * the cmake configure and build steps; actually running them is the adapter's
- * job (see `@argus/hermes`).
+ * job (see `@arguslab/hermes`).
  *
  * The flag set mirrors what React Native builds Hermes with (its
  * `utils/build-apple-framework.sh`), so a VM that Argus builds behaves like the

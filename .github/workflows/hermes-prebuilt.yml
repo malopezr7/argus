@@ -227,7 +227,7 @@ jobs:
           pattern: hermes-bin-*
           merge-multiple: true
 
-      # Names, tag and body all come from @argus/core, which is also where the
+      # Names, tag and body all come from @arguslab/core, which is also where the
       # provisioning chain derives the download URL — so what CI publishes and
       # what a user fetches cannot be named differently.
       - name: Derive release identity

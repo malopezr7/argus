@@ -13,11 +13,11 @@
  * into an arm64 and an x64 archive, so a user downloads roughly half of a
  * universal binary rather than all of it.
  *
- * Asset identity — tag, name, checksum file — comes from `@argus/core` rather
+ * Asset identity — tag, name, checksum file — comes from `@arguslab/core` rather
  * than from here, because the provisioning side has to arrive at exactly the
  * same answers.
  *
- * The tar is written by `@argus/hermes`'s own encoder rather than by shelling
+ * The tar is written by `@arguslab/hermes`'s own encoder rather than by shelling
  * out to the system `tar`. That is not fussiness: macOS `bsdtar` writes
  * AppleDouble `._*` companion entries for extended attributes unless
  * `COPYFILE_DISABLE` is set, so shelling out would put junk in the archive on

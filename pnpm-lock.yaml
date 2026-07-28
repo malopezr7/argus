@@ -32,7 +32,7 @@ importers:
 
   packages/adapter-esbuild:
     dependencies:
-      '@argus/core':
+      '@arguslab/core':
         specifier: workspace:*
         version: link:../core
       '@babel/core':
@@ -54,7 +54,7 @@ importers:
 
   packages/adapter-hermes:
     dependencies:
-      '@argus/core':
+      '@arguslab/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -67,14 +67,14 @@ importers:
 
   packages/adapter-sourcemap:
     dependencies:
-      '@argus/core':
+      '@arguslab/core':
         specifier: workspace:*
         version: link:../core
       source-map:
         specifier: 0.7.4
         version: 0.7.4
     devDependencies:
-      '@argus/esbuild':
+      '@arguslab/esbuild':
         specifier: workspace:*
         version: link:../adapter-esbuild
       typescript:
@@ -86,22 +86,22 @@ importers:
 
   packages/cli:
     dependencies:
-      '@argus/core':
+      '@arguslab/core':
         specifier: workspace:*
         version: link:../core
-      '@argus/esbuild':
+      '@arguslab/esbuild':
         specifier: workspace:*
         version: link:../adapter-esbuild
-      '@argus/framework':
+      '@arguslab/framework':
         specifier: workspace:*
         version: link:../framework
-      '@argus/hermes':
+      '@arguslab/hermes':
         specifier: workspace:*
         version: link:../adapter-hermes
-      '@argus/reporter-cli':
+      '@arguslab/reporter-cli':
         specifier: workspace:*
         version: link:../reporter-cli
-      '@argus/sourcemap':
+      '@arguslab/sourcemap':
         specifier: workspace:*
         version: link:../adapter-sourcemap
     devDependencies:
@@ -126,7 +126,7 @@ importers:
 
   packages/reporter-cli:
     dependencies:
-      '@argus/core':
+      '@arguslab/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:

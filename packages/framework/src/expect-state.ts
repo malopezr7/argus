@@ -1,5 +1,5 @@
 /**
- * @argus/framework — assertion counter + custom-matcher registry
+ * @arguslab/framework — assertion counter + custom-matcher registry
  *
  * Extracted from matchers.ts to keep each module under ~500 LOC.
  * This module has NO imports from other local modules — it is the

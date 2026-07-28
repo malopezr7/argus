@@ -57,7 +57,7 @@ describe('source-map integration (AC-11, AC-21, REQ-15-A)', () => {
 // Task 5.4 — AC-12: packages/core/package.json has no source-map dep
 // ---------------------------------------------------------------------------
 
-describe('static: @argus/core gains no source-map dep (AC-12, REQ-19)', () => {
+describe('static: @arguslab/core gains no source-map dep (AC-12, REQ-19)', () => {
   it('packages/core/package.json has no source-map in dependencies or devDependencies', () => {
     const pkgPath = resolve(REPO_ROOT, 'packages', 'core', 'package.json');
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {

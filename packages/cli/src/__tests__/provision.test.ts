@@ -1,9 +1,9 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AssetResponse } from '@argus/hermes/prebuilt-assets.js';
-import { sha256 } from '@argus/hermes/prebuilt-assets.js';
-import { writeTarGz } from '@argus/hermes/tar.js';
+import type { AssetResponse } from '@arguslab/hermes/prebuilt-assets.js';
+import { sha256 } from '@arguslab/hermes/prebuilt-assets.js';
+import { writeTarGz } from '@arguslab/hermes/tar.js';
 import { afterAll, describe, expect, it } from 'vitest';
 import { isExecutableFile, provisionHermes } from '../provision/provision.js';
 

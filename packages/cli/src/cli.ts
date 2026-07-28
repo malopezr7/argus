@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @argus/cli — composition root.
+ * @arguslab/cli — composition root.
  *
  * Wiring: args → resolveFrameworkPaths → provisionHermes → discover(globs)
  *         → mapPool(files, concurrency, runFile) → ordered render → aggregate → exit code.
@@ -10,12 +10,12 @@
  */
 
 import { homedir } from 'node:os';
-import type { FileResult, RunOutcome } from '@argus/core';
-import { parseHermesOutput } from '@argus/core';
-import { DEFAULT_ENGINE_TARGET, EsbuildBundler } from '@argus/esbuild';
-import { HermesSpawnEngine } from '@argus/hermes/hermes-spawn-engine.js';
-import { exitCodeForSession, renderFileOutcome, renderSessionSummary } from '@argus/reporter-cli';
-import { remapStacks } from '@argus/sourcemap';
+import type { FileResult, RunOutcome } from '@arguslab/core';
+import { parseHermesOutput } from '@arguslab/core';
+import { DEFAULT_ENGINE_TARGET, EsbuildBundler } from '@arguslab/esbuild';
+import { HermesSpawnEngine } from '@arguslab/hermes/hermes-spawn-engine.js';
+import { exitCodeForSession, renderFileOutcome, renderSessionSummary } from '@arguslab/reporter-cli';
+import { remapStacks } from '@arguslab/sourcemap';
 import { foldOutcomes } from './aggregate.js';
 import { parseCliArgs, USAGE, UsageError } from './args.js';
 import { resolveFiles } from './discover.js';

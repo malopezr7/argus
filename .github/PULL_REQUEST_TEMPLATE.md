@@ -45,7 +45,7 @@ something ran. A user-facing change to bundled behaviour needs a fixture.
 
 # Architecture
 
-- [ ] `@argus/core` is still pure: no `node:*`, no adapters, no I/O.
+- [ ] `@arguslab/core` is still pure: no `node:*`, no adapters, no I/O.
 - [ ] Files touched are still around or below ~500 lines.
 - [ ] If in-Hermes code changed, it stays inside the Hermes syntax envelope.
 - [ ] If `packages/framework/src/index.ts` changed, the result channel still

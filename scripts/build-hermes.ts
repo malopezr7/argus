@@ -6,7 +6,7 @@
  * Thin on purpose. The work is done by `SourceBuildAdapter`, which is the same
  * code path a user without a published prebuilt takes: it checks for cmake and
  * ninja, shallow-clones facebook/hermes at the tag, and configures with the
- * flag set React Native uses (from `@argus/core`'s pure builders, so the flags
+ * flag set React Native uses (from `@arguslab/core`'s pure builders, so the flags
  * are asserted by unit tests rather than only by a multi-minute build). Having
  * CI build through a different implementation than users do would let the two
  * drift, and the drift would only ever surface as a user-only failure.

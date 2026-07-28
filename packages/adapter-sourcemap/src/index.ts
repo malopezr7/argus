@@ -1,4 +1,4 @@
-import type { RunResult, Suite, TestCase } from '@argus/core';
+import type { RunResult, Suite, TestCase } from '@arguslab/core';
 import { SourceMapConsumer } from 'source-map';
 
 // ---------------------------------------------------------------------------

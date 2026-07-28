@@ -1,5 +1,5 @@
 {
-  "name": "@argus/sourcemap",
+  "name": "@arguslab/sourcemap",
   "version": "0.0.0",
   "type": "module",
   "license": "MIT",
@@ -16,11 +16,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@argus/core": "workspace:*",
+    "@arguslab/core": "workspace:*",
     "source-map": "0.7.4"
   },
   "devDependencies": {
-    "@argus/esbuild": "workspace:*",
+    "@arguslab/esbuild": "workspace:*",
     "typescript": "^6.0.0",
     "vitest": "^4.0.0"
   }

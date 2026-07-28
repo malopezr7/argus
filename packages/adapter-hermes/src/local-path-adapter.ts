@@ -1,5 +1,5 @@
 import { accessSync, constants, existsSync } from 'node:fs';
-import type { EngineTarget, HermesBinary, HermesProvisioner } from '@argus/core';
+import type { EngineTarget, HermesBinary, HermesProvisioner } from '@arguslab/core';
 import { detectArch, readHermesVersionInfo } from './utils.js';
 
 /**

@@ -10,7 +10,7 @@
  * exactly. The integration tests (integration.test.ts task 5.1b, 5.5) confirm
  * the full CLI stack behaves consistently.
  */
-import type { RunOutcome } from '@argus/core';
+import type { RunOutcome } from '@arguslab/core';
 import { describe, expect, it } from 'vitest';
 import { mapPool } from '../pool.js';
 

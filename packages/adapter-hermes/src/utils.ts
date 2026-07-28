@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { type HermesVersionInfo, parseHermesVersionOutput } from '@argus/core';
+import { type HermesVersionInfo, parseHermesVersionOutput } from '@arguslab/core';
 
 /** Wall-clock cap so a hung or non-Hermes binary cannot stall provisioning. */
 const VERSION_TIMEOUT_MS = 10_000;

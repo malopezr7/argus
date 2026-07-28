@@ -9,7 +9,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { EngineTarget, HermesRef } from '@argus/core';
+import type { EngineTarget, HermesRef } from '@arguslab/core';
 import { afterAll, describe, expect, it } from 'vitest';
 import { PrebuiltAdapter, PrebuiltUnavailableError } from '../prebuilt-adapter.js';
 import {

@@ -1,5 +1,5 @@
 /**
- * @argus/framework — bounded, cycle-safe value renderer
+ * @arguslab/framework — bounded, cycle-safe value renderer
  *
  * Moved from matchers.ts (ADR-1, ADR-5, R5). Runs IN-REALM alongside user
  * test code. Uses Object.getOwnPropertyDescriptor to read object keys so

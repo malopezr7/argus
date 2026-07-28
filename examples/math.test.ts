@@ -1,6 +1,6 @@
 /**
  * Sample Argus test. `describe`/`test`/`expect` are installed as globals by
- * @argus/framework, so no import is needed (Jest style).
+ * @arguslab/framework, so no import is needed (Jest style).
  */
 declare const describe: (name: string, fn: () => void) => void;
 declare const test: (name: string, fn: () => void | Promise<unknown>) => void;

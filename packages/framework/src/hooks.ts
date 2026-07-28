@@ -1,9 +1,9 @@
 /**
- * @argus/framework — pure hook-chain execution helpers.
+ * @arguslab/framework — pure hook-chain execution helpers.
  *
  * All helpers are async function declarations (no async arrows).
  * No for..of, no spread. Index loops only.
- * No imports from @argus/core or Node built-ins (AC-91).
+ * No imports from @arguslab/core or Node built-ins (AC-91).
  *
  * Error policy (design D3):
  *  - beforeAll throws → store error; all block+nested tests fail; afterAll still runs.

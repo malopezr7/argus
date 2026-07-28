@@ -25,7 +25,7 @@ import {
   hermesReleasePlatform,
   hermesReleaseTag,
   hermesReleaseVersion,
-} from '@argus/core';
+} from '@arguslab/core';
 import {
   type AssetFetcher,
   fetchAssetOverHttps,

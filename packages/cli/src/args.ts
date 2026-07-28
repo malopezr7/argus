@@ -1,6 +1,6 @@
 import { availableParallelism } from 'node:os';
 import { parseArgs } from 'node:util';
-import type { HermesEngine } from '@argus/core';
+import type { HermesEngine } from '@arguslab/core';
 
 export const USAGE = `argus — run React Native tests on the standalone Hermes engine
 

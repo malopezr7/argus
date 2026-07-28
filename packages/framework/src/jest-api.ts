@@ -1,5 +1,5 @@
 /**
- * @argus/framework — Jest-API compatibility surface.
+ * @arguslab/framework — Jest-API compatibility surface.
  *
  * Module boundary (design D6): this module OWNS the registry state and the
  * full registration API. index.ts imports ONE-WAY from here; no back-imports.

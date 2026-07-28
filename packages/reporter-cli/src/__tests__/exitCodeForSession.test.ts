@@ -1,4 +1,4 @@
-import type { RunOutcome, SessionResult } from '@argus/core';
+import type { RunOutcome, SessionResult } from '@arguslab/core';
 import { describe, expect, it } from 'vitest';
 import { exitCodeForSession } from '../index.js';
 

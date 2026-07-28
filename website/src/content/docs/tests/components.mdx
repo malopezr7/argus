@@ -13,7 +13,7 @@ Argus runs **real React** inside the Hermes VM. Not a DOM emulation, not a mocke
 The surface is intentionally synchronous and intentionally small.
 
 ```bash
-pnpm add -D @argus/rntl
+pnpm add -D @arguslab/rntl
 ```
 
 ```tsx title="src/Counter.test.tsx"
@@ -181,7 +181,7 @@ Deliberately out of scope for this iteration:
 
 If your assertion needs any of those, it belongs in an on-device test, not here.
 
-## About `@argus/rntl`
+## About `@arguslab/rntl`
 
 The facade is maintained as its own package and treated as a **stopgap**. When upstream
 React Native Testing Library v14 on `test-renderer` becomes bundleable within the supported

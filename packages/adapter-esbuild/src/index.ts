@@ -8,7 +8,7 @@ import type {
   TransformedCode,
   Transformer,
   TransformOptions,
-} from '@argus/core';
+} from '@arguslab/core';
 import { build, transform } from 'esbuild';
 import { hermesClassLowering } from './hermes-class-lowering.js';
 

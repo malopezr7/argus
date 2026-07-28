@@ -1,5 +1,5 @@
 /**
- * @argus/framework — expect() matchers
+ * @arguslab/framework — expect() matchers
  *
  * BOUNDARY NOTE (read before editing):
  *

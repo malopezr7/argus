@@ -11,7 +11,7 @@ import {
   hermesCacheBinarySegments,
   hermesCacheRootSegments,
   releaseVersionForRef,
-} from '@argus/core';
+} from '@arguslab/core';
 import { resolveHermesEngine } from './engine-resolver.js';
 import { detectArch, readHermesVersionInfo } from './utils.js';
 
@@ -32,7 +32,7 @@ export class SourceBuildAdapter implements HermesProvisioner {
 
   async resolve(target: EngineTarget): Promise<HermesBinary> {
     const ref = this.hermesRef ?? resolveHermesRef(target.rnVersion);
-    // Layout comes from @argus/core so the CLI's cache lookup and this writer
+    // Layout comes from @arguslab/core so the CLI's cache lookup and this writer
     // can never disagree about where a built binary lives.
     const home = homedir();
     const root = join(home, ...hermesCacheRootSegments(ref));
@@ -101,7 +101,7 @@ const HERMES_REPO_URL = 'https://github.com/facebook/hermes.git';
  * Clone facebook/hermes at `ref` and build the VM, the compiler, and the
  * bytecode runner with the configuration React Native itself uses.
  *
- * The argument vectors are built by pure helpers in `@argus/core` so the flag
+ * The argument vectors are built by pure helpers in `@arguslab/core` so the flag
  * set is asserted by unit tests instead of only by a 95-second build.
  */
 function buildHermesFromSource(ref: string, root: string): void {

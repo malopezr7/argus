@@ -1,5 +1,5 @@
 {
-  "name": "@argus/reporter-cli",
+  "name": "@arguslab/reporter-cli",
   "version": "0.0.0",
   "type": "module",
   "license": "MIT",
@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@argus/core": "workspace:*"
+    "@arguslab/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^6.0.0"

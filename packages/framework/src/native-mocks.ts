@@ -1,5 +1,5 @@
 /**
- * @argus/framework — React Native native-module shim registry.
+ * @arguslab/framework — React Native native-module shim registry.
  */
 
 const registry: Record<string, unknown> = Object.create(null) as Record<string, unknown>;

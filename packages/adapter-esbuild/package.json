@@ -1,5 +1,5 @@
 {
-  "name": "@argus/esbuild",
+  "name": "@arguslab/esbuild",
   "version": "0.0.0",
   "type": "module",
   "license": "MIT",
@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@argus/core": "workspace:*",
+    "@arguslab/core": "workspace:*",
     "@babel/core": "^8.0.1",
     "@babel/plugin-transform-classes": "^8.0.1",
     "esbuild": "^0.28.0"

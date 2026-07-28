@@ -5,7 +5,7 @@
  *   pnpm exec tsx scripts/hermes-release-meta.ts \
  *     --tag hermes-v250829098.0.16 --notes-out notes.md
  *
- * Every answer comes from `@argus/core` — the same module the provisioning
+ * Every answer comes from `@arguslab/core` — the same module the provisioning
  * chain derives the download URL from, so the release a maintainer publishes
  * and the release a user fetches can never be named differently.
  *

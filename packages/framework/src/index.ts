@@ -1,5 +1,5 @@
 /**
- * @argus/framework — in-Hermes micro test framework.
+ * @arguslab/framework — in-Hermes micro test framework.
  *
  * Runs INSIDE the Hermes VM (bundled into the sealed bundle). Constraints:
  *  - `print()` is the only stdout primitive; NO console/process/Node.
@@ -45,7 +45,7 @@ declare function print(message: string): void;
 const safePrint = print;
 const safeDateNow = Date.now;
 
-// MUST stay in sync with ARGUS_RESULT_PREFIX in @argus/core.
+// MUST stay in sync with ARGUS_RESULT_PREFIX in @arguslab/core.
 const ARGUS_RESULT_PREFIX = '__ARGUS_RESULT__:';
 
 // Date.now() exists in standalone Hermes; performance.now() does not.

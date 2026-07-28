@@ -1,7 +1,7 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { HermesRef } from '@argus/core';
+import type { HermesRef } from '@arguslab/core';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   bundledLegacyVmPath,

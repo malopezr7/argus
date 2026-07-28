@@ -1,5 +1,5 @@
 /**
- * @argus/framework env polyfill.
+ * @arguslab/framework env polyfill.
  *
  * Runs INSIDE Hermes, FIRST in the virtual entry, before framework/user code.
  * Standalone Hermes has only `print`: no `console`, no RN-style `global`. This

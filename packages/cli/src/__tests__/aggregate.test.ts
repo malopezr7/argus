@@ -1,4 +1,4 @@
-import type { FileResult, RunOutcome } from '@argus/core';
+import type { FileResult, RunOutcome } from '@arguslab/core';
 import { describe, expect, it } from 'vitest';
 import { foldOutcomes } from '../aggregate.js';
 
