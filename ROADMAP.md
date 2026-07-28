@@ -29,8 +29,11 @@ The runner works. What is missing is distribution.
 - Component testing on real React running inside Hermes, exposed through the
   virtual `argus` module: `render`, `rerender`, `unmount`, `screen`, `getBy*`,
   `queryBy*`, `within`, `fireEvent`, `act`.
-- 372 host-side unit tests, plus 15 Hermes fixtures — 6 passing, 2 intentionally
+- 720 host-side unit tests, plus 15 Hermes fixtures — 6 passing, 2 intentionally
   failing, 7 adversarial.
+- Engine resolution from the React Native install, a provisioning chain ending in
+  prebuilt binaries published to GitHub Releases, and bytecode parity with the
+  official `hermes-compiler` enforced as a CI gate on every build.
 
 **Not done**
 
@@ -163,19 +166,17 @@ Build configuration mirrors React Native's own:
 - [ ] Version resolver reading the four project files above.
 - [ ] Generated RN-to-Hermes lookup table, refreshed in CI from the branches
       table.
-- [ ] Fix the `.hermesv1version` filename casing — the current lookup uses a
-      capital `V` and silently falls through to the legacy file on
+- [x] Fix the `.hermesv1version` filename casing — the previous lookup used a
+      capital `V` and silently fell through to the legacy file on
       case-sensitive filesystems.
-- [ ] Publish prebuilts for `darwin-arm64`, `darwin-x64`, `linux-x64` and
-      `linux-arm64`. The build-and-publish pipeline exists
-      (`.github/workflows/hermes-prebuilt.yml`, manual dispatch, gated on
-      bytecode parity with the official `hermes-compiler`, publishing a GitHub
-      Release); it has not been run and nothing is published yet, so the
-      prebuilt step in the provisioning chain currently reports a 404 and falls
-      through. Windows stays out until there is a verified toolchain for it.
-- [ ] Set the engine release version explicitly at build time — a raw clone
+- [x] Publish prebuilts for `darwin-arm64`, `darwin-x64`, `linux-x64` and
+      `linux-arm64`, built by `.github/workflows/hermes-prebuilt.yml` on manual
+      dispatch, gated on bytecode parity with the official `hermes-compiler`,
+      and attached to a GitHub Release with checksums and signed build
+      provenance. Windows stays out until there is a verified toolchain for it.
+- [x] Set the engine release version explicitly at build time — a raw clone
       reports `1.0.0`.
-- [ ] Bundled-VM detection for the legacy target on RN 0.73–0.82.
+- [x] Bundled-VM detection for the legacy target on RN 0.73–0.82.
 - [ ] Wire the full fallback chain and remove the hardcoded
       `{ rnVersion, os, arch }` target from the CLI composition root.
 
