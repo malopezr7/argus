@@ -1,6 +1,6 @@
 ---
 title: Contributing
-description: How to get the repo running, the gates every change must pass, and the rules that are not negotiable.
+description: Where the canonical contributor docs live, the one rule people skip, and how to work on this site.
 sidebar:
   order: 3
 ---
@@ -8,91 +8,78 @@ sidebar:
 Argus lives at [github.com/malopezr7/argus](https://github.com/malopezr7/argus). MIT
 licensed.
 
-## Getting set up
+## The canonical documents
 
-```bash
-git clone https://github.com/malopezr7/argus.git
-cd argus
-pnpm install
-```
+These live in the repository and are the source of truth. This page does not restate them,
+because two copies of the same rules drift:
 
-**pnpm only.** Not npm, not npx, not yarn, not bun. The workspace uses the `workspace:*`
-protocol and the package manager version is pinned in `package.json`.
-
-You also need a Hermes binary to run the fixtures. Either vendor one at `.hermes/hermes`
-(gitignored) or let the runner provision it.
-
-## The gates
-
-Every change runs all four. No exceptions, and no "done" claimed without them.
-
-```bash
-pnpm typecheck              # tsc across the workspace
-pnpm exec biome check .     # lint + format
-pnpm test                   # vitest, host-side
-pnpm argus "examples/**/*.test.ts"   # real Hermes
-```
-
-That last one is not optional, and it is the one people skip.
-
-### Why a green Node suite is not enough
-
-The bug that motivated this rule: esbuild lowers a loop-scoped `const` to `var` for the
-Hermes target, so a closure created in the loop captures the last iteration's value. A
-matcher-wrapping loop made every wrapped matcher call the same method.
-
-Every Node unit test passed. It only failed on a real Hermes run, because **the bug does
-not exist until the bundle is lowered**, and Node never sees the lowered bundle.
-
-Any change to bundling, the framework, matchers or the runner needs a real
-`pnpm argus …` run. New user-facing features that affect bundled Hermes behaviour need at
-least one fixture in `examples/`.
-
-## The fixtures
-
-`examples/` holds files meant to run through `pnpm argus`, **not** through Vitest.
-
-| Fixture | Expected |
+| Document | Covers |
 |---|---|
-| `math.test.ts`, `matchers.test.ts`, `jest-api.test.ts`, `rn-mocks.test.ts`, `component-api.test.tsx` | exit 0 |
-| `math-failing.test.ts`, `component-query-failing.test.tsx` | exit 1 — and the stack must point at the source |
-| `forge.test.ts` | exit 2 — a fabricated result frame must not be accepted |
-| `robustness`, `print-hijack`, `json-hijack`, `tojson-hijack`, `push-hijack`, `iterator-hijack` | must stay inert |
+| [CONTRIBUTING.md](https://github.com/malopezr7/argus/blob/main/CONTRIBUTING.md) | Setup, the Hermes binary, the gates, architecture rules, commits and pull requests |
+| [SECURITY.md](https://github.com/malopezr7/argus/blob/main/SECURITY.md) | Supported versions and how to report a vulnerability privately |
+| [CODE_OF_CONDUCT.md](https://github.com/malopezr7/argus/blob/main/CODE_OF_CONDUCT.md) | Expected conduct |
 
-The adversarial set is the regression suite for the threat model in
+## The rule people skip
+
+Run the gates — and the fourth one is not optional:
+
+```bash
+pnpm typecheck
+pnpm exec biome check .
+pnpm test
+pnpm argus "examples/**/*.test.ts"
+```
+
+`pnpm test` runs on **Node**. Argus ships code that runs on **Hermes**, after being lowered
+by esbuild. A green Node suite is not evidence about the artifact that actually ships.
+
+The bug that made this a rule: esbuild lowers a loop-scoped `const` to `var` for the Hermes
+target, so a closure created inside the loop captures the **last** iteration's value.
+
+```ts
+// Correct in source. Wrong once lowered.
+for (const key of keys) {
+  const original = target[key];
+  target[key] = (...args) => wrap(original, args); // every wrapper gets the LAST original
+}
+```
+
+A matcher-wrapping loop shaped exactly like that made every wrapped matcher call the same
+method. Every Node unit test passed. It failed only on a real Hermes run, because **the bug
+does not exist until the bundle is lowered**, and Node never sees the lowered bundle.
+
+Anything touching bundling, the framework, matchers or the runner needs a real `pnpm argus`
+run. New user-facing behaviour that affects the bundled Hermes side needs a fixture in
+`examples/`.
+
+## The adversarial fixtures
+
+`examples/` also holds files that attack the result channel on a real Hermes run and must
+stay inert: `print-hijack`, `json-hijack`, `tojson-hijack`, `push-hijack`,
+`iterator-hijack`, `robustness`, and `forge` (which prints a fabricated result frame and
+must not be believed).
+
+They are the regression suite for the threat model in
 [the result protocol](/internals/result-protocol/). If you touch result emission, run all
-of them.
+of them — a green Node suite proves nothing here.
 
-## Non-negotiable rules
+## Working on this site
 
-- **Keep `@argus/core` pure.** No adapter imports, no runtime imports, not even
-  `node:path`. Paths are segments.
-- **The result channel is sacred.** In `packages/framework/src/index.ts`: captured
-  primordials, the private nonce, the hand-written serializer. No `JSON.stringify`, no
-  array methods, no iterators, no prototype-sensitive APIs. Index loops only.
-- **Respect the syntax envelope** for anything bundled into Hermes. Host-side code is
-  ordinary Node and has none of these constraints —
-  [details](/hermes/syntax-envelope/).
-- **Never run Hermes through stdin.** Stdin puts it in REPL mode. File mode only.
-- **Files stay around or below ~500 lines.** Split when they grow past it.
-- **Conventional Commits**, no AI attribution in commit messages.
+The site is Astro + Starlight, in `website/` at the repository root. It sits **outside** the
+pnpm workspace on purpose, so it never affects the runner's dependency graph — and it is
+excluded from Biome, which cannot parse its Tailwind v4 CSS.
 
-## Where to start reading
+```bash
+cd website
+pnpm install --ignore-workspace
+pnpm dev      # http://localhost:4321
+pnpm build
+```
 
-1. `packages/core/src/domain/types.ts` — the domain model.
-2. `packages/framework/src/index.ts` — before touching result emission.
-3. `packages/cli/src/cli.ts` — the composition flow.
-4. The current [roadmap](/reference/roadmap/) item, before adding surface area.
+Pages are Markdown or MDX in `src/content/docs/`. The sidebar is declared explicitly in
+`astro.config.mjs`, so a new page means a new file **and** a new sidebar entry.
 
-## A known trap
-
-The unit-test harness **duplicates** the runner.
-`packages/framework/__tests__/run-harness.ts` reimplements `runSuite` / `runTest` because
-`index.ts` captures `print` at module evaluation and cannot be imported under Node.
-
-Runner bugs therefore have to be fixed in **both** places, and the real runner is only
-covered by the fixtures on Hermes. A green unit suite alone does not prove runner logic.
-Extracting a shared runner module is on the list.
+Every page has an "Edit page" link in its footer pointing at the file that produced it.
 
 ## Reporting a change
 
