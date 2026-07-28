@@ -1,0 +1,61 @@
+{
+  "name": "@arguslab/argus",
+  "version": "0.1.0",
+  "description": "Run React Native unit tests on the real Hermes engine, at unit-test speed.",
+  "license": "MIT",
+  "author": "Manuel Lopez <malopezr7@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/malopezr7/argus.git"
+  },
+  "homepage": "https://github.com/malopezr7/argus#readme",
+  "bugs": {
+    "url": "https://github.com/malopezr7/argus/issues"
+  },
+  "keywords": [
+    "hermes",
+    "react-native",
+    "test",
+    "test-runner",
+    "testing",
+    "unit-testing",
+    "jest",
+    "esbuild"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "argus": "./bin/argus.js"
+  },
+  "types": "./types/argus.d.ts",
+  "files": [
+    "bin",
+    "runtime",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@babel/core": "^8.0.1",
+    "@babel/plugin-transform-classes": "^8.0.1",
+    "esbuild": "^0.28.0",
+    "source-map": "0.7.4"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "test-renderer": "~1.2.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "test-renderer": {
+      "optional": true
+    }
+  }
+}

@@ -79,6 +79,14 @@ export interface BundleInput {
   polyfillPaths: string[];
   /** esbuild target forwarded to the bundler, e.g. ['es2020'] (see SPEC §3.4). */
   engineTarget: string[];
+  /**
+   * Root of the project under test — where packages the project OWNS (React) are
+   * resolved from, so the bundle is built against the same React the user's
+   * components are written against rather than a copy shipped alongside Argus.
+   *
+   * Optional: absent means the bundler falls back to the working directory.
+   */
+  projectDir?: string;
 }
 
 /**

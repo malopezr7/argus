@@ -11,6 +11,7 @@
     "lint": "biome lint .",
     "format": "biome format --write .",
     "test": "vitest run",
+    "build": "tsx scripts/build-package.ts",
     "phase1": "tsx scripts/run-phase1.ts",
     "argus": "tsx packages/cli/src/cli.ts"
   },

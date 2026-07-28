@@ -9,8 +9,8 @@ Argus bundles each `*.test.ts` into a sealed IIFE with esbuild, runs it on the
 standalone `hermes` VM as a subprocess, and parses the result back on the Node
 host. That is the same engine your users run, at roughly the cost of a unit test.
 
-> **Pre-release.** Argus cannot be installed from a package registry yet. See
-> [Status](#status) for what that means in practice and how to run it today.
+> **Pre-release.** Argus is at v0.1.0. It installs and runs, and the surface it
+> exposes is still free to change. See [Status](#status).
 
 ## Why
 
@@ -30,38 +30,56 @@ the engine, with a Jest-shaped surface where that costs nothing.
 
 ## Status
 
-Argus is pre-1.0 and **not installable from npm**. This is not a packaging
-detail waiting on a release button — no package emits build output. Several
-packages point `main` at `./src/*.ts`, which Node cannot import, and the rest
-point at a `dist/` nothing generates. The CLI also resolves its runtime inputs
-through the monorepo layout, so it would not find the framework under
-`node_modules` even if it loaded.
+Argus is pre-1.0. The runner, the engine targeting, automatic Hermes
+provisioning, and component testing all work; the API is still free to change
+between minor versions, and the roadmap below is the honest picture of what is
+missing.
 
-Making it installable is the whole of the [v0.1.0 milestone](ROADMAP.md#v010--make-it-installable),
-and no test-authoring features ship before it.
+## Installing
 
-What *does* work, today, is everything below: the runner, the engine targeting,
-and automatic Hermes provisioning. You run it from a clone.
-
-## Running it
-
-You need **Node 24 or newer** and **pnpm**.
+You need **Node 24 or newer**.
 
 ```bash
-git clone https://github.com/malopezr7/argus.git
-cd argus
-corepack enable
-pnpm install
+npm install --save-dev @arguslab/argus
 ```
 
-### Against your own React Native project
+One package, one binary. `core`, the adapters, and the Hermes-side framework are
+internal seams rather than an API, so they are not published separately.
+
+React is **not** a dependency. It is an optional peer, needed only if you write
+component tests:
+
+```bash
+npm install --save-dev react test-renderer
+```
+
+A suite that never imports `argus` never pulls React into the bundle, so a
+pure-TypeScript project runs with no React installed at all.
+
+### TypeScript
+
+Test globals (`describe`, `expect`) and the virtual `argus` module are declared
+in the package. TypeScript cannot pick up an ambient declaration on its own, so
+point it at them once — either in `tsconfig.json`:
+
+```json
+{ "compilerOptions": { "types": ["@arguslab/argus"] } }
+```
+
+or, leaving `tsconfig.json` alone, with one line in any `.d.ts` of your own:
+
+```ts
+/// <reference types="@arguslab/argus" />
+```
+
+## Running it
 
 Argus reads the Hermes version your project pins and provisions a matching VM.
 Run it with your project as the working directory:
 
 ```bash
 cd ~/my-rn-app
-/path/to/argus/node_modules/.bin/tsx /path/to/argus/packages/cli/src/cli.ts
+npx argus "src/**/*.test.ts"
 ```
 
 On a clean machine — no binary, no cache — that prints:
@@ -78,12 +96,17 @@ sum
 1 tests: 1 passed, 0 failed, 0 todo
 ```
 
-The `tsx` invocation is ugly on purpose — it is the honest one. `node
---experimental-strip-types` fails on the same file, because the workspace
-resolves `.js` specifiers to `.ts` sources. That is the missing build step,
-visible from the outside.
+### Working on Argus itself
 
-### The repository's own examples
+From a clone, the same CLI runs straight from source — there is no build step in
+the development loop:
+
+```bash
+git clone https://github.com/malopezr7/argus.git
+cd argus
+corepack enable
+pnpm install
+```
 
 `examples/` holds fixtures that run on real Hermes. The repository has no React
 Native install of its own, so there is no engine pin to read and nothing to
@@ -323,6 +346,9 @@ Result channel
 The load-bearing constraint: **Hermes cannot ask the host for modules at
 runtime.** Everything is bundled up front, which makes each run deterministic,
 isolated per file, and trivially parallel.
+
+These are internal seams, not an API — all eight are private, and `@arguslab/argus`
+is the only thing published.
 
 | Package | Role |
 | --- | --- |

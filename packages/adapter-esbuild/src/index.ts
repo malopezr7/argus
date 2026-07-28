@@ -11,6 +11,7 @@ import type {
 } from '@arguslab/core';
 import { build, transform } from 'esbuild';
 import { hermesClassLowering } from './hermes-class-lowering.js';
+import { projectPackageAliases } from './project-packages.js';
 
 /**
  * Default esbuild target.
@@ -56,14 +57,12 @@ export class EsbuildBundler implements Bundler {
     const resultNonce = randomBytes(12).toString('hex');
     const entry = generateVirtualEntry(input, resultNonce);
     const frameworkSourceDir = dirname(input.frameworkPath);
-    const rntlSourceDir = dirname(input.componentPath);
-    const rntlPackageDir = dirname(rntlSourceDir);
+    const projectDir = input.projectDir ?? process.cwd();
     const rnShim = join(frameworkSourceDir, 'rn-shim');
-    const reactPackage = join(rntlPackageDir, 'node_modules', 'react');
     const result = await build({
       stdin: {
         contents: entry,
-        resolveDir: process.cwd(),
+        resolveDir: projectDir,
         sourcefile: 'argus-virtual-entry.ts',
         loader: 'ts',
       },
@@ -82,7 +81,11 @@ export class EsbuildBundler implements Bundler {
         __DEV__: 'true',
         'process.env.NODE_ENV': '"development"',
       },
-      alias: { argus: input.componentPath, react: reactPackage, 'react-native': rnShim },
+      alias: {
+        argus: input.componentPath,
+        'react-native': rnShim,
+        ...projectPackageAliases(projectDir),
+      },
       plugins: [hermesClassLowering()],
       legalComments: 'none',
     });

@@ -14,7 +14,11 @@ import type { FileResult, RunOutcome } from '@arguslab/core';
 import { parseHermesOutput } from '@arguslab/core';
 import { DEFAULT_ENGINE_TARGET, EsbuildBundler } from '@arguslab/esbuild';
 import { HermesSpawnEngine } from '@arguslab/hermes/hermes-spawn-engine.js';
-import { exitCodeForSession, renderFileOutcome, renderSessionSummary } from '@arguslab/reporter-cli';
+import {
+  exitCodeForSession,
+  renderFileOutcome,
+  renderSessionSummary,
+} from '@arguslab/reporter-cli';
 import { remapStacks } from '@arguslab/sourcemap';
 import { foldOutcomes } from './aggregate.js';
 import { parseCliArgs, USAGE, UsageError } from './args.js';
@@ -114,6 +118,7 @@ async function main(): Promise<void> {
           componentPath,
           polyfillPaths,
           engineTarget: DEFAULT_ENGINE_TARGET,
+          projectDir: cwd,
         })
         .catch((e) => {
           throw Object.assign(new Error(errMsg(e)), { stage: 'bundle' });
