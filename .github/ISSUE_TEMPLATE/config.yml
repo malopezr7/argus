@@ -1,0 +1,21 @@
+# Blank issues stay enabled on purpose. Discussions are not turned on for this
+# repository, so disabling them would leave questions and anything the two
+# forms do not cover with nowhere to go. If Discussions are ever enabled, this
+# should flip to false and a Q&A link should be added below.
+blank_issues_enabled: true
+
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/malopezr7/argus/security/advisories/new
+    about: >-
+      Do not open a public issue. This opens a private advisory visible only to
+      you and the maintainer. Use it for anything letting a test forge a passing
+      result, anything affecting which binary Argus downloads and executes, or
+      anything that could steer the release pipeline.
+
+  - name: Setup, gates and contribution guide
+    url: https://github.com/malopezr7/argus/blob/main/CONTRIBUTING.md
+    about: >-
+      How to install, which Hermes binary you need (it is provisioned for you),
+      how to run the gates, and why examples/ runs under pnpm argus rather than
+      Vitest. Worth a look before filing a bug about a failing setup.

@@ -1,0 +1,90 @@
+name: Feature request
+description: Propose something Argus should do that it does not do today.
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Argus is deliberately small. It is a Hermes-faithful test runner with a
+        Jest-like surface where that helps, not a Jest reimplementation, and it
+        is not trying to become a full React Native runtime.
+
+        That is not a "no" — it is the bar. A proposal lands more easily when it
+        says why the thing belongs *here* rather than in a user's own helper.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What you are trying to do and where Argus gets in the way. Describe the
+        situation, not the solution — the best fix is often not the one the
+        reporter had in mind.
+      placeholder: >-
+        I cannot tell whether a component re-rendered, so I end up asserting on
+        internal state instead of on what the user would see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: >-
+        Sketch the API if you have one in mind. Real code, even rough, beats a
+        description.
+      render: typescript
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: >-
+        Workarounds you attempted and why they were not enough. If a small
+        helper in your own repo solves it, say so — that is useful evidence
+        either way.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Argus
+      description: Best guess is fine.
+      options:
+        - Test framework (describe/test/expect, hooks, matchers)
+        - Component testing (render, queries, fireEvent)
+        - CLI and reporting
+        - Bundling and the Hermes syntax envelope
+        - Hermes provisioning (prebuilts, source builds, engine selection)
+        - Mocks and spies
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: hermes-relevance
+    attributes:
+      label: Does this need to run on Hermes?
+      description: >-
+        The thing that justifies Argus existing is engine fidelity. If the
+        feature only matters on the host — reporting, CLI ergonomics, output
+        formats — say that; it is still a legitimate request and the answer
+        changes how it gets built. If it has to observe real Hermes behaviour,
+        explain what breaks when it does not.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: >-
+            I read the "What Argus is not" section of the README and this is not
+            already ruled out there.
+          required: true

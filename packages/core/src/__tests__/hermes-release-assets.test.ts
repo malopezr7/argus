@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { HERMES_PINS_BY_RN_MINOR } from '../domain/hermes-pins.js';
 import {
+  ARGUS_REPOSITORY,
   HERMES_BIN_PLATFORMS,
   HERMES_CHECKSUMS_ASSET,
   hermesAssetName,
@@ -182,5 +183,26 @@ describe('release notes', () => {
 
   it('tells a human how to verify the checksums', () => {
     expect(notes).toContain(`shasum -a 256 -c ${HERMES_CHECKSUMS_ASSET}`);
+  });
+
+  it('tells a human how to verify provenance, against the repository that publishes', () => {
+    expect(notes).toContain('gh attestation verify');
+    expect(notes).toContain(`--repo ${ARGUS_REPOSITORY}`);
+  });
+
+  it('names a real published asset in the verify example', () => {
+    // A copy-pasteable command is worth nothing if it names an asset the
+    // release does not carry, so the example has to be one of the real ones.
+    const named = HERMES_BIN_PLATFORMS.map((platform) =>
+      hermesAssetName(platform, '250829098.0.16'),
+    );
+    const example = /gh attestation verify (\S+)/.exec(notes)?.[1];
+
+    expect(example).toBeDefined();
+    expect(named).toContain(example);
+  });
+
+  it('says why provenance is not the same guarantee as a checksum', () => {
+    expect(notes).toContain('cannot say who built it');
   });
 });

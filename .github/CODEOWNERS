@@ -1,0 +1,24 @@
+# Code owners for Argus.
+#
+# Matching is last-rule-wins, so the catch-all comes first and the narrower
+# rules below override it. Every rule resolves to the same person today; they
+# are written separately because the paths differ in blast radius, and a second
+# maintainer should be able to take ownership of source without silently
+# inheriting the pipeline that signs and publishes executables.
+#
+# This file requests review automatically. It only *blocks* a merge if the
+# branch ruleset also requires code-owner approval.
+
+# Everything.
+*                       @malopezr7
+
+# The release pipeline: compiles Hermes and publishes binaries users download
+# and execute. Changes here alter what lands on someone else's machine.
+/.github/               @malopezr7
+/scripts/               @malopezr7
+
+# The result channel. A defect here can make a failing suite report as passing.
+/packages/framework/    @malopezr7
+
+# Pure domain and ports. Anything impure landing here breaks the architecture.
+/packages/core/         @malopezr7

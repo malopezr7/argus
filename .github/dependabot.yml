@@ -1,0 +1,99 @@
+version: 2
+
+updates:
+  # ---------------------------------------------------------------------------
+  # npm (pnpm workspace)
+  #
+  # pnpm is handled by the `npm` ecosystem. The root manifest is not enough on
+  # its own: the workspace packages carry real external dependencies that appear
+  # nowhere else — `@babel/core` and `esbuild` in adapter-esbuild, `source-map`
+  # in adapter-sourcemap, `react` and `test-renderer` in rntl — so the glob is
+  # what makes them visible.
+  #
+  # `group-by: dependency-name` is the part that keeps this quiet. `typescript`
+  # and `vitest` are declared in seven of the nine manifests, and without it a
+  # single bump would arrive as one pull request per manifest.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: npm
+    directories:
+      - '/'
+      - '/packages/*'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    # Conventional Commits, matching the rest of the history. `include: scope`
+    # appends `deps` or `deps-dev`, giving `build(deps): ...`.
+    commit-message:
+      prefix: build
+      include: scope
+
+    # Two groups, split by whether an update can change what runs on Hermes.
+    # That is the line that decides how a bump has to be reviewed, so it is the
+    # line the pull requests are cut along. The sets are disjoint by explicit
+    # exclusion rather than by ordering, so neither group can quietly swallow
+    # the other's dependencies if the groups are ever reordered.
+    groups:
+      # Reviewing one of these means running the real Hermes fixtures
+      # (`pnpm argus "examples/**/*.test.ts"`), not just watching CI go green.
+      # esbuild decides how test code is lowered for the Hermes syntax
+      # envelope, and Babel lowers classes for dependencies Hermes cannot parse;
+      # both have changed generated output before without changing any type.
+      hermes-bundle:
+        group-by: dependency-name
+        patterns:
+          - 'esbuild'
+          - '@babel/*'
+          - 'react'
+          - '@types/react'
+          - 'test-renderer'
+
+      # Everything else runs on the host during development and is covered by
+      # the ordinary gates.
+      dev-toolchain:
+        group-by: dependency-name
+        patterns:
+          - '*'
+        exclude-patterns:
+          - 'esbuild'
+          - '@babel/*'
+          - 'react'
+          - '@types/react'
+          - 'test-renderer'
+
+  # ---------------------------------------------------------------------------
+  # GitHub Actions
+  #
+  # Every action is pinned to a commit SHA. Dependabot understands that pinning
+  # and moves both the SHA and the `# v4.4.0` comment beside it, which is the
+  # only practical way to keep SHA pins current without hand-resolving refs.
+  #
+  # `/` is correct here and is not the repository root in the usual sense: for
+  # this ecosystem Dependabot reads it as ".github/workflows plus any action
+  # manifest at the root".
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope
+
+    # A week of distance from a fresh action release. These workflows compile
+    # and publish executables, so a compromised or broken action release is a
+    # supply-chain event rather than an inconvenience — and such releases are
+    # typically caught and yanked within days. Nothing here needs a same-day
+    # action bump. This delays version updates only; security updates ignore
+    # cooldown entirely.
+    cooldown:
+      default-days: 7
+
+    # Six actions across two workflows. One pull request that moves them
+    # together is easier to review than six that each move one SHA.
+    groups:
+      actions:
+        patterns:
+          - '*'

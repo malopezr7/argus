@@ -169,6 +169,10 @@ export function hermesReleaseNotes(options: HermesReleaseNotesOptions): string {
       `| \`${platform.os}-${platform.cpu}\` | \`${hermesAssetName(platform, version)}\` |`,
   );
 
+  // Built through `hermesAssetName` rather than written out, so the command a
+  // user copies cannot name an asset differently from the ones published.
+  const exampleAsset = hermesAssetName({ os: 'darwin', cpu: 'arm64' }, version);
+
   return `Prebuilt Hermes ${ENGINE_LABEL[engine]} binaries, built from
 [facebook/hermes](https://github.com/facebook/hermes) at tag \`${tag}\`.
 
@@ -192,7 +196,7 @@ and 0.86 want different ones with the same Argus installed. That is why this
 release is versioned by the **Hermes** version (\`${version}\`) and not by the
 Argus version, and why no Argus package depends on it.
 
-## Verifying
+## Verifying integrity
 
 Every asset ships a \`.sha256\` next to it, and \`${HERMES_CHECKSUMS_ASSET}\`
 covers the whole release:
@@ -203,7 +207,22 @@ shasum -a 256 -c ${HERMES_CHECKSUMS_ASSET}
 
 Argus verifies the checksum on download before it trusts an archive.
 
-## Provenance
+## Verifying origin
+
+A checksum says an archive arrived intact. It cannot say who built it —
+whoever replaces an archive replaces the \`.sha256\` beside it. Every archive
+here therefore carries a signed build provenance attestation, recorded in a
+public transparency log rather than served alongside the file:
+
+\`\`\`
+gh attestation verify ${exampleAsset} --repo ${ARGUS_REPOSITORY}
+\`\`\`
+
+That succeeds only for bytes produced by this repository's
+\`hermes-prebuilt\` workflow. Run it on an archive from anywhere else and it
+fails, which is the point.
+
+## How these were built
 
 Built in CI with the configuration React Native uses for its own Hermes builds:
 \`HERMES_ENABLE_INTL=ON\`, \`HERMES_ENABLE_DEBUGGER=ON\`,

@@ -1,0 +1,136 @@
+name: Bug report
+description: Something in Argus behaves differently from what it documents or promises.
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file this.
+
+        **If this is a security issue, stop here.** Report it privately through
+        [a security advisory](https://github.com/malopezr7/argus/security/advisories/new)
+        instead. That includes anything letting a test file forge a passing
+        result, or anything affecting which binary Argus downloads and runs.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+      placeholder: |
+        `expect(0.1 + 0.2).toBeCloseTo(0.3)` fails on Hermes but passes under Vitest.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: >-
+        The smallest test file that shows it, plus the exact command you ran.
+        A reproduction that fits in this box gets looked at first.
+      render: typescript
+      placeholder: |
+        // repro.test.ts
+        test('reproduces the bug', () => {
+          expect(somethingSmall()).toBe(1);
+        });
+
+        // pnpm argus repro.test.ts
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: What Argus printed
+      description: >-
+        The failing output, unabridged. Include the exit code if you have it —
+        Argus separates test failures (1) from infrastructure failures (2), and
+        which one you got narrows the search considerably.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: provisioning-summary
+    attributes:
+      label: Provisioning summary line
+      description: >-
+        Argus prints this on every run. It carries the engine, the Hermes tag,
+        where the binary came from, and its path — most of the diagnosis in one
+        line. If the run failed before printing it, say so here.
+      placeholder: '✓ hermes v1 hermes-v250829098.0.16 · prebuilt darwin-arm64 · /Users/you/.argus/cache/...'
+    validations:
+      required: true
+
+  - type: input
+    id: react-native-version
+    attributes:
+      label: React Native version
+      description: >-
+        The version in your project's package.json. It determines which Hermes
+        Argus targets, so a bug can be specific to it. Put `none` if you are
+        running Argus outside a React Native project.
+      placeholder: '0.86.0'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: OS and architecture
+      options:
+        - macOS arm64 (Apple Silicon)
+        - macOS x64 (Intel)
+        - Linux x64
+        - Linux arm64
+        - Windows
+        - Other (say which below)
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      description: 'Output of `node --version`.'
+      placeholder: 'v24.4.0'
+    validations:
+      required: true
+
+  - type: input
+    id: argus-version
+    attributes:
+      label: Argus commit
+      description: >-
+        Output of `git rev-parse --short HEAD`. Argus is pre-release and
+        unpublished, so the commit is the only version there is.
+      placeholder: '44631bd'
+    validations:
+      required: true
+
+  - type: textarea
+    id: anything-else
+    attributes:
+      label: Anything else
+      description: >-
+        Whether it reproduces on a different engine (`--engine legacy` /
+        `--engine v1`), whether it is a regression and from which commit,
+        anything unusual about your setup.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: This is not a security issue. Those go through a private advisory.
+          required: true
+        - label: >-
+            I reproduced this on the current `main`, or I have said above which
+            commit I am on and why I cannot.
+          required: true
