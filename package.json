@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "license": "MIT",
   "packageManager": "pnpm@11.9.0",
   "scripts": {
     "typecheck": "pnpm -r typecheck && tsc -p tsconfig.examples.json && tsc -p tsconfig.scripts.json",

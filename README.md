@@ -287,4 +287,8 @@ Before claiming a change is done, report the exact commands you ran and whether 
 
 ## License
 
-No license has been declared yet.
+MIT — see [LICENSE](LICENSE).
+
+Argus builds and redistributes the Hermes VM from [facebook/hermes](https://github.com/facebook/hermes),
+which is also MIT licensed. Those builds statically link `llvh`, a fork of LLVM vendored in the Hermes
+tree and covered by Apache-2.0 WITH LLVM-exception.

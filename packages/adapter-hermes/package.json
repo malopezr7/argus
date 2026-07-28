@@ -2,6 +2,7 @@
   "name": "@argus/hermes",
   "version": "0.0.0",
   "type": "module",
+  "license": "MIT",
   "exports": {
     "./engine-resolver.js": {
       "types": "./src/engine-resolver.ts",
