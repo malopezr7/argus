@@ -4,3 +4,9 @@ packages:
 allowBuilds:
   esbuild: true
   '@biomejs/biome': true
+
+overrides:
+  # Transitive through vitest -> vite. Only ever runs on a maintainer's machine,
+  # never in a published artifact, but there is no reason to carry a known path
+  # traversal when the fix is a version bump.
+  postcss: '>=8.5.18'
