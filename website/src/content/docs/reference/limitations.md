@@ -21,7 +21,7 @@ On the [roadmap](/reference/roadmap/), in priority order.
 | Pluggable reporters | Terminal output only. No JSON, no JUnit. |
 | `bail`, `retry`, test-name filtering | Not implemented. |
 | Setup files | No user-supplied global setup or teardown. |
-| Windows | No prebuilt VM. `--provision` or `--hermes` only. |
+| Windows | **Unsupported.** No prebuilt VM is published for `win32-x64`, and no source-build path is verified. Prebuilts cover `darwin-arm64`, `darwin-x64`, `linux-x64` and `linux-arm64`. |
 
 ## Out of scope on purpose
 

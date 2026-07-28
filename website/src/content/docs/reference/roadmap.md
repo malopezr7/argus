@@ -1,13 +1,14 @@
 ---
 title: Roadmap
-description: What is done, what ships in v0.1.0, and what comes after.
+description: What shipped in v0.1.0, what comes next, and what is deliberately deferred.
 sidebar:
   order: 2
 ---
 
-Status: **pre-release**, working toward `v0.1.0`.
+Status: **`v0.1.0`** — installable from npm as `@arguslab/argus`. Pre-1.0: the surface is
+still free to change between minor versions.
 
-The runner works. What is missing is distribution.
+The runner works and ships. What is missing is test-authoring surface.
 
 ## Done and verified
 
@@ -29,37 +30,51 @@ The runner works. What is missing is distribution.
   `hermes-compiler` — with the first release cut:
   [`hermes-bin-v250829098.0.16`](https://github.com/malopezr7/argus/releases/tag/hermes-bin-v250829098.0.16),
   V1, all four platforms, covering React Native 0.86 and 0.87.
-- 372 host-side unit tests, plus 15 Hermes fixtures — 6 passing, 2 intentionally failing,
-  7 adversarial.
+- 747 host-side unit tests across 65 files (2 skipped), plus 15 Hermes fixtures — 6 passing,
+  2 intentionally failing, 7 adversarial.
 
-## v0.1.0 — Make it installable
+## Shipped in v0.1.0 — distribution
 
-The only milestone that matters right now. No new test-authoring features ship before it.
+Argus is installable. This was the milestone everything else waited behind.
 
-### Distribution
+- One published package, `@arguslab/argus`, exposing the `argus` bin. The other seven
+  workspace packages are private and never reach the registry — see
+  [Package map](/internals/packages/).
+- A build pipeline staging the tarball: host code bundled to a single ESM binary, the
+  Hermes-side sources copied verbatim as TypeScript runtime assets. 28 files, 54 kB packed,
+  202 kB unpacked, 256 kB installed.
+- Path resolution anchored to the CLI module's own location instead of the monorepo layout,
+  so the framework and polyfills are found in both the development and installed shapes.
+- React resolved from the **user's project** rather than relative to the component-testing
+  package. React and `test-renderer` are optional peers; a pure-TypeScript suite runs with
+  neither installed.
+- Complete package metadata: `license`, `repository`, `description`, `files`, `engines`
+  (`node >= 24`), `publishConfig.access: public`.
+- Types for the virtual `argus` module and the test globals.
 
-- Build pipeline emitting JS and `.d.ts` for every published package.
-- Replace monorepo-layout path resolution with node resolution, so the CLI finds the
-  framework and polyfills when installed under `node_modules`.
-- A working `argus` bin entry.
-- Publish flow with complete package metadata: `license`, `repository`, `description`,
-  `files`, `engines`, `publishConfig.access`.
-- Cut the remaining `hermes-bin-v*` releases so the prebuilt step stops reporting a 404 on
-  React Native 0.83 through 0.85 and on the legacy engine.
+That last one comes with a caveat the docs state plainly rather than glossing: it is **not**
+zero-config. TypeScript only auto-loads ambient declarations from `node_modules/@types/*`,
+so consumers add `"types": ["@arguslab/argus"]` or one triple-slash reference. See
+[Installation → TypeScript](/start/installation/#typescript).
 
-### Engine target
+## Still open in the engine and provisioning work
 
-- Default to V1, with V0 as an explicit opt-in target.
-- Detect the project's engine and warn loudly on mismatch.
-- Assert the VM's HBC bytecode version against the project's pinned `hermes-compiler` at
-  startup.
-- Scope the class-lowering plugin to the legacy target only.
+- Scope the class-lowering plugin to the legacy target only. Today it is scoped to
+  *dependencies* — `node_modules` JavaScript containing class syntax — and runs regardless
+  of engine. Correct and cheap, but broader than it needs to be on V1, whose parser handles
+  classes natively.
+- Revisit the documented [syntax envelope](/hermes/syntax-envelope/) — it describes V0, not
+  V1.
+- Refresh the RN-to-Hermes lookup table in CI from the published branches table. The table
+  exists and is correct; refreshing it is manual.
+- Cut the remaining `hermes-bin-v*` releases. Only `hermes-bin-v250829098.0.16` is
+  published, so the prebuilt step 404s on React Native 0.83–0.85 and on every legacy pin,
+  falling through to `--provision`.
 
-### Provisioning
+## v0.2.0 — Test-authoring features
 
-- Publish prebuilts for `darwin-arm64`, `darwin-x64`, `linux-x64` and `linux-arm64`.
-- Refresh the RN-to-Hermes lookup table in CI from the published branches table.
-- Bundled-VM detection for the legacy target on RN 0.73–0.82.
+The next milestone. None of these blocked installability; all of them are the reason
+someone would ask for a v0.2.
 
 ### Configuration
 
@@ -85,28 +100,7 @@ so this needs no dependency and no bundler.
 - `include` / `exclude` replacing the hardcoded globs.
 - `passWithNoTests` — a zero-match run currently exits 2.
 
-### Make component testing optional
-
-Testing plain TypeScript should not require the component facade. The runtime already
-behaves correctly; what remains is packaging plus one genuine design fix — React is
-currently located relative to the `@arguslab/rntl` install directory, which makes it
-structurally mandatory for any JSX.
-
-- Optional `componentPath` in the bundler input and the CLI path resolver.
-- Resolve React from the user's project, independent of `@arguslab/rntl`.
-- Conditional alias map, with a clear diagnostic when `argus` is imported without the
-  package installed.
-- Regression test: bundle a pure-TypeScript suite with no React installed.
-
-### CI
-
-- Build on CI; run the Hermes fixtures there, not just locally.
-- macOS and Linux matrix.
-- Release workflow.
-
-## v0.2.0 — Test-authoring features
-
-Deferred until v0.1.0 ships. Valuable, but none of them block adoption.
+### Snapshots, coverage, watch
 
 - **Snapshots** — `toMatchSnapshot()`, external `.snap` files, `--update`, obsolete
   detection and safe pruning. Design work is complete.
@@ -116,6 +110,26 @@ Deferred until v0.1.0 ships. Valuable, but none of them block adoption.
   it. Measured at roughly four times faster on re-runs, because compilation dominates and
   the cache absorbs it.
 
+### Component testing — the deferred half
+
+The synchronous surface shipped. The asynchronous one did not, and the reason is structural
+rather than scheduling: the standalone VM has no timers, so there is nothing for a polling
+helper to wait on until Argus supplies its own clock.
+
+- `waitFor` and `findBy*`.
+- `userEvent` — the high-level interaction layer.
+- Fake timers.
+
+### CI
+
+- Build on CI. The workflow runs typecheck, Biome and Vitest on `ubuntu-latest` only;
+  `pnpm build` is not exercised.
+- Run the Hermes fixtures there, not just locally. They are gated on a local binary that is
+  not committed, so they skip.
+- macOS and Linux matrix.
+- Release workflow for the npm package. The Hermes VM binaries are published by a workflow;
+  publishing `@arguslab/argus` is manual.
+
 ## v0.3.0 and beyond
 
 - **Reporters** — pluggable output, JSON and JUnit for CI.
@@ -123,7 +137,7 @@ Deferred until v0.1.0 ships. Valuable, but none of them block adoption.
   `watch`). Until then the built-in parser is adequate.
 - **`argus init`** — scaffold a config file.
 - **Windows support** — needs a prebuilt VM for `win32-x64` or a documented source-build
-  path.
+  path. Unsupported today in any form.
 - **Broader React Native range** — validate and document which versions work.
 - **Setup files** — user-supplied global setup and teardown.
 - **`bail` / fail-fast**, **retry**, **test-name filtering**.
@@ -133,3 +147,7 @@ Deferred until v0.1.0 ships. Valuable, but none of them block adoption.
 Running on a device, full Jest compatibility, replacing Vitest for non-RN projects, and
 bundling a JavaScript engine other than Hermes. Reasoning:
 [Limitations & non-goals](/reference/limitations/).
+
+Publishing the internal packages is also a non-goal. `core`, the adapters and the reporter
+are a hexagonal seam, not an API; `framework` and `rntl` are never imported by Node at all.
+See [Package map](/internals/packages/).

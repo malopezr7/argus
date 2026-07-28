@@ -46,8 +46,9 @@ This is where Argus differs from the esbuild model, which pins one binary per es
 release — esbuild only ever needs one.
 
 A release on a public repository also needs no authentication to download, has no practical
-size limit, and is CDN-served. npm stays reserved for the Argus code packages, which is a
-separate concern.
+size limit, and is CDN-served. npm stays reserved for the Argus package itself, which is a
+separate concern — `@arguslab/argus` carries no VM at all, which is why it installs in
+256 kB.
 
 The `hermes-bin-v` prefix keeps the two tag namespaces separable: Argus tags its own
 releases `v0.1.0`, and both live on the same repository. A hyphen rather than a slash keeps
@@ -68,6 +69,18 @@ wants exactly one archive and should not pay for the others.
 Argus verifies the checksum on download **before** it trusts an archive, and extracts
 through a temporary directory so an interrupted run cannot leave a half-populated cache
 entry behind.
+
+A checksum only answers *did this arrive intact* — whoever replaces an archive replaces the
+`.sha256` beside it. For *who built this*, every archive also carries a signed build
+provenance attestation recorded in a public transparency log:
+
+```bash
+gh attestation verify hermes-250829098.0.16-darwin-arm64.tar.gz --repo malopezr7/argus
+```
+
+That succeeds only for bytes produced by this repository's `hermes-prebuilt` workflow. An
+archive from anywhere else fails. Full detail:
+[SECURITY.md](https://github.com/malopezr7/argus/blob/main/SECURITY.md).
 
 ## The parity gate
 

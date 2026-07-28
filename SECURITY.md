@@ -124,11 +124,13 @@ This succeeds only for bytes produced by this repository's `hermes-prebuilt`
 workflow, and reports the workflow and commit that produced them. An archive
 from anywhere else fails, which is the entire point.
 
-> **One known gap.** The `hermes-bin-v250829098.0.16` release was published
-> before provenance attestation was added to the workflow, so it carries
-> checksums only. `gh attestation verify` failing on those specific archives
-> means they predate the signing, not that they were tampered with. Republishing
-> that release through the workflow attaches an attestation to it.
+All four archives in `hermes-bin-v250829098.0.16` — `darwin-arm64`, `darwin-x64`,
+`linux-x64` and `linux-arm64` — carry an attestation and verify.
+
+> **Reading the output.** `gh attestation verify` prints nothing on success in
+> some versions; the exit code is the signal. `echo $?` after it, and expect
+> `0`. A tampered or foreign archive exits non-zero with an HTTP 404 — no
+> attestation is recorded for those bytes under this repository.
 
 ## How the supply chain is protected
 

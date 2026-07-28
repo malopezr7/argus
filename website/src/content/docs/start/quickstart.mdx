@@ -9,10 +9,17 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
 <Steps>
 
-1. **Install the runner.**
+1. **Install the runner.** One package, one binary.
 
    ```bash
-   pnpm add -D @arguslab/cli
+   pnpm add -D @arguslab/argus
+   ```
+
+   For type-checking, point TypeScript at the shipped declarations — it does not find them
+   on its own. See [Installation → TypeScript](/start/installation/#typescript).
+
+   ```json title="tsconfig.json"
+   { "compilerOptions": { "types": ["@arguslab/argus"] } }
    ```
 
 2. **Write a test.** No import of the test API is needed — `describe`, `test`, `it`,

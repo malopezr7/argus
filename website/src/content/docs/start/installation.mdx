@@ -11,9 +11,9 @@ import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 | Requirement | Why |
 |---|---|
-| Node 22+ | The host process. Argus uses `node:util.parseArgs`, `fs.promises.glob` and `util.styleText`. |
+| Node 24+ | The host process. Argus uses `node:util.parseArgs`, `fs.promises.glob` and `util.styleText`. Declared as `"engines": { "node": ">=24" }`. |
 | A `react-native` install | Argus reads the Hermes engine your project pins from it. Without one, you must name a binary yourself. |
-| macOS or Linux | Prebuilt Hermes binaries are published for `darwin-arm64`, `darwin-x64`, `linux-x64` and `linux-arm64`. Windows needs a source build. |
+| macOS or Linux | Prebuilt Hermes binaries are published for `darwin-arm64`, `darwin-x64`, `linux-x64` and `linux-arm64`. **Windows is not supported.** |
 
 You do **not** need Xcode, Android Studio, a simulator, cmake, or Metro. The Hermes VM is
 downloaded on first use.
@@ -23,35 +23,92 @@ downloaded on first use.
 <Tabs syncKey="pm">
   <TabItem label="pnpm">
   ```bash
-  pnpm add -D @arguslab/cli
+  pnpm add -D @arguslab/argus
   ```
   </TabItem>
   <TabItem label="npm">
   ```bash
-  npm install --save-dev @arguslab/cli
+  npm install --save-dev @arguslab/argus
   ```
   </TabItem>
   <TabItem label="yarn">
   ```bash
-  yarn add -D @arguslab/cli
+  yarn add -D @arguslab/argus
   ```
   </TabItem>
 </Tabs>
 
-That gives you the `argus` binary. Everything the runner needs on the host —
-the bundler, the Hermes adapter, the source-map remapper, the reporter — comes with it.
+One package, one binary — 28 files, 54 kB packed, 256 kB installed. Everything the runner
+needs on the host comes with it: the bundler, the Hermes adapter, the source-map remapper,
+the reporter.
+
+<Aside type="note">
+There is no `@arguslab/cli`, `@arguslab/rntl` or `@arguslab/core` on npm, and there never
+will be. Those are internal seams inside the repository — see
+[Package map](/internals/packages/).
+</Aside>
 
 ### Component testing (optional)
 
-Testing React components needs one more package. Plain TypeScript and plain-logic tests do
-not.
+Testing React components needs React and a renderer. Plain TypeScript and plain-logic tests
+do not.
 
-```bash
-pnpm add -D @arguslab/rntl
+<Tabs syncKey="pm">
+  <TabItem label="pnpm">
+  ```bash
+  pnpm add -D react test-renderer
+  ```
+  </TabItem>
+  <TabItem label="npm">
+  ```bash
+  npm install --save-dev react test-renderer
+  ```
+  </TabItem>
+  <TabItem label="yarn">
+  ```bash
+  yarn add -D react test-renderer
+  ```
+  </TabItem>
+</Tabs>
+
+Both are **optional peer dependencies**, so installing Argus does not pull them in. A suite
+that never imports `argus` never pulls React into the bundle, so a pure-TypeScript project
+runs with neither installed.
+
+Import `argus` without them and the run stops at the bundle step:
+
+```text
+✘ [ERROR] Could not resolve "react"
+✗ INFRASTRUCTURE FAILURE [bundle] Build failed with 5 errors
 ```
 
-Your test files keep importing from `'argus'`; the bundler maps that specifier to the
-package. See [Component testing](/tests/components/).
+Exit code 2 — an infrastructure failure, never a red test. See
+[Component testing](/tests/components/).
+
+## TypeScript
+
+Test globals (`describe`, `test`, `expect`) and the virtual `argus` module are declared in
+the package, but TypeScript will not find them on its own: it only auto-loads ambient
+declarations from `node_modules/@types/*`, and Argus is not published under that scope.
+
+Point it at them once — either in `tsconfig.json`:
+
+```json title="tsconfig.json"
+{ "compilerOptions": { "types": ["@arguslab/argus"] } }
+```
+
+or, leaving `compilerOptions` alone, with one line in a `.d.ts` your `include` already
+covers:
+
+```ts title="argus-env.d.ts"
+/// <reference types="@arguslab/argus" />
+```
+
+<Aside type="caution">
+This step is not optional. Skip it and you get `Cannot find name 'describe'` and
+`Cannot find module 'argus'` from `tsc`. It affects type-checking only — the run itself
+works either way, because the bundler never consults your tsconfig.
+</Aside>
 
 ## Add a script
 
@@ -105,8 +162,9 @@ Full precedence rules: [How the binary is provisioned](/hermes/provisioning/).
 
 ## Building Hermes from source
 
-When no prebuilt applies — a Windows host, or a React Native version whose Hermes pin is
-date-based or a bare commit SHA — Argus can build the VM. It never does so silently:
+When no prebuilt applies — a React Native version whose Hermes pin is date-based or a bare
+commit SHA, or one of the releases not yet cut — Argus can build the VM. It never does so
+silently:
 
 ```bash
 argus --provision "src/**/*.test.ts"
@@ -114,6 +172,11 @@ argus --provision "src/**/*.test.ts"
 
 Needs `git`, `cmake` and `ninja` on `PATH`. Expect a couple of minutes for the first build;
 the result is cached like any other binary.
+
+<Aside type="caution">
+This is not a Windows escape hatch. Windows has no published prebuilt and no verified
+source-build path — it is [unsupported](/reference/limitations/), not merely inconvenient.
+</Aside>
 
 ## CI
 

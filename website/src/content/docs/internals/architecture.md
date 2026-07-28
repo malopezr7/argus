@@ -79,6 +79,10 @@ global `define`, which would expose it to user code and make the result frame fo
 The domain in `@arguslab/core` is pure — no filesystem, no process, no adapter imports, not
 even `node:path`. On-disk layout is expressed as path *segments* that callers join.
 
+Every package named below is **internal**: only `@arguslab/argus` is published, and the
+host side of it is bundled into one file at build time. The seam is a source-tree boundary,
+not an installable one — see [Package map](/internals/packages/).
+
 Four ports, four adapters:
 
 | Port | Adapter | Responsibility |

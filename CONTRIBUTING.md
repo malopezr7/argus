@@ -92,6 +92,30 @@ expected, not just that something ran.
 A user-facing change that affects bundled Hermes behaviour needs at least one
 real fixture exercising it.
 
+### Changing what gets published
+
+The repository is eight workspace packages; exactly one is published. If you
+touch `packaging/`, `scripts/build-package.ts`, `packages/cli/src/paths.ts`, or
+anything that decides what lands in the tarball, stage it and look:
+
+```bash
+pnpm build          # → dist/, the directory that IS the tarball
+npm pack ./dist     # prints the file list, the packed and unpacked sizes
+```
+
+`pnpm build` is a staging step, not a per-package compile. The host side (cli,
+core, adapters, reporter) is bundled into one ESM binary. The Hermes side
+(`framework`, `rntl`) is copied **verbatim as TypeScript**, because esbuild
+compiles it on the user's machine against the engine their project pins —
+compiling it here would bake in one engine's syntax envelope and defeat the
+point.
+
+The build asserts the things that fail silently otherwise: the hashbang survived,
+every externalised dependency is declared in `packaging/package.json`, and no
+test, tsconfig or build-info file leaked into the staged tree. Note the `./` in
+`npm pack ./dist` — without it npm resolves `dist` as a package name on the
+registry.
+
 ## Architecture rules
 
 These are load-bearing. A change that breaks one of them will be sent back even

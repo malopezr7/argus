@@ -12,8 +12,11 @@ Argus runs **real React** inside the Hermes VM. Not a DOM emulation, not a mocke
 
 The surface is intentionally synchronous and intentionally small.
 
+It needs React and a renderer. Both are **optional peer dependencies** of Argus, so they
+are not installed for you:
+
 ```bash
-pnpm add -D @arguslab/rntl
+pnpm add -D react test-renderer
 ```
 
 ```tsx title="src/Counter.test.tsx"
@@ -32,8 +35,28 @@ describe('Counter', () => {
 });
 ```
 
-Test files import from `'argus'`; the bundler maps that specifier to the package. Plain
-TypeScript tests never touch it and do not need it installed.
+Test files import from `'argus'` — a virtual specifier the bundler maps onto the
+component-testing layer that ships inside the Argus package. Plain TypeScript tests never
+import it, so React is never pulled into their bundle and they run with nothing extra
+installed.
+
+Import `'argus'` without React and the run stops at the bundle step rather than resolving
+something unexpected:
+
+```text
+✘ [ERROR] Could not resolve "react"
+    node_modules/@arguslab/argus/runtime/rntl/src/index.ts:1:18:
+      1 │ import React from 'react';
+
+✗ INFRASTRUCTURE FAILURE [bundle] Build failed with 5 errors
+```
+
+Exit code 2 — an infrastructure failure, reported separately from test failures.
+
+React is resolved from **your project**, not from Argus's own tree, so the renderer shares
+the exact module instance your components were built against. Two copies of React in one
+bundle means two copies of the internals `act` and the reconciler coordinate through, and
+component tests break in ways that look like Argus bugs.
 
 ## `render`
 
@@ -181,11 +204,17 @@ Deliberately out of scope for this iteration:
 
 If your assertion needs any of those, it belongs in an on-device test, not here.
 
-## About `@arguslab/rntl`
+## Where this layer lives
 
-The facade is maintained as its own package and treated as a **stopgap**. When upstream
-React Native Testing Library v14 on `test-renderer` becomes bundleable within the supported
-Hermes envelope, this package can be deprecated without growing the framework core.
+The facade is a separate workspace package in the repository (`packages/rntl`) and is
+**never published to npm**. It ships inside `@arguslab/argus` as TypeScript source under
+`runtime/rntl/src`, and esbuild compiles it on your machine on every run — the same way the
+test framework itself ships. Keeping it a distinct package is an internal boundary that
+stops React from leaking into the framework core, not a distribution decision.
 
-Your test code is insulated from that: it imports from `'argus'`, and the specifier is what
-gets remapped.
+It is treated as a **stopgap**. When upstream React Native Testing Library v14 on
+`test-renderer` becomes bundleable within the supported Hermes envelope, this layer can be
+retired without growing the framework core.
+
+Your test code is insulated from either outcome: it imports from `'argus'`, and the
+specifier is what gets remapped.

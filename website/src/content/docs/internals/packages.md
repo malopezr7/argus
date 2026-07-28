@@ -5,18 +5,50 @@ sidebar:
   order: 4
 ---
 
-Argus is a pnpm workspace. Each package has one job and one rule.
+Argus is a pnpm workspace of eight packages. **Exactly one is published:**
+`@arguslab/argus`. The other seven are `private: true` and will never appear on the
+registry.
+
+That is a packaging decision, not an architectural one. The hexagonal split below is
+entirely intact in the source tree; it simply does not require eight registry entries.
 
 | Package | Role | Rule |
 |---|---|---|
 | `@arguslab/core` | Pure domain types, ports, result-protocol parser, Hermes version/pin/asset logic | No adapter or runtime imports — not even `node:path` |
 | `@arguslab/framework` | Runs **inside Hermes**: globals, runner, matchers, mocks, result emission | Protect the result channel |
-| `@arguslab/rntl` | Synchronous component-testing facade, exposed through the `argus` alias | A replaceable stopgap, maintained separately |
+| `@arguslab/rntl` | Synchronous component-testing facade, exposed through the `argus` alias | A replaceable stopgap, kept out of the framework core |
 | `@arguslab/esbuild` | Bundles polyfills + framework + tests into one IIFE | Owns syntax lowering and the virtual entry |
 | `@arguslab/hermes` | Spawns the standalone VM, resolves engines, downloads prebuilts, builds from source | Never use stdin — stdin puts Hermes in REPL mode |
 | `@arguslab/sourcemap` | Remaps Hermes stack frames back to original sources | Must be total: never throw during reporting |
 | `@arguslab/reporter-cli` | Terminal output and exit-code policy | Report test failures separately from infra failures |
 | `@arguslab/cli` | Composition root | Wires adapters; keeps the domain pure |
+
+## How eight packages become one tarball
+
+`pnpm build` (`scripts/build-package.ts`) is a **staging** step, not a per-package compile.
+The two halves are handled differently, and the difference is the whole design:
+
+| | Host code | Runtime assets |
+|---|---|---|
+| Packages | `cli`, `core`, `esbuild`, `hermes`, `sourcemap`, `reporter-cli` | `framework`, `rntl` |
+| Runs on | Node | Hermes |
+| Shipped as | One bundled ESM file, `bin/argus.js` | **TypeScript, copied verbatim**, under `runtime/<name>/src` |
+| Why | Nobody imports it — it is a binary, not a library, so it needs no declarations and the internal seam costs the user nothing at install time | esbuild compiles them on the user's machine, against the engine their project pins. Compiling them here would bake in one engine's syntax envelope and defeat the point |
+
+The result is 28 files: 54 kB packed, 202 kB unpacked, 256 kB installed. Four dependencies
+stay external because none of them survives being inlined — `esbuild` ships a
+platform-specific native binary, `@babel/core` and `@babel/plugin-transform-classes`
+resolve plugins dynamically, and `source-map` loads a WASM file.
+
+`framework` and `rntl` are therefore never imported by Node at any point, in development or
+once installed. Their paths are handed to esbuild as strings. That is why
+`packages/cli/src/paths.ts` probes the disk for them instead of calling `require.resolve` —
+and why the published layout mirrors `packages/<name>/src` exactly, since
+`rntl/src/index.ts` imports `../../framework/src/lifecycle.js` across the package boundary.
+
+React and `test-renderer` are **optional peer dependencies**, resolved from the user's
+project rather than from Argus's own tree. A pure-TypeScript suite runs with neither
+installed.
 
 ## Why core is *this* pure
 
@@ -63,9 +95,11 @@ Node's built-ins cover more than they used to:
 | Glob discovery | `fs.promises.glob` |
 | Loading a TypeScript config | Native type stripping |
 
-The only external runtime dependencies in the whole workspace are `esbuild` (the bundler),
-`source-map` (isolated in `@arguslab/sourcemap`), Babel (legacy class lowering only), and
-React plus `test-renderer` inside the optional component-testing package.
+The published package declares exactly four dependencies: `esbuild` (the bundler),
+`source-map` (isolated in `@arguslab/sourcemap`), and `@babel/core` plus
+`@babel/plugin-transform-classes` (class lowering for dependencies that ship class syntax).
+React and `test-renderer` are optional peers, not dependencies — they belong to the project
+under test.
 
 Every added dependency needs a reason a built-in cannot satisfy.
 

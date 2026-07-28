@@ -42,8 +42,12 @@ describe('sum', () => {
 ```
 
 ```bash
-argus "src/**/*.test.ts"
+npm install --save-dev @arguslab/argus
+npx argus "src/**/*.test.ts"
 ```
+
+One package, one binary. React is an optional peer — a pure-TypeScript suite runs without
+it.
 
 <CardGrid>
 	<Card title="Real Hermes, not an emulation" icon="rocket">
@@ -82,8 +86,10 @@ argus "src/**/*.test.ts"
 </CardGrid>
 
 :::caution[Status]
-Argus is **pre-release**, working toward `v0.1.0`. The runner, matchers, mocks, source maps
-and synchronous component testing are built and verified. Snapshots, coverage, watch mode
-and a config file are not — see the [Roadmap](/reference/roadmap/) for what is landing and
+Argus is at **`v0.1.0`** and installable from npm — one package, one binary. Pre-1.0: the
+runner, matchers, mocks, source maps and synchronous component testing are built and
+verified, but the surface is still free to change between minor versions. Snapshots,
+coverage, watch mode and a config file are not built — see the
+[Roadmap](/reference/roadmap/) for what is landing and
 [Limitations](/reference/limitations/) for what is out of scope on purpose.
 :::

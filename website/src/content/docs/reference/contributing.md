@@ -52,6 +52,21 @@ Anything touching bundling, the framework, matchers or the runner needs a real `
 run. New user-facing behaviour that affects the bundled Hermes side needs a fixture in
 `examples/`.
 
+## Changing what gets published
+
+Eight workspace packages, one published artifact. If you touch `packaging/`,
+`scripts/build-package.ts`, `packages/cli/src/paths.ts`, or anything else that decides what
+lands in the tarball, stage it and look:
+
+```bash
+pnpm build          # → dist/, the directory that IS the tarball
+npm pack ./dist     # file list, packed and unpacked sizes
+```
+
+The `./` matters — without it npm resolves `dist` as a package name on the registry. How
+the two halves are staged, and why the Hermes side ships as TypeScript, is on
+[Package map](/internals/packages/#how-eight-packages-become-one-tarball).
+
 ## The adversarial fixtures
 
 `examples/` also holds files that attack the result channel on a real Hermes run and must

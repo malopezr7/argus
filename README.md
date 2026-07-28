@@ -43,8 +43,9 @@ You need **Node 24 or newer**.
 npm install --save-dev @arguslab/argus
 ```
 
-One package, one binary. `core`, the adapters, and the Hermes-side framework are
-internal seams rather than an API, so they are not published separately.
+One package, one binary — 28 files, 54 kB packed, 256 kB installed. `core`, the
+adapters, and the Hermes-side framework are internal seams rather than an API,
+so they are not published separately.
 
 React is **not** a dependency. It is an optional peer, needed only if you write
 component tests:
@@ -54,23 +55,38 @@ npm install --save-dev react test-renderer
 ```
 
 A suite that never imports `argus` never pulls React into the bundle, so a
-pure-TypeScript project runs with no React installed at all.
+pure-TypeScript project runs with no React installed at all. Import `argus`
+without them and the run stops at the bundle step rather than guessing:
+
+```
+✘ [ERROR] Could not resolve "react"
+✗ INFRASTRUCTURE FAILURE [bundle] Build failed with 5 errors
+```
+
+That is exit **2**, an infrastructure failure — never a red test.
 
 ### TypeScript
 
 Test globals (`describe`, `expect`) and the virtual `argus` module are declared
-in the package. TypeScript cannot pick up an ambient declaration on its own, so
-point it at them once — either in `tsconfig.json`:
+in the package. This is not zero-config, and pretending otherwise wastes an
+afternoon: TypeScript only auto-loads ambient declarations from
+`node_modules/@types/*`, and Argus is not published under that scope. Point it
+at them once — either in `tsconfig.json`:
 
 ```json
 { "compilerOptions": { "types": ["@arguslab/argus"] } }
 ```
 
-or, leaving `tsconfig.json` alone, with one line in any `.d.ts` of your own:
+or, leaving `compilerOptions` alone, with one line in a `.d.ts` your `include`
+already covers:
 
 ```ts
 /// <reference types="@arguslab/argus" />
 ```
+
+Both are verified. Without one of them you get `Cannot find name 'describe'` and
+`Cannot find module 'argus'` — at type-check time only; the run itself is
+unaffected.
 
 ## Running it
 
@@ -213,8 +229,9 @@ Prebuilts are published for `darwin-arm64`, `darwin-x64`, `linux-x64` and
 `linux-arm64`. Windows is not supported yet.
 
 Measured on a clean project with no binary and no cache: **3.6 s** for the first
-run including the download, **0.62 s** for the second from cache. With the
-network cut, the cached run still passes.
+run including the download, **1.3 s** for the second, settling at **0.62 s** once
+the cache is warm. The download leg is network-bound, so the first number is the
+one that moves. With the network cut, the cached run still passes.
 
 The source build is last and opt-in for a reason. It clones and compiles Hermes,
 takes minutes rather than seconds, and needs `git`, `cmake` and `ninja`. That
@@ -361,6 +378,14 @@ is the only thing published.
 | `@arguslab/cli` | Composition root |
 | `@arguslab/reporter-cli` | Terminal output and exit-code policy |
 
+The two halves ship differently, and the difference is the design. The host side
+is bundled into one ESM binary: it is a program, not a library, so collapsing the
+seam costs the user nothing. `framework` and `rntl` are never imported by Node at
+all — their paths are handed to esbuild, which compiles them on your machine
+against the engine your project pins. So they ship as **TypeScript runtime assets
+inside the tarball**, copied verbatim. Compiling them at publish time would bake
+in one engine's syntax envelope and defeat the point.
+
 The result channel is treated as a high-integrity boundary. A test file can
 pollute prototypes and override globals, so the framework captures primordials
 before user code runs, frames output with a private per-run nonce, and
@@ -368,6 +393,9 @@ serialises by hand rather than through `JSON.stringify`. A test must not be able
 to forge its own verdict.
 
 ## Documentation
+
+Full docs: **[argus-hermes.pages.dev](https://argus-hermes.pages.dev)** — installation,
+matchers, mocks, component testing, the provisioning chain, and the internals.
 
 - [ROADMAP.md](ROADMAP.md) — what ships next, and what is deliberately out of scope
 - [CONTRIBUTING.md](CONTRIBUTING.md) — setup, gates, architecture rules
