@@ -20,8 +20,8 @@ Environment:
 
 Hermes is taken from the first source that has one: --hermes/ARGUS_HERMES,
 ./.hermes/hermes in this project, the build cache in ~/.argus/cache, the legacy
-VM bundled with react-native 0.73-0.82, then a source build if --provision was
-passed.
+VM bundled with react-native 0.73-0.82, a prebuilt binary downloaded from the
+Argus releases, then a source build if --provision was passed.
 `;
 
 /** The engine names `--engine` accepts. Rejecting anything else keeps a typo from silently changing which engine runs. */
