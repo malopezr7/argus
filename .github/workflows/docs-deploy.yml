@@ -1,0 +1,78 @@
+name: Deploy docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/docs-deploy.yml'
+  workflow_dispatch:
+
+# The job builds a static site and hands the output to Cloudflare. It writes
+# nothing back here — no comment, no ref, no release — so `contents: read` is
+# the whole grant it needs.
+permissions:
+  contents: read
+
+# A newer commit on main makes an in-flight deploy obsolete rather than
+# something to finish. Deploys are not cancelled mid-upload only to be safe:
+# Pages serves the previous deployment until a new one completes.
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy to Cloudflare Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Reading the secret here rather than in an `if:` on each step: secrets are
+    # not available in job-level `if` expressions, but they are in `env`.
+    env:
+      HAS_CLOUDFLARE_CREDENTIALS: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+
+    steps:
+      # `persist-credentials: false` keeps the job token out of .git/config.
+      # `pnpm install` runs build scripts (sharp), and a token left on disk is
+      # readable by any code that runs after checkout.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Report missing credentials
+        if: env.HAS_CLOUDFLARE_CREDENTIALS != 'true'
+        run: |
+          echo "::notice::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are not set — skipping the deploy."
+          echo "Add them under Settings -> Secrets and variables -> Actions to enable it."
+
+      # pnpm version comes from the "packageManager" field in package.json.
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        if: env.HAS_CLOUDFLARE_CREDENTIALS == 'true'
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: env.HAS_CLOUDFLARE_CREDENTIALS == 'true'
+        with:
+          node-version: 24
+
+      # `--ignore-workspace` because website/ is deliberately outside the pnpm
+      # workspace: it has its own lockfile and must not pull in the runner's
+      # dependency graph.
+      - name: Install dependencies
+        if: env.HAS_CLOUDFLARE_CREDENTIALS == 'true'
+        working-directory: website
+        run: pnpm install --frozen-lockfile --ignore-workspace
+
+      - name: Build
+        if: env.HAS_CLOUDFLARE_CREDENTIALS == 'true'
+        working-directory: website
+        run: pnpm build
+
+      - name: Deploy
+        if: env.HAS_CLOUDFLARE_CREDENTIALS == 'true'
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: website
+          command: pages deploy dist --project-name argus-hermes --branch main
