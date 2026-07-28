@@ -1,6 +1,9 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { AssetResponse } from '@argus/hermes/prebuilt-assets.js';
+import { sha256 } from '@argus/hermes/prebuilt-assets.js';
+import { writeTarGz } from '@argus/hermes/tar.js';
 import { afterAll, describe, expect, it } from 'vitest';
 import { isExecutableFile, provisionHermes } from '../provision/provision.js';
 
@@ -11,6 +14,11 @@ import { isExecutableFile, provisionHermes } from '../provision/provision.js';
  *
  * Fixtures are built at test time under the OS temp dir — a committed tree
  * containing `node_modules` would need a .gitignore exception.
+ *
+ * The prebuilt download boundary is injected in EVERY case, defaulting to "no
+ * asset published". Without it these tests would reach github.com the moment
+ * the chain got as far as the prebuilt step, which would make the suite depend
+ * on the network and on what happens to be published at the time.
  */
 
 const RN_BOTH_ENGINES = 'HERMES_VERSION_NAME=0.17.0\nHERMES_V1_VERSION_NAME=250829098.0.16\n';
@@ -60,6 +68,9 @@ function createFakeHermes(releaseVersion: string, bytecodeVersion?: number): str
   return path;
 }
 
+/** Nothing is published — the world every pre-release test runs in. */
+const NOTHING_PUBLISHED = async (): Promise<AssetResponse> => ({ kind: 'not-found' });
+
 /** Shared options; every test overrides only what it is about. */
 function options(overrides: Record<string, unknown> = {}) {
   return {
@@ -68,6 +79,7 @@ function options(overrides: Record<string, unknown> = {}) {
     homeDir: tempDir('argus-home-'),
     platform: process.platform,
     arch: process.arch,
+    fetchAsset: NOTHING_PUBLISHED,
     ...overrides,
   } as Parameters<typeof provisionHermes>[0];
 }
@@ -208,6 +220,81 @@ describe('provisionHermes — fidelity', () => {
     );
 
     expect(result.kind === 'provisioned' && result.warning).toBeUndefined();
+  });
+});
+
+describe('provisionHermes — prebuilt download', () => {
+  // A fixed target rather than the host's, so the asset name is the same
+  // wherever this suite runs.
+  const HOST = { platform: 'linux', arch: 'x64' };
+  const ASSET = 'hermes-250829098.0.16-linux-x64.tar.gz';
+
+  /** Three executables answering `--version` the way Hermes V1 does. */
+  function publishedArchive(): Buffer {
+    const script =
+      '#!/bin/sh\necho "  Hermes release version: 250829098.0.16"\n' +
+      'echo "  HBC bytecode version: 98"\n';
+    return writeTarGz([
+      { path: 'hermes', mode: 0o755, data: Buffer.from(script) },
+      { path: 'hermesc', mode: 0o755, data: Buffer.from(script) },
+      { path: 'hvm', mode: 0o755, data: Buffer.from(script) },
+    ]);
+  }
+
+  /** Serves `archive` with the digest the adapter should accept. */
+  function serving(archive: Buffer, digest = sha256(archive)) {
+    return async (url: string): Promise<AssetResponse> => {
+      if (url.endsWith('.sha256')) {
+        return { kind: 'ok', bytes: Buffer.from(`${digest}  ${ASSET}\n`) };
+      }
+      return { kind: 'ok', bytes: archive };
+    };
+  }
+
+  it('downloads a published prebuilt and runs the tests on it', async () => {
+    const homeDir = tempDir('argus-home-');
+    const result = await provisionHermes(
+      options({
+        ...HOST,
+        startDir: createProject(RN_V1_ONLY),
+        homeDir,
+        fetchAsset: serving(publishedArchive()),
+      }),
+    );
+
+    expect(result.kind).toBe('provisioned');
+    expect(result.kind === 'provisioned' && result.summary).toContain('prebuilt linux-x64');
+    expect(result.kind === 'provisioned' && result.binary.path).toBe(
+      join(homeDir, '.argus', 'cache', 'hermes-hermes-v250829098.0.16', 'build', 'bin', 'hermes'),
+    );
+    expect(result.kind === 'provisioned' && result.binary.bytecodeVersion).toBe(98);
+  });
+
+  it('falls through when nothing is published, rather than aborting', async () => {
+    const result = await provisionHermes(
+      options({ ...HOST, startDir: createProject(RN_V1_ONLY), allowSourceBuild: false }),
+    );
+
+    // Not a crash: the chain carried on and reported the whole picture.
+    expect(result.kind).toBe('failed');
+    const message = result.kind === 'failed' ? result.message : '';
+    expect(message).toContain('prebuilt');
+    expect(message).toContain('no published prebuilt');
+    expect(message).toContain('--provision');
+  });
+
+  it('stops on a checksum mismatch instead of quietly building from source', async () => {
+    const result = await provisionHermes(
+      options({
+        ...HOST,
+        startDir: createProject(RN_V1_ONLY),
+        allowSourceBuild: true,
+        fetchAsset: serving(publishedArchive(), '0'.repeat(64)),
+      }),
+    );
+
+    expect(result.kind).toBe('failed');
+    expect(result.kind === 'failed' && result.message).toContain('failed its checksum');
   });
 });
 

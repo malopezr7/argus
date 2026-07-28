@@ -20,6 +20,14 @@
       "types": "./src/prebuilt-adapter.ts",
       "import": "./src/prebuilt-adapter.ts"
     },
+    "./prebuilt-assets.js": {
+      "types": "./src/prebuilt-assets.ts",
+      "import": "./src/prebuilt-assets.ts"
+    },
+    "./tar.js": {
+      "types": "./src/tar.ts",
+      "import": "./src/tar.ts"
+    },
     "./source-build-adapter.js": {
       "types": "./src/source-build-adapter.ts",
       "import": "./src/source-build-adapter.ts"

@@ -1,8 +1,11 @@
 import { join } from 'node:path';
 import {
   BUNDLED_LEGACY_VM_SEGMENTS,
+  type HermesBinPlatform,
   type HermesRef,
   hermesCacheBinarySegments,
+  hermesReleasePlatform,
+  hermesReleaseTag,
   PROJECT_VENDORED_VM_SEGMENTS,
 } from '@argus/core';
 
@@ -19,7 +22,7 @@ import {
  *   2. project-vendored — `./.hermes/hermes` in the project under test
  *   3. cache            — an already-built binary in `~/.argus/cache`
  *   4. bundled-legacy   — the VM inside the react-native tarball (RN 0.73-0.82)
- *   5. prebuilt         — reserved; see PREBUILT_SEAM below
+ *   5. prebuilt         — downloaded from an Argus GitHub Release
  *   6. source-build     — opt-in via `--provision`, never silent
  */
 
@@ -52,8 +55,21 @@ export interface ChainInput {
   reactNativeDir?: string;
   /** Host platform (`process.platform`). The bundled VM is macOS-only. */
   platform: string;
+  /** Host architecture (`process.arch`). Decides which prebuilt applies. */
+  arch: string;
   /** True when `--provision` authorised a source build. */
   allowSourceBuild: boolean;
+  /**
+   * Why a prebuilt download already failed, when one was tried and could not
+   * supply a binary.
+   *
+   * Whether an asset exists is only knowable over the network, which this
+   * function must not do. So the caller downloads, and on an ordinary
+   * "nothing published" outcome walks the chain again with the reason set —
+   * the step is then skipped with that reason, and the rest of the chain
+   * continues exactly as if it had never applied.
+   */
+  prebuiltUnavailable?: string;
 }
 
 /** A source that did not supply a binary, and why. Feeds the failure message. */
@@ -71,6 +87,7 @@ export type SelectedSource =
   | { kind: 'project-vendored'; path: string }
   | { kind: 'cache'; path: string; ref: HermesRef }
   | { kind: 'bundled-legacy'; path: string; ref: HermesRef }
+  | { kind: 'prebuilt'; ref: HermesRef; platform: HermesBinPlatform }
   | { kind: 'source-build'; ref: HermesRef };
 
 export type ChainOutcome =
@@ -79,19 +96,6 @@ export type ChainOutcome =
 
 /** Answers "is there an executable file here?". Injected to keep selection pure. */
 export type ExecutableProbe = (path: string) => boolean;
-
-/**
- * Where a downloaded prebuilt binary will slot in once that adapter exists.
- *
- * Deliberately not wired: `PrebuiltAdapter.resolve` currently throws
- * `NotImplemented`, and calling it would turn an orderly "nothing available"
- * report into a stack trace. The step still appears in `attempted` so the
- * failure message shows the real shape of the chain.
- */
-const PREBUILT_SEAM: AttemptedSource = {
-  kind: 'prebuilt',
-  reason: 'not implemented yet — no prebuilt binaries are published',
-};
 
 /** Absolute path of the cached build for `ref`. */
 export function cacheBinaryPath(homeDir: string, ref: HermesRef): string {
@@ -160,7 +164,13 @@ export function selectProvisionSource(input: ChainInput, probe: ExecutableProbe)
   }
   attempted.push(bundled.attempt);
 
-  attempted.push(PREBUILT_SEAM);
+  // 5. Prebuilt — a download, so it ranks below everything already on disk but
+  //    above a build the user has to wait several minutes for.
+  const prebuilt = attemptPrebuilt(input);
+  if (prebuilt.kind === 'selected') {
+    return { kind: 'selected', source: prebuilt.source, attempted };
+  }
+  attempted.push(prebuilt.attempt);
 
   // 6. Source build — multi-minute, needs git/cmake/ninja, so it happens only
   //    when the user explicitly authorised it.
@@ -178,9 +188,43 @@ export function selectProvisionSource(input: ChainInput, probe: ExecutableProbe)
   return { kind: 'exhausted', attempted };
 }
 
-type BundledAttempt =
+type SourceAttempt =
   | { kind: 'selected'; source: SelectedSource }
   | { kind: 'skipped'; attempt: AttemptedSource };
+
+/**
+ * The prebuilt applies only when a matching asset could exist: there is a ref,
+ * that ref can name a release version, and the host is one of the published
+ * platforms. Each miss reports its own reason so the failure message explains
+ * itself rather than saying "unavailable".
+ *
+ * Whether the asset is actually published is a network question and is answered
+ * by the adapter — see `prebuiltUnavailable` on `ChainInput`.
+ */
+function attemptPrebuilt(input: ChainInput): SourceAttempt {
+  const skip = (reason: string): SourceAttempt => ({
+    kind: 'skipped',
+    attempt: { kind: 'prebuilt', reason },
+  });
+
+  if (input.prebuiltUnavailable !== undefined) return skip(input.prebuiltUnavailable);
+
+  const { ref } = input;
+  if (ref === undefined) return skip('no engine resolved, so there is no ref to download');
+  if (hermesReleaseTag(ref.tag) === undefined) {
+    return skip(
+      `${ref.tag} cannot name a release version — date-based refs and bare ` +
+        'commit SHAs are not published as prebuilts',
+    );
+  }
+
+  const platform = hermesReleasePlatform(input.platform, input.arch);
+  if (platform === undefined) {
+    return skip(`no prebuilt is published for ${input.platform}-${input.arch}`);
+  }
+
+  return { kind: 'selected', source: { kind: 'prebuilt', ref, platform } };
+}
 
 /**
  * The bundled VM applies only when every one of its preconditions holds: the
@@ -188,9 +232,9 @@ type BundledAttempt =
  * is Mach-O), and the file is actually there and executable. Each miss reports
  * its own reason so the failure message explains itself.
  */
-function attemptBundledLegacy(input: ChainInput, probe: ExecutableProbe): BundledAttempt {
+function attemptBundledLegacy(input: ChainInput, probe: ExecutableProbe): SourceAttempt {
   const { ref, reactNativeDir, platform } = input;
-  const skip = (reason: string): BundledAttempt => ({
+  const skip = (reason: string): SourceAttempt => ({
     kind: 'skipped',
     attempt: { kind: 'bundled-legacy', reason },
   });

@@ -1,14 +1,22 @@
 import { accessSync, constants, statSync } from 'node:fs';
-import type { HermesBinary, HermesEngine, HermesProvisioner } from '@argus/core';
+import type { EngineTarget, HermesBinary, HermesEngine, HermesProvisioner } from '@argus/core';
 import { checkEngineFidelity } from '@argus/core';
 import {
   type EngineResolutionOutcome,
   resolveHermesEngine,
 } from '@argus/hermes/engine-resolver.js';
 import { LocalPathAdapter } from '@argus/hermes/local-path-adapter.js';
+import { PrebuiltAdapter, PrebuiltUnavailableError } from '@argus/hermes/prebuilt-adapter.js';
+import type { AssetFetcher } from '@argus/hermes/prebuilt-assets.js';
 import { SourceBuildAdapter } from '@argus/hermes/source-build-adapter.js';
 import { errMsg } from '../errors.js';
-import { type ExecutableProbe, type SelectedSource, selectProvisionSource } from './chain.js';
+import {
+  type AttemptedSource,
+  type ChainInput,
+  type ExecutableProbe,
+  type SelectedSource,
+  selectProvisionSource,
+} from './chain.js';
 import { detectHostTarget } from './host-target.js';
 import {
   type EngineContext,
@@ -46,6 +54,11 @@ export interface ProvisionOptions {
   arch: string;
   /** Override the executable check. Tests inject a fake; runtime uses the real one. */
   probe?: ExecutableProbe;
+  /**
+   * Override the prebuilt download boundary. Tests inject a stub so no test
+   * reaches the network; runtime uses real `fetch`.
+   */
+  fetchAsset?: AssetFetcher;
 }
 
 export type ProvisionResult =
@@ -102,11 +115,62 @@ function toEngineContext(outcome: EngineResolutionOutcome, startDir: string): En
  * Explicit paths, cache hits and the bundled VM are all "a binary that already
  * exists at a path", which is exactly what `LocalPathAdapter` models — the
  * difference between them is how the path was found, not how it is used. Only
- * the opt-in source build needs the heavyweight adapter.
+ * the download and the opt-in source build need their own adapters.
  */
-function adapterFor(source: SelectedSource): HermesProvisioner {
+function adapterFor(source: SelectedSource, options: ProvisionOptions): HermesProvisioner {
   if (source.kind === 'source-build') return new SourceBuildAdapter(source.ref.tag);
+  if (source.kind === 'prebuilt') {
+    return new PrebuiltAdapter({
+      ref: source.ref,
+      homeDir: options.homeDir,
+      ...(options.fetchAsset === undefined ? {} : { fetchAsset: options.fetchAsset }),
+    });
+  }
   return new LocalPathAdapter(source.path);
+}
+
+/** Outcome of walking the chain and running whichever adapter it selected. */
+type BinaryOutcome =
+  | { kind: 'ok'; binary: HermesBinary; source: SelectedSource }
+  | { kind: 'exhausted'; attempted: AttemptedSource[] }
+  | { kind: 'adapter-failed'; message: string };
+
+/**
+ * Walk the chain, run the selected adapter, and retry past a prebuilt that
+ * turned out not to exist.
+ *
+ * Whether an asset is published cannot be known without the network, and the
+ * chain is pure, so "nothing published for this ref" surfaces here as a
+ * `PrebuiltUnavailableError` after selection. Feeding the reason back into a
+ * second walk is what makes that an ordinary fall-through rather than a hard
+ * stop — every other step keeps its behaviour, and the failure message ends up
+ * naming the real reason the download did not apply.
+ *
+ * The loop runs at most twice: the retry sets `prebuiltUnavailable`, which
+ * makes the prebuilt step skip unconditionally.
+ */
+async function resolveBinary(
+  base: ChainInput,
+  target: EngineTarget,
+  options: ProvisionOptions,
+): Promise<BinaryOutcome> {
+  let input = base;
+
+  for (;;) {
+    const chain = selectProvisionSource(input, options.probe ?? isExecutableFile);
+    if (chain.kind === 'exhausted') return { kind: 'exhausted', attempted: chain.attempted };
+
+    try {
+      const binary = await adapterFor(chain.source, options).resolve(target);
+      return { kind: 'ok', binary, source: chain.source };
+    } catch (error) {
+      if (chain.source.kind === 'prebuilt' && error instanceof PrebuiltUnavailableError) {
+        input = { ...input, prebuiltUnavailable: errMsg(error) };
+        continue;
+      }
+      return { kind: 'adapter-failed', message: errMsg(error) };
+    }
+  }
 }
 
 /**
@@ -146,23 +210,6 @@ export async function provisionHermes(options: ProvisionOptions): Promise<Provis
   const ref = outcome.kind === 'resolved' ? outcome.resolution.ref : undefined;
   const reactNativeDir = outcome.kind === 'resolved' ? outcome.reactNativeDir : undefined;
 
-  const chain = selectProvisionSource(
-    {
-      ...(explicit === undefined ? {} : { explicit }),
-      ...(ref === undefined ? {} : { ref }),
-      projectDir: options.startDir,
-      homeDir: options.homeDir,
-      ...(reactNativeDir === undefined ? {} : { reactNativeDir }),
-      platform: options.platform,
-      allowSourceBuild: options.allowSourceBuild,
-    },
-    options.probe ?? isExecutableFile,
-  );
-
-  if (chain.kind === 'exhausted') {
-    return { kind: 'failed', message: formatProvisionFailure(context, chain.attempted) };
-  }
-
   const target = detectHostTarget({
     platform: options.platform,
     arch: options.arch,
@@ -170,21 +217,37 @@ export async function provisionHermes(options: ProvisionOptions): Promise<Provis
     ...(ref === undefined ? {} : { hermesVersion: ref.tag }),
   });
 
-  let binary: HermesBinary;
-  try {
-    binary = await adapterFor(chain.source).resolve(target);
-  } catch (e) {
+  const resolved = await resolveBinary(
+    {
+      ...(explicit === undefined ? {} : { explicit }),
+      ...(ref === undefined ? {} : { ref }),
+      projectDir: options.startDir,
+      homeDir: options.homeDir,
+      ...(reactNativeDir === undefined ? {} : { reactNativeDir }),
+      platform: options.platform,
+      arch: options.arch,
+      allowSourceBuild: options.allowSourceBuild,
+    },
+    target,
+    options,
+  );
+
+  if (resolved.kind === 'exhausted') {
+    return { kind: 'failed', message: formatProvisionFailure(context, resolved.attempted) };
+  }
+  if (resolved.kind === 'adapter-failed') {
     return {
       kind: 'failed',
-      message: `✗ INFRASTRUCTURE FAILURE [provision] ${errMsg(e)}\n`,
+      message: `✗ INFRASTRUCTURE FAILURE [provision] ${resolved.message}\n`,
     };
   }
 
+  const { binary } = resolved;
   const warning = formatFidelityWarning(checkEngineFidelity(ref?.engine, binary), binary);
   return {
     kind: 'provisioned',
     binary,
-    summary: formatProvisionSummary(chain.source, context, binary),
+    summary: formatProvisionSummary(resolved.source, context, binary),
     ...(warning === '' ? {} : { warning }),
   };
 }

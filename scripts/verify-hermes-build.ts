@@ -34,7 +34,7 @@ import {
   HERMES_BUILD_TARGETS,
   type HermesBinCpu,
   type HermesBinOs,
-  hermesBinPackageVersion,
+  hermesReleaseVersion,
   parseHermesTag,
   parseHermesVersionOutput,
   releaseVersionForRef,
@@ -204,7 +204,7 @@ function verifyBytecodeParity(options: Options, fixture: string, workDir: string
     return;
   }
 
-  const version = hermesBinPackageVersion(options.tag);
+  const version = hermesReleaseVersion(options.tag);
   if (version === undefined) {
     skip('bytecode parity', `${options.tag} does not name a published hermes-compiler version`);
     return;

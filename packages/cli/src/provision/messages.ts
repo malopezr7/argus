@@ -109,6 +109,8 @@ export function describeSource(source: SelectedSource): string {
       return 'cache';
     case 'bundled-legacy':
       return 'react-native bundled vm';
+    case 'prebuilt':
+      return `prebuilt ${source.platform.os}-${source.platform.cpu}`;
     case 'source-build':
       return 'source build';
   }

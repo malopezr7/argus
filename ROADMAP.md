@@ -121,14 +121,25 @@ build is well below the number of RN releases.
 
 Resolution order for the binary itself:
 
-1. **Cache** — `~/.cache/argus/hermes/<tag>/<platform>/hermes`.
-2. **Argus prebuilt** — `@argus/hermes-bin-<os>-<arch>`, built and published by
-   our CI, and versioned by the Hermes version rather than the Argus version.
-   Fetched at run time, never declared as a dependency: RN 0.83 wants Hermes
-   `250829098.0.4` and RN 0.86 wants `250829098.0.16` with the same Argus
-   installed, and a dependency fixed at publish time cannot express that. This
-   is where Argus differs from the esbuild model, which pins one binary per
-   esbuild release because it only ever needs one.
+1. **Cache** — `~/.argus/cache/hermes-<tag>/build/bin/hermes`.
+2. **Argus prebuilt** — a GitHub Release on this repository, tagged
+   `hermes-bin-v<hermes version>` and carrying one gzipped tar per platform
+   (`hermes-<version>-<os>-<cpu>.tar.gz`) plus per-asset and aggregate
+   checksums. Built and published by our CI, and versioned by the Hermes
+   version rather than the Argus version. Fetched at run time, never declared
+   as a dependency: RN 0.83 wants Hermes `250829098.0.4` and RN 0.86 wants
+   `250829098.0.16` with the same Argus installed, and a dependency fixed at
+   publish time cannot express that. This is where Argus differs from the
+   esbuild model, which pins one binary per esbuild release because it only
+   ever needs one.
+
+   Releases rather than npm because the constraint is run-time resolution, and
+   npm's job is to install a version chosen at publish time. A release on a
+   public repository needs no authentication to download, has no practical size
+   limit, and is CDN-served. npm stays reserved for the Argus code packages,
+   which is a separate concern. The download verifies the published SHA-256
+   before it trusts an archive, and extracts through a temporary directory so an
+   interrupted run cannot leave a half-populated cache entry behind.
 3. **Bundled legacy VM** — `node_modules/react-native/sdks/hermesc/osx-bin/hermes`.
    Present for RN 0.73 through 0.82 on macOS, universal binary. Free and exact,
    but legacy-only; use it when the project targets V0.
@@ -158,9 +169,10 @@ Build configuration mirrors React Native's own:
 - [ ] Publish prebuilts for `darwin-arm64`, `darwin-x64`, `linux-x64` and
       `linux-arm64`. The build-and-publish pipeline exists
       (`.github/workflows/hermes-prebuilt.yml`, manual dispatch, gated on
-      bytecode parity with the official `hermes-compiler`); it has not been run
-      and nothing is published yet. Windows stays out until there is a
-      verified toolchain for it.
+      bytecode parity with the official `hermes-compiler`, publishing a GitHub
+      Release); it has not been run and nothing is published yet, so the
+      prebuilt step in the provisioning chain currently reports a 404 and falls
+      through. Windows stays out until there is a verified toolchain for it.
 - [ ] Set the engine release version explicitly at build time — a raw clone
       reports `1.0.0`.
 - [ ] Bundled-VM detection for the legacy target on RN 0.73–0.82.

@@ -50,10 +50,19 @@ function input(overrides: Partial<ChainInput> = {}): ChainInput {
     projectDir: PROJECT,
     homeDir: HOME,
     platform: 'darwin',
+    arch: 'arm64',
     allowSourceBuild: false,
     ...overrides,
   };
 }
+
+/**
+ * The prebuilt step is reached by most of these fixtures, and it would win
+ * before the source build could be reached. Marking it already-tried is how a
+ * test looks at the steps BELOW it, and mirrors what `provision.ts` does after
+ * a download reports that nothing is published.
+ */
+const PREBUILT_TRIED = 'nothing published for this ref';
 
 describe('selectProvisionSource — precedence', () => {
   it('explicit beats a vendored binary and a usable cache entry', () => {
@@ -146,7 +155,7 @@ describe('selectProvisionSource — precedence', () => {
 describe('selectProvisionSource — bundled VM applicability', () => {
   it('is skipped when the project targets v1', () => {
     const outcome = selectProvisionSource(
-      input({ ref: V1, reactNativeDir: RN_DIR }),
+      input({ ref: V1, reactNativeDir: RN_DIR, prebuiltUnavailable: PREBUILT_TRIED }),
       probeFor(bundledLegacyVmPath(RN_DIR)),
     );
 
@@ -157,7 +166,10 @@ describe('selectProvisionSource — bundled VM applicability', () => {
   });
 
   it('is skipped when the file is missing', () => {
-    const outcome = selectProvisionSource(input({ ref: LEGACY, reactNativeDir: RN_DIR }), NOTHING);
+    const outcome = selectProvisionSource(
+      input({ ref: LEGACY, reactNativeDir: RN_DIR, prebuiltUnavailable: PREBUILT_TRIED }),
+      NOTHING,
+    );
 
     expect(outcome.kind).toBe('exhausted');
     expect(outcome.attempted.find((a) => a.kind === 'bundled-legacy')?.path).toBe(
@@ -166,7 +178,10 @@ describe('selectProvisionSource — bundled VM applicability', () => {
   });
 
   it('is skipped when no react-native install was found', () => {
-    const outcome = selectProvisionSource(input({ ref: LEGACY }), NOTHING);
+    const outcome = selectProvisionSource(
+      input({ ref: LEGACY, prebuiltUnavailable: PREBUILT_TRIED }),
+      NOTHING,
+    );
 
     expect(outcome.kind).toBe('exhausted');
     expect(outcome.attempted.find((a) => a.kind === 'bundled-legacy')?.reason).toContain(
@@ -177,7 +192,12 @@ describe('selectProvisionSource — bundled VM applicability', () => {
   it('is skipped off macOS, where the Mach-O binary cannot run', () => {
     // The VM IS present; only the host platform disqualifies it.
     const outcome = selectProvisionSource(
-      input({ ref: LEGACY, reactNativeDir: RN_DIR, platform: 'linux' }),
+      input({
+        ref: LEGACY,
+        reactNativeDir: RN_DIR,
+        platform: 'linux',
+        prebuiltUnavailable: PREBUILT_TRIED,
+      }),
       probeFor(bundledLegacyVmPath(RN_DIR)),
     );
 
@@ -193,7 +213,13 @@ describe('selectProvisionSource — bundled VM applicability', () => {
     chmodSync(vmPath, 0o644);
 
     const outcome = selectProvisionSource(
-      input({ ref: LEGACY, reactNativeDir: rnDir, homeDir: tempDir(), projectDir: tempDir() }),
+      input({
+        ref: LEGACY,
+        reactNativeDir: rnDir,
+        homeDir: tempDir(),
+        projectDir: tempDir(),
+        prebuiltUnavailable: PREBUILT_TRIED,
+      }),
       isExecutableFile,
     );
 
@@ -227,9 +253,114 @@ describe('selectProvisionSource — bundled VM applicability', () => {
   });
 });
 
+describe('selectProvisionSource — prebuilt download', () => {
+  it('is selected after the cache and before a source build', () => {
+    const outcome = selectProvisionSource(input({ ref: V1, allowSourceBuild: true }), NOTHING);
+
+    expect(outcome.kind === 'selected' && outcome.source).toEqual({
+      kind: 'prebuilt',
+      ref: V1,
+      platform: { os: 'darwin', cpu: 'arm64' },
+    });
+    // Everything above it was tried first; the source build was never reached.
+    expect(outcome.attempted.map((a) => a.kind)).toEqual([
+      'project-vendored',
+      'cache',
+      'bundled-legacy',
+    ]);
+  });
+
+  it('loses to a cache hit, so a downloaded binary is fetched once', () => {
+    const cached = cacheBinaryPath(HOME, V1);
+
+    const outcome = selectProvisionSource(input({ ref: V1 }), probeFor(cached));
+
+    expect(outcome.kind === 'selected' && outcome.source.kind).toBe('cache');
+  });
+
+  it('carries the host platform it resolved to', () => {
+    const outcome = selectProvisionSource(
+      input({ ref: V1, platform: 'linux', arch: 'x64' }),
+      NOTHING,
+    );
+
+    expect(outcome.kind === 'selected' && outcome.source).toEqual({
+      kind: 'prebuilt',
+      ref: V1,
+      platform: { os: 'linux', cpu: 'x64' },
+    });
+  });
+
+  it('is skipped on a platform nothing is published for', () => {
+    const outcome = selectProvisionSource(
+      input({ ref: V1, platform: 'win32', arch: 'x64' }),
+      NOTHING,
+    );
+
+    expect(outcome.kind).toBe('exhausted');
+    expect(outcome.attempted.find((a) => a.kind === 'prebuilt')?.reason).toContain('win32-x64');
+  });
+
+  it('is skipped for a ref that cannot name a release version', () => {
+    const dateRef: HermesRef = {
+      engine: 'legacy',
+      tag: 'hermes-2025-09-01-RNv0.82.0',
+      version: '2025-09-01-RNv0.82.0',
+    };
+
+    const outcome = selectProvisionSource(input({ ref: dateRef }), NOTHING);
+
+    expect(outcome.kind).toBe('exhausted');
+    expect(outcome.attempted.find((a) => a.kind === 'prebuilt')?.reason).toContain(
+      'cannot name a release version',
+    );
+  });
+
+  it('is skipped when no engine was resolved', () => {
+    const outcome = selectProvisionSource(input(), NOTHING);
+
+    expect(outcome.attempted.find((a) => a.kind === 'prebuilt')?.reason).toContain(
+      'no engine resolved',
+    );
+  });
+
+  it('falls through to the source build once a download reported nothing published', () => {
+    // What `provision.ts` does after the adapter answers PrebuiltUnavailable:
+    // walk again with the reason recorded. The step must then step aside
+    // instead of aborting the whole chain.
+    const outcome = selectProvisionSource(
+      input({
+        ref: V1,
+        allowSourceBuild: true,
+        prebuiltUnavailable: 'no published prebuilt for Hermes 250829098.0.16',
+      }),
+      NOTHING,
+    );
+
+    expect(outcome.kind === 'selected' && outcome.source).toEqual({
+      kind: 'source-build',
+      ref: V1,
+    });
+  });
+
+  it('reports the download failure verbatim, so the message stays truthful', () => {
+    const outcome = selectProvisionSource(
+      input({ ref: V1, prebuiltUnavailable: 'could not reach the prebuilt release: ENOTFOUND' }),
+      NOTHING,
+    );
+
+    expect(outcome.attempted.find((a) => a.kind === 'prebuilt')?.reason).toBe(
+      'could not reach the prebuilt release: ENOTFOUND',
+    );
+  });
+});
+
 describe('selectProvisionSource — source build is opt-in', () => {
   it('is not attempted without --provision', () => {
-    const outcome = selectProvisionSource(input({ ref: V1 }), NOTHING);
+    const outcome = selectProvisionSource(
+      input({ ref: V1, prebuiltUnavailable: PREBUILT_TRIED }),
+      NOTHING,
+    );
 
     expect(outcome.kind).toBe('exhausted');
     expect(outcome.attempted.find((a) => a.kind === 'source-build')?.reason).toContain(
@@ -238,7 +369,10 @@ describe('selectProvisionSource — source build is opt-in', () => {
   });
 
   it('is selected once --provision authorises it', () => {
-    const outcome = selectProvisionSource(input({ ref: V1, allowSourceBuild: true }), NOTHING);
+    const outcome = selectProvisionSource(
+      input({ ref: V1, allowSourceBuild: true, prebuiltUnavailable: PREBUILT_TRIED }),
+      NOTHING,
+    );
 
     expect(outcome.kind === 'selected' && outcome.source).toEqual({
       kind: 'source-build',
@@ -252,20 +386,14 @@ describe('selectProvisionSource — source build is opt-in', () => {
     expect(outcome.kind).toBe('exhausted');
     expect(outcome.attempted.find((a) => a.kind === 'source-build')?.reason).toContain('ref');
   });
-
-  it('never selects the unimplemented prebuilt source', () => {
-    const outcome = selectProvisionSource(input({ ref: V1, allowSourceBuild: true }), NOTHING);
-
-    expect(outcome.kind === 'selected' && outcome.source.kind).not.toBe('prebuilt');
-    expect(outcome.attempted.find((a) => a.kind === 'prebuilt')?.reason).toContain(
-      'not implemented',
-    );
-  });
 });
 
 describe('selectProvisionSource — exhausted', () => {
   it('records every source it tried, in chain order', () => {
-    const outcome = selectProvisionSource(input({ ref: V1, reactNativeDir: RN_DIR }), NOTHING);
+    const outcome = selectProvisionSource(
+      input({ ref: V1, reactNativeDir: RN_DIR, prebuiltUnavailable: PREBUILT_TRIED }),
+      NOTHING,
+    );
 
     expect(outcome.kind).toBe('exhausted');
     expect(outcome.attempted.map((a) => a.kind)).toEqual([

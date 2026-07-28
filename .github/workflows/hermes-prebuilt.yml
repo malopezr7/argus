@@ -2,14 +2,16 @@ name: Hermes prebuilt
 
 # Builds the standalone Hermes VM from source for every platform Argus ships a
 # prebuilt for, gates each build on bytecode parity with the compiler React
-# Native itself ships, and optionally publishes the results to npm.
+# Native itself ships, and optionally publishes the results as a GitHub Release.
 #
 # Manual dispatch only. Each run is several minutes of compute per platform, and
 # a build triggered by an unrelated push would be waste rather than signal.
 #
-# The published packages are versioned by the HERMES version, never by the Argus
-# version, and are not dependencies of any Argus package — which Hermes a user
-# needs depends on their React Native version, not on which Argus they installed.
+# The assets are versioned by the HERMES version, never by the Argus version,
+# and are not dependencies of any Argus package — which Hermes a user needs
+# depends on their React Native version, not on which Argus they installed. A
+# release on a public repository serves that with no authentication, no
+# practical size limit, and a CDN in front.
 
 on:
   workflow_dispatch:
@@ -19,11 +21,20 @@ on:
         required: true
         type: string
       publish:
-        description: 'Publish to npm once every platform has built and passed'
+        description: 'Publish a GitHub Release once every platform has built and passed'
+        required: false
+        type: boolean
+        default: false
+      overwrite:
+        description: >-
+          Replace an existing release for this tag. Off by default: users pin
+          checksums against published bytes, so replacing them is a decision,
+          not an accident.
         required: false
         type: boolean
         default: false
 
+# Read-only by default. The publish job elevates itself, and only itself.
 permissions:
   contents: read
 
@@ -126,18 +137,18 @@ jobs:
           SLICES: ${{ matrix.slices }}
         run: |
           # --thin slices one architecture out of a universal binary, which is a
-          # macOS concept and the reason macOS produces two packages from one build.
+          # macOS concept and the reason macOS produces two archives from one build.
           extra=()
           if [ "$TARGET_OS" = "darwin" ]; then extra+=(--thin); fi
 
           for cpu in $SLICES; do
-            pnpm exec tsx scripts/pack-hermes-bin.ts \
+            pnpm exec tsx scripts/pack-hermes-release.ts \
               --bin-dir "$BIN_DIR" \
               --tag "$HERMES_TAG" \
               --os "$TARGET_OS" \
               --cpu "$cpu" \
               --out "$GITHUB_WORKSPACE/dist/hermes-bin" \
-              "${extra[@]}" --pack
+              "${extra[@]}"
           done
 
           ls -l "$GITHUB_WORKSPACE/dist/hermes-bin"
@@ -146,17 +157,24 @@ jobs:
         with:
           name: hermes-bin-${{ matrix.slug }}
           path: |
-            dist/hermes-bin/*.tgz
-            dist/hermes-bin/*.tgz.sha256
+            dist/hermes-bin/*.tar.gz
+            dist/hermes-bin/*.tar.gz.sha256
           if-no-files-found: error
           retention-days: 14
 
   publish:
-    name: Publish to npm
+    name: Publish GitHub Release
+    # `needs` waits for every matrix job AND requires all of them to have
+    # succeeded, so a release can never be cut from a partial set of platforms.
     needs: build
     if: ${{ inputs.publish }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    # The only elevated permission in the workflow, scoped to the one job that
+    # needs it. Creating a release is a write to repository contents.
+    permissions:
+      contents: write
 
     # A GitHub Environment, so publishing can be held behind required reviewers.
     # NOTE: this environment does not exist yet — create it (Settings ->
@@ -164,41 +182,93 @@ jobs:
     environment: hermes-prebuilt-publish
 
     steps:
+      - uses: actions/checkout@v4
+
+      # pnpm version comes from the "packageManager" field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - uses: actions/download-artifact@v4
         with:
           path: dist
           pattern: hermes-bin-*
           merge-multiple: true
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          registry-url: 'https://registry.npmjs.org'
+      # Names, tag and body all come from @argus/core, which is also where the
+      # provisioning chain derives the download URL — so what CI publishes and
+      # what a user fetches cannot be named differently.
+      - name: Derive release identity
+        id: meta
+        shell: bash
+        env:
+          HERMES_TAG: ${{ inputs.hermes_tag }}
+        run: |
+          pnpm exec tsx scripts/hermes-release-meta.ts \
+            --tag "$HERMES_TAG" --notes-out "$RUNNER_TEMP/release-notes.md"
 
-      - name: Verify checksums
+      - name: Verify checksums and asset set
         shell: bash
         working-directory: dist
+        env:
+          EXPECTED: ${{ steps.meta.outputs.asset-count }}
         run: |
           ls -l
-          # The .sha256 files name their tarball with no path, so verify from
+
+          # The .sha256 files name their archive with no path, so verify from
           # the directory holding both.
-          for checksum in *.tgz.sha256; do
+          for checksum in *.tar.gz.sha256; do
             shasum -a 256 -c "$checksum"
           done
 
-      - name: Publish
+          found=$(ls -1 *.tar.gz | wc -l | tr -d ' ')
+          if [ "$found" != "$EXPECTED" ]; then
+            echo "expected $EXPECTED archives, found $found — refusing to publish a partial release" >&2
+            exit 1
+          fi
+
+          # One aggregate file so a human verifies the whole release in one
+          # command; sorted so re-running produces identical bytes.
+          cat *.tar.gz.sha256 | sort > checksums.txt
+          cat checksums.txt
+
+      # Re-running for a tag that is already published is refused unless the
+      # dispatcher opted in. Users pin checksums against published bytes, and a
+      # release that is half old and half new is worse than either. With
+      # `overwrite` the old release is deleted and a new one created in a single
+      # command carrying every asset, so a release is never patched in place.
+      - name: Publish release
         shell: bash
         env:
-          # NOTE: the NPM_TOKEN secret does not exist yet — create it (an npm
-          # automation token with publish rights on the @argus scope) before
-          # dispatching this workflow with publish enabled.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.release-tag }}
+          RELEASE_TITLE: ${{ steps.meta.outputs.release-title }}
+          OVERWRITE: ${{ inputs.overwrite }}
         run: |
-          # Plain `npm`, not `pnpm`: these packages have no workspace
-          # dependencies, so there is no `workspace:*` protocol to rewrite and
-          # nothing pnpm contributes. --access public because a scoped package
-          # would otherwise be published as restricted.
-          for tarball in dist/*.tgz; do
-            echo "publishing $tarball"
-            npm publish "$tarball" --access public
-          done
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            if [ "$OVERWRITE" != "true" ]; then
+              echo "release $RELEASE_TAG already exists." >&2
+              echo "Re-run with 'overwrite' enabled to replace it." >&2
+              exit 1
+            fi
+            echo "replacing existing release $RELEASE_TAG"
+            gh release delete "$RELEASE_TAG" --yes --cleanup-tag
+          fi
+
+          # --latest=false keeps the repository's "Latest" badge pointing at an
+          # Argus release. These are production artifacts rather than
+          # prereleases, so marking them unstable would be a lie; they simply
+          # are not the thing a human visiting the repo is looking for.
+          gh release create "$RELEASE_TAG" \
+            --title "$RELEASE_TITLE" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --latest=false \
+            dist/*.tar.gz dist/*.tar.gz.sha256 dist/checksums.txt
+
+          gh release view "$RELEASE_TAG"

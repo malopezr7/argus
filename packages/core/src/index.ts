@@ -1,19 +1,5 @@
-// Hermes prebuilt binary packages (pure)
-export type {
-  HermesBinCpu,
-  HermesBinManifest,
-  HermesBinManifestOptions,
-  HermesBinOs,
-  HermesBinPlatform,
-} from './domain/hermes-bin-package.js';
-export {
-  HERMES_BIN_DIR,
-  HERMES_BIN_PLATFORMS,
-  HERMES_BIN_SCOPE,
-  hermesBinPackageManifest,
-  hermesBinPackageName,
-  hermesBinPackageVersion,
-} from './domain/hermes-bin-package.js';
+// Hermes prebuilt binary release assets (pure)
+
 // Hermes source-build configuration (pure)
 export type {
   CmakeBuildOptions,
@@ -41,6 +27,25 @@ export {
 } from './domain/hermes-locations.js';
 // Hermes engine/version domain (pure)
 export { HERMES_PINS_BY_RN_MINOR, lookupPinnedRefs, rnMinor } from './domain/hermes-pins.js';
+export type {
+  HermesBinCpu,
+  HermesBinOs,
+  HermesBinPlatform,
+  HermesReleaseNotesOptions,
+} from './domain/hermes-release-assets.js';
+export {
+  ARGUS_REPOSITORY,
+  HERMES_BIN_PLATFORMS,
+  HERMES_CHECKSUMS_ASSET,
+  HERMES_RELEASE_TAG_PREFIX,
+  hermesAssetName,
+  hermesAssetUrl,
+  hermesChecksumAssetName,
+  hermesReleaseNotes,
+  hermesReleasePlatform,
+  hermesReleaseTag,
+  hermesReleaseVersion,
+} from './domain/hermes-release-assets.js';
 export type {
   EngineResolution,
   EngineSelection,
