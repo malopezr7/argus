@@ -1,0 +1,204 @@
+name: Hermes prebuilt
+
+# Builds the standalone Hermes VM from source for every platform Argus ships a
+# prebuilt for, gates each build on bytecode parity with the compiler React
+# Native itself ships, and optionally publishes the results to npm.
+#
+# Manual dispatch only. Each run is several minutes of compute per platform, and
+# a build triggered by an unrelated push would be waste rather than signal.
+#
+# The published packages are versioned by the HERMES version, never by the Argus
+# version, and are not dependencies of any Argus package — which Hermes a user
+# needs depends on their React Native version, not on which Argus they installed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      hermes_tag:
+        description: 'facebook/hermes git tag, e.g. hermes-v250829098.0.16'
+        required: true
+        type: string
+      publish:
+        description: 'Publish to npm once every platform has built and passed'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Two runs of the same tag would race to publish identical versions.
+concurrency:
+  group: hermes-prebuilt-${{ inputs.hermes_tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.slug }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+
+    strategy:
+      # One platform failing should not hide whether the others are healthy.
+      fail-fast: false
+      matrix:
+        include:
+          # macOS builds ONE universal binary and slices it into two packages,
+          # so a user downloads roughly half a universal binary instead of all
+          # of it. `cpu` is the runner's own architecture, used for verification;
+          # `slices` are the packages cut from that single build.
+          - slug: darwin
+            runner: macos-latest
+            os: darwin
+            cpu: arm64
+            slices: arm64 x64
+          - slug: linux-x64
+            runner: ubuntu-latest
+            os: linux
+            cpu: x64
+            slices: x64
+          - slug: linux-arm64
+            runner: ubuntu-24.04-arm
+            os: linux
+            cpu: arm64
+            slices: arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm version comes from the "packageManager" field in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install cmake and ninja
+        shell: bash
+        run: |
+          if command -v cmake >/dev/null && command -v ninja >/dev/null; then
+            echo "cmake and ninja already present on the runner image"
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            brew install cmake ninja
+          else
+            sudo apt-get update
+            sudo apt-get install -y cmake ninja-build
+          fi
+          cmake --version | head -1
+          ninja --version
+
+      # Builds through SourceBuildAdapter — the same path a user without a
+      # published prebuilt takes — so CI cannot drift from what users run.
+      - name: Build Hermes
+        id: build
+        shell: bash
+        env:
+          HERMES_TAG: ${{ inputs.hermes_tag }}
+        run: pnpm exec tsx scripts/build-hermes.ts --tag "$HERMES_TAG"
+
+      # Every gate here is a hard failure. The load-bearing one is bytecode
+      # parity: the freshly built hermesc and the official hermes-compiler npm
+      # package must emit a byte-identical .hbc for the same source.
+      - name: Verify build
+        shell: bash
+        env:
+          BIN_DIR: ${{ steps.build.outputs.bin-dir }}
+          HERMES_TAG: ${{ inputs.hermes_tag }}
+          TARGET_OS: ${{ matrix.os }}
+          TARGET_CPU: ${{ matrix.cpu }}
+        run: |
+          pnpm exec tsx scripts/verify-hermes-build.ts \
+            --bin-dir "$BIN_DIR" \
+            --tag "$HERMES_TAG" \
+            --os "$TARGET_OS" \
+            --cpu "$TARGET_CPU"
+
+      - name: Package
+        shell: bash
+        env:
+          BIN_DIR: ${{ steps.build.outputs.bin-dir }}
+          HERMES_TAG: ${{ inputs.hermes_tag }}
+          TARGET_OS: ${{ matrix.os }}
+          SLICES: ${{ matrix.slices }}
+        run: |
+          # --thin slices one architecture out of a universal binary, which is a
+          # macOS concept and the reason macOS produces two packages from one build.
+          extra=()
+          if [ "$TARGET_OS" = "darwin" ]; then extra+=(--thin); fi
+
+          for cpu in $SLICES; do
+            pnpm exec tsx scripts/pack-hermes-bin.ts \
+              --bin-dir "$BIN_DIR" \
+              --tag "$HERMES_TAG" \
+              --os "$TARGET_OS" \
+              --cpu "$cpu" \
+              --out "$GITHUB_WORKSPACE/dist/hermes-bin" \
+              "${extra[@]}" --pack
+          done
+
+          ls -l "$GITHUB_WORKSPACE/dist/hermes-bin"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hermes-bin-${{ matrix.slug }}
+          path: |
+            dist/hermes-bin/*.tgz
+            dist/hermes-bin/*.tgz.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish to npm
+    needs: build
+    if: ${{ inputs.publish }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # A GitHub Environment, so publishing can be held behind required reviewers.
+    # NOTE: this environment does not exist yet — create it (Settings ->
+    # Environments) and add required reviewers before the first real publish.
+    environment: hermes-prebuilt-publish
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: hermes-bin-*
+          merge-multiple: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify checksums
+        shell: bash
+        working-directory: dist
+        run: |
+          ls -l
+          # The .sha256 files name their tarball with no path, so verify from
+          # the directory holding both.
+          for checksum in *.tgz.sha256; do
+            shasum -a 256 -c "$checksum"
+          done
+
+      - name: Publish
+        shell: bash
+        env:
+          # NOTE: the NPM_TOKEN secret does not exist yet — create it (an npm
+          # automation token with publish rights on the @argus scope) before
+          # dispatching this workflow with publish enabled.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Plain `npm`, not `pnpm`: these packages have no workspace
+          # dependencies, so there is no `workspace:*` protocol to rewrite and
+          # nothing pnpm contributes. --access public because a scoped package
+          # would otherwise be published as restricted.
+          for tarball in dist/*.tgz; do
+            echo "publishing $tarball"
+            npm publish "$tarball" --access public
+          done

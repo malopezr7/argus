@@ -1,3 +1,19 @@
+// Hermes prebuilt binary packages (pure)
+export type {
+  HermesBinCpu,
+  HermesBinManifest,
+  HermesBinManifestOptions,
+  HermesBinOs,
+  HermesBinPlatform,
+} from './domain/hermes-bin-package.js';
+export {
+  HERMES_BIN_DIR,
+  HERMES_BIN_PLATFORMS,
+  HERMES_BIN_SCOPE,
+  hermesBinPackageManifest,
+  hermesBinPackageName,
+  hermesBinPackageVersion,
+} from './domain/hermes-bin-package.js';
 // Hermes source-build configuration (pure)
 export type {
   CmakeBuildOptions,

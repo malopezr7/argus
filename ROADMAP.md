@@ -122,8 +122,13 @@ build is well below the number of RN releases.
 Resolution order for the binary itself:
 
 1. **Cache** — `~/.cache/argus/hermes/<tag>/<platform>/hermes`.
-2. **Argus prebuilt** — `@argus/hermes-bin-<os>-<arch>` as optional dependencies,
-   keyed by Hermes tag, built by our CI.
+2. **Argus prebuilt** — `@argus/hermes-bin-<os>-<arch>`, built and published by
+   our CI, and versioned by the Hermes version rather than the Argus version.
+   Fetched at run time, never declared as a dependency: RN 0.83 wants Hermes
+   `250829098.0.4` and RN 0.86 wants `250829098.0.16` with the same Argus
+   installed, and a dependency fixed at publish time cannot express that. This
+   is where Argus differs from the esbuild model, which pins one binary per
+   esbuild release because it only ever needs one.
 3. **Bundled legacy VM** — `node_modules/react-native/sdks/hermesc/osx-bin/hermes`.
    Present for RN 0.73 through 0.82 on macOS, universal binary. Free and exact,
    but legacy-only; use it when the project targets V0.
@@ -150,8 +155,12 @@ Build configuration mirrors React Native's own:
 - [ ] Fix the `.hermesv1version` filename casing — the current lookup uses a
       capital `V` and silently falls through to the legacy file on
       case-sensitive filesystems.
-- [ ] CI building and publishing prebuilts for `linux-x64` and `darwin-arm64`
-      (P0), `darwin-x64` and `linux-arm64` (P1).
+- [ ] Publish prebuilts for `darwin-arm64`, `darwin-x64`, `linux-x64` and
+      `linux-arm64`. The build-and-publish pipeline exists
+      (`.github/workflows/hermes-prebuilt.yml`, manual dispatch, gated on
+      bytecode parity with the official `hermes-compiler`); it has not been run
+      and nothing is published yet. Windows stays out until there is a
+      verified toolchain for it.
 - [ ] Set the engine release version explicitly at build time — a raw clone
       reports `1.0.0`.
 - [ ] Bundled-VM detection for the legacy target on RN 0.73–0.82.
