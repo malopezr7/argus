@@ -27,16 +27,19 @@ layered on `@astrojs/starlight-tailwind`.
 
 ## Deployment
 
-Cloudflare Pages, static output.
+Cloudflare Pages project `argus-hermes`, static output.
 
-| Setting | Value |
+Every push to `main` that touches `website/` runs
+[`.github/workflows/docs-deploy.yml`](../.github/workflows/docs-deploy.yml), which builds
+and deploys. It needs two repository secrets and skips itself with a notice when they are
+absent:
+
+| Secret | Where to get it |
 |---|---|
-| Root directory | `website` |
-| Build command | `pnpm install --ignore-workspace && pnpm build` |
-| Output directory | `dist` |
-| Node version | 22 or later |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard → My Profile → API Tokens, with **Cloudflare Pages: Edit** |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID |
 
-Or from a local machine:
+From a local machine:
 
 ```bash
 cd website
