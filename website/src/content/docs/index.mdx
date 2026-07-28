@@ -1,0 +1,89 @@
+---
+title: Argus
+description: Run React Native tests on the standalone Hermes VM — the real production engine, at unit-test cost. No Metro, no native build, no device.
+template: splash
+head:
+  - tag: title
+    content: Argus — Hermes-native tests for React Native
+hero:
+  tagline: Your React Native app ships on Hermes. Your tests run on Node. Argus closes that gap — the real engine, spawned per test file, at unit-test speed.
+  actions:
+    - text: Get started
+      link: /start/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: Why Hermes, not Node
+      link: /start/why-hermes/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+## The engine that ships is the engine that tests
+
+Argus bundles each test file into a sealed IIFE, spawns the standalone `hermes` VM on it,
+and reads a framed result line back. No Metro, no native build, no emulator — and no V8
+pretending to be Hermes.
+
+```ts
+// sum.test.ts — plain TypeScript, running on the real Hermes VM
+import { sum } from './sum';
+
+describe('sum', () => {
+  test('adds numbers', () => {
+    expect(sum(2, 3)).toBe(5);
+  });
+
+  test('rejects a non-number', () => {
+    expect(() => sum(2, 'three' as never)).toThrow(TypeError);
+  });
+});
+```
+
+```bash
+argus "src/**/*.test.ts"
+```
+
+<CardGrid>
+	<Card title="Real Hermes, not an emulation" icon="rocket">
+		The `hermes` CLI VM, spawned as a subprocess per file. Same bytecode model React
+		Native uses on device — compile to HBC, interpret it.
+	</Card>
+	<Card title="Jest-shaped surface" icon="approve-check">
+		`describe` / `test` / `it`, the four hooks, `.skip` / `.only` / `.todo`, async tests,
+		`expect.extend`, assertion counting. Familiar where familiarity helps.
+	</Card>
+	<Card title="Engine pinned by your project" icon="setting">
+		Argus reads the Hermes version **your** React Native install pins, then provisions
+		exactly that VM. Legacy and V1 both supported.
+	</Card>
+	<Card title="Stacks that point at your source" icon="seti:typescript">
+		Failure stacks are remapped through the bundle's source map, back to the original
+		`.ts` / `.tsx` line you wrote.
+	</Card>
+	<Card title="Component testing on real React" icon="puzzle">
+		`render`, `screen`, `getBy*`, `within`, `fireEvent`, `act` — real React 19 running
+		inside Hermes, not a DOM shim on Node.
+	</Card>
+	<Card title="A hardened result channel" icon="warning">
+		User tests can pollute prototypes and hijack globals. The result frame survives it:
+		captured primordials, a private nonce, a hand-written serializer.
+	</Card>
+</CardGrid>
+
+## Start reading
+
+<CardGrid>
+	<LinkCard title="What is Argus" href="/start/introduction/" description="The gap it fills, and what it deliberately is not." />
+	<LinkCard title="Why Hermes, not Node" href="/start/why-hermes/" description="Where a Node-based runner tells you the wrong answer." />
+	<LinkCard title="Quick start" href="/start/quickstart/" description="From install to a green run on the real VM." />
+	<LinkCard title="React Native version table" href="/hermes/versions/" description="Which Hermes engine each React Native release pins." />
+</CardGrid>
+
+:::caution[Status]
+Argus is **pre-release**, working toward `v0.1.0`. The runner, matchers, mocks, source maps
+and synchronous component testing are built and verified. Snapshots, coverage, watch mode
+and a config file are not — see the [Roadmap](/reference/roadmap/) for what is landing and
+[Limitations](/reference/limitations/) for what is out of scope on purpose.
+:::

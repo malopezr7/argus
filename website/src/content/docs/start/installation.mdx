@@ -1,0 +1,138 @@
+---
+title: Installation
+description: Add Argus to a React Native project, and understand what it needs from your machine.
+sidebar:
+  order: 3
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+## Requirements
+
+| Requirement | Why |
+|---|---|
+| Node 22+ | The host process. Argus uses `node:util.parseArgs`, `fs.promises.glob` and `util.styleText`. |
+| A `react-native` install | Argus reads the Hermes engine your project pins from it. Without one, you must name a binary yourself. |
+| macOS or Linux | Prebuilt Hermes binaries are published for `darwin-arm64`, `darwin-x64`, `linux-x64` and `linux-arm64`. Windows needs a source build. |
+
+You do **not** need Xcode, Android Studio, a simulator, cmake, or Metro. The Hermes VM is
+downloaded on first use.
+
+## Install
+
+<Tabs syncKey="pm">
+  <TabItem label="pnpm">
+  ```bash
+  pnpm add -D @argus/cli
+  ```
+  </TabItem>
+  <TabItem label="npm">
+  ```bash
+  npm install --save-dev @argus/cli
+  ```
+  </TabItem>
+  <TabItem label="yarn">
+  ```bash
+  yarn add -D @argus/cli
+  ```
+  </TabItem>
+</Tabs>
+
+That gives you the `argus` binary. Everything the runner needs on the host —
+the bundler, the Hermes adapter, the source-map remapper, the reporter — comes with it.
+
+### Component testing (optional)
+
+Testing React components needs one more package. Plain TypeScript and plain-logic tests do
+not.
+
+```bash
+pnpm add -D @argus/rntl
+```
+
+Your test files keep importing from `'argus'`; the bundler maps that specifier to the
+package. See [Component testing](/tests/components/).
+
+## Add a script
+
+```json title="package.json"
+{
+  "scripts": {
+    "test:hermes": "argus \"src/**/*.test.ts\" \"src/**/*.test.tsx\""
+  }
+}
+```
+
+Quote your globs. Leaving them unquoted lets the shell expand them before Argus sees them,
+which usually works and occasionally does something surprising with `**`.
+
+## First run
+
+```bash
+pnpm test:hermes
+```
+
+On the first run Argus resolves which Hermes your project pins, downloads the matching
+prebuilt, verifies its SHA-256, and caches it under `~/.argus/cache/`. Later runs reuse the
+cache and start immediately.
+
+The run opens with one line naming exactly what it ran on:
+
+```text
+✓ hermes v1 hermes-v250829098.0.16 · prebuilt darwin-arm64 · /Users/you/.argus/cache/hermes-hermes-v250829098.0.16/build/bin/hermes
+```
+
+<Aside type="tip">
+That line is deliberately one line so it survives in a CI log. The engine identity is the
+difference between a meaningful run and a misleading one — read it.
+</Aside>
+
+## Using a Hermes binary you already have
+
+Any of these skips provisioning entirely:
+
+```bash
+argus --hermes /path/to/hermes "src/**/*.test.ts"
+```
+
+```bash
+ARGUS_HERMES=/path/to/hermes argus "src/**/*.test.ts"
+```
+
+Or drop one at `./.hermes/hermes` in your project and it is picked up with no flag at all.
+
+Full precedence rules: [How the binary is provisioned](/hermes/provisioning/).
+
+## Building Hermes from source
+
+When no prebuilt applies — a Windows host, or a React Native version whose Hermes pin is
+date-based or a bare commit SHA — Argus can build the VM. It never does so silently:
+
+```bash
+argus --provision "src/**/*.test.ts"
+```
+
+Needs `git`, `cmake` and `ninja` on `PATH`. Expect a couple of minutes for the first build;
+the result is cached like any other binary.
+
+## CI
+
+```yaml title=".github/workflows/test.yml"
+- uses: actions/setup-node@v4
+  with:
+    node-version: 24
+    cache: 'pnpm'
+
+- run: pnpm install --frozen-lockfile
+
+# Cache the provisioned VM so only the first run pays the download.
+- uses: actions/cache@v4
+  with:
+    path: ~/.argus/cache
+    key: argus-hermes-${{ runner.os }}-${{ runner.arch }}
+
+- run: pnpm test:hermes
+```
+
+Argus never prompts. A blocked provisioning step fails with a message listing every source
+it tried and what to type next — a prompt in CI is a hang.

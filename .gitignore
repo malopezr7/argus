@@ -13,9 +13,11 @@ coverage
 # Tooling artifacts (gentle-ai skill registry, etc.)
 .atl/
 
-# Specs / SDD artifacts — kept LOCAL, never committed (per project preference)
-docs/
-openspec/
+# Specs / SDD artifacts — kept LOCAL, never committed (per project preference).
+# Anchored to the repo root so the docs site's own content directory
+# (website/src/content/docs) stays tracked.
+/docs/
+/openspec/
 
 # Agent handoff / working context — local only, never committed
 AGENTS.md

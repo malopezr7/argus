@@ -1,0 +1,191 @@
+---
+title: Component testing
+description: render, screen, queries, within, fireEvent and act — real React 19 running inside Hermes, synchronously.
+sidebar:
+  order: 6
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Argus runs **real React** inside the Hermes VM. Not a DOM emulation, not a mocked renderer
+— the actual React 19 reconciler, driven by a test renderer, on the engine your app ships.
+
+The surface is intentionally synchronous and intentionally small.
+
+```bash
+pnpm add -D @argus/rntl
+```
+
+```tsx title="src/Counter.test.tsx"
+import { fireEvent, render, screen, within } from 'argus';
+import { Pressable, Text, View } from 'react-native';
+import { Counter } from './Counter';
+
+describe('Counter', () => {
+  test('increments on press', () => {
+    render(<Counter />);
+
+    fireEvent.press(screen.getByText('+'));
+
+    expect(screen.getByTestId('value').props.children).toBe('1');
+  });
+});
+```
+
+Test files import from `'argus'`; the bundler maps that specifier to the package. Plain
+TypeScript tests never touch it and do not need it installed.
+
+## `render`
+
+```tsx
+const result = render(<Profile user={user} />);
+
+result.root;                 // the rendered host tree
+result.rerender(<Profile user={other} />);
+result.unmount();
+```
+
+Rendering is wrapped in `act`, so state set during mount is already flushed by the time
+`render` returns.
+
+Roots are unmounted automatically after each test. You do not need `afterEach(cleanup)` —
+the facade registers an internal lifecycle hook that runs even when the test failed.
+
+## `screen` and queries
+
+`screen` queries the most recent render.
+
+```tsx
+screen.getByText('Submit');
+screen.getByTestId('email-field');
+screen.getByRole('header');
+screen.getByPlaceholderText('Email');
+screen.getByDisplayValue('user@example.com');
+```
+
+Each of the five predicates comes in four forms:
+
+| Form | No match | Multiple matches |
+|---|---|---|
+| `getBy*` | throws | throws |
+| `getAllBy*` | throws | returns all |
+| `queryBy*` | returns `null` | throws |
+| `queryAllBy*` | returns `[]` | returns all |
+
+Use `getBy*` when the element must exist — the throw is a better failure message than a
+`null` dereference three lines later. Use `queryBy*` to assert absence:
+
+```tsx
+expect(screen.queryByText('Error')).toBeNull();
+```
+
+Matchers accept a string (exact match) or a `RegExp`:
+
+```tsx
+screen.getByText('Total: 12.00');
+screen.getByText(/^Total:/);
+```
+
+What each predicate looks at:
+
+| Query | Matches against |
+|---|---|
+| `*ByText` | The concatenated text content of a `Text` node |
+| `*ByTestId` | `props.testID` |
+| `*ByRole` | `props.accessibilityRole`, falling back to `props.role` |
+| `*ByPlaceholderText` | `props.placeholder` |
+| `*ByDisplayValue` | `props.value`, falling back to `props.defaultValue` |
+
+## `within`
+
+Scopes queries to a subtree — the fix for "two elements have the same label".
+
+```tsx
+render(
+  <View>
+    <View testID="left"><Text>same</Text></View>
+    <View testID="right"><Text>same</Text></View>
+  </View>,
+);
+
+expect(screen.getAllByText('same')).toHaveLength(2);
+expect(within(screen.getByTestId('left')).getAllByText('same')).toHaveLength(1);
+```
+
+## `fireEvent`
+
+```tsx
+fireEvent.press(node);
+fireEvent.changeText(node, 'Ada');
+fireEvent(node, 'focus');           // any handler: 'focus' → onFocus
+fireEvent(node, 'scroll', payload); // with a payload
+```
+
+Behaviour worth knowing:
+
+- The handler is looked up on the node, then **up its ancestors**. Pressing the `Text`
+  inside a `Pressable` fires the `Pressable`'s `onPress`, exactly as a real press would.
+- A node with `disabled`, `accessibilityState.disabled`, or (for `changeText`)
+  `editable={false}` swallows the event silently, matching production.
+- No handler anywhere up the tree throws `No handler found for onPress` — a typo in a prop
+  name fails loudly instead of passing quietly.
+- Dispatch is wrapped in `act`, so resulting state updates are flushed before the call
+  returns.
+
+## `act`
+
+For state changes you trigger yourself, outside an event.
+
+```tsx
+act(() => {
+  store.setUser(nextUser);
+});
+
+expect(screen.getByText(nextUser.name)).toBeDefined();
+```
+
+Synchronous only. Async `act` is not supported, because there is nothing asynchronous to
+flush without timers.
+
+## Held nodes go stale
+
+<Aside type="caution">
+A node reference and a `within(scope)` are **snapshots of the tree at query time**. After
+an update, re-query through `screen` and build a fresh `within` scope before asserting or
+dispatching again.
+</Aside>
+
+```tsx
+// ✗ stale — `button` points at the tree from before the press
+const button = screen.getByText('+');
+fireEvent.press(button);
+fireEvent.press(button);
+
+// ✓ re-query after every update
+fireEvent.press(screen.getByText('+'));
+fireEvent.press(screen.getByText('+'));
+```
+
+The same applies to `result.root` and to any scope captured from `within`.
+
+## What is not supported
+
+Deliberately out of scope for this iteration:
+
+- `waitFor`, `findBy*` and every other async query — there are no timers to wait on.
+- `userEvent` — the high-level interaction layer.
+- Fake timers.
+- Suspense guarantees.
+- Layout, measurement, and anything positional.
+- Native platform fidelity beyond the four shim components.
+
+If your assertion needs any of those, it belongs in an on-device test, not here.
+
+## About `@argus/rntl`
+
+The facade is maintained as its own package and treated as a **stopgap**. When upstream
+React Native Testing Library v14 on `test-renderer` becomes bundleable within the supported
+Hermes envelope, this package can be deprecated without growing the framework core.
+
+Your test code is insulated from that: it imports from `'argus'`, and the specifier is what
+gets remapped.

@@ -1,0 +1,118 @@
+---
+title: Quick start
+description: From an installed package to a green run on the real Hermes VM, then a failing one that points at your source.
+sidebar:
+  order: 4
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+<Steps>
+
+1. **Install the runner.**
+
+   ```bash
+   pnpm add -D @argus/cli
+   ```
+
+2. **Write a test.** No import of the test API is needed — `describe`, `test`, `it`,
+   `expect` and the hooks are installed as globals inside the Hermes realm.
+
+   ```ts title="src/money.test.ts"
+   import { formatCents } from './money';
+
+   describe('formatCents', () => {
+     test('formats whole euros', () => {
+       expect(formatCents(1200)).toBe('12.00');
+     });
+
+     test('rounds half up', () => {
+       expect(formatCents(1205)).toBe('12.05');
+     });
+
+     test('rejects a negative amount', () => {
+       expect(() => formatCents(-1)).toThrow(RangeError);
+     });
+   });
+   ```
+
+3. **Run it.**
+
+   ```bash
+   pnpm exec argus "src/**/*.test.ts"
+   ```
+
+   ```text
+   ✓ hermes v1 hermes-v250829098.0.16 · prebuilt darwin-arm64 · ~/.argus/cache/…/bin/hermes
+
+   formatCents
+     ✓ formats whole euros
+     ✓ rounds half up
+     ✓ rejects a negative amount
+
+   3 passed, 0 failed, 0 todo, 3 total (41 ms in Hermes)
+
+   1 files: 1 passed, 0 failed
+   3 tests: 3 passed, 0 failed, 0 todo
+   ```
+
+4. **Break it on purpose**, so you can see what a failure looks like.
+
+   ```ts
+   test('rounds half up', () => {
+     expect(formatCents(1205)).toBe('12.06'); // wrong
+   });
+   ```
+
+   ```text
+   formatCents
+     ✓ formats whole euros
+     ✗ rounds half up  — expected "12.06" but received "12.05"
+       at src/money.test.ts:8:34
+     ✓ rejects a negative amount
+
+   2 passed, 1 failed, 0 todo, 3 total (39 ms in Hermes)
+   ```
+
+   The frame says `src/money.test.ts:8`, not `run.argus-bundle.js:2418`. Stacks are
+   remapped through the bundle's source map before anything is printed — see
+   [Source maps](/internals/source-maps/).
+
+5. **Add it to `package.json`** so it runs like any other check.
+
+   ```json title="package.json"
+   {
+     "scripts": {
+       "test:hermes": "argus \"src/**/*.test.ts\" \"src/**/*.test.tsx\""
+     }
+   }
+   ```
+
+</Steps>
+
+## What just happened
+
+For that one file, Argus:
+
+1. Read `node_modules/react-native` to find which Hermes engine and version your project
+   pins.
+2. Resolved a binary for it — cache, then the published prebuilt, verifying its checksum.
+3. Bundled the test and its imports into a single sealed IIFE, lowered to the Hermes
+   syntax envelope, with an external source map.
+4. Spawned `hermes` on that file, in its own process.
+5. Read back exactly one framed result line carrying a private per-run nonce.
+6. Remapped every stack frame to your source, and rendered the report.
+
+## Where to go next
+
+- [Test structure](/tests/structure/) — hooks, `.skip` / `.only` / `.todo`, nesting.
+- [Matchers](/tests/matchers/) — the full `expect` surface.
+- [Mocks & spies](/tests/mocks/) — `argus.fn()`, `argus.spyOn()`, call matchers.
+- [Component testing](/tests/components/) — `render`, `screen`, `fireEvent`.
+- [Command and flags](/cli/usage/) — timeouts, concurrency, engine selection.
+
+<Aside type="caution">
+`argus` and Jest are not interchangeable. There is no `jest` global, no `jest.mock()`
+module factory, no fake timers, no snapshots yet. The differences are catalogued in
+[Limitations & non-goals](/reference/limitations/).
+</Aside>
