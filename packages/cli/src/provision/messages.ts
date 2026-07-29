@@ -102,7 +102,8 @@ export function formatProvisionFailure(
 export function describeSource(source: SelectedSource): string {
   switch (source.kind) {
     case 'explicit':
-      return source.origin === 'flag' ? '--hermes' : 'ARGUS_HERMES';
+      if (source.origin === 'flag') return '--hermes';
+      return source.origin === 'env' ? 'ARGUS_HERMES' : 'argus.config';
     case 'project-vendored':
       return 'project .hermes';
     case 'cache':

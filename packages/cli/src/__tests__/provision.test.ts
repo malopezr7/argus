@@ -36,6 +36,22 @@ function tempDir(prefix: string): string {
   return dir;
 }
 
+/**
+ * An explicit binary path, tagged with the mechanism that named it.
+ *
+ * Which of `--hermes`, `ARGUS_HERMES` and the config file wins is settled by
+ * `mergeConfig` (see config-merge.test.ts); by the time provisioning runs there
+ * is one path and one origin, and the origin only decides what the summary line
+ * calls it.
+ */
+function flag(path: string): { path: string; origin: 'flag' } {
+  return { path, origin: 'flag' };
+}
+
+function env(path: string): { path: string; origin: 'env' } {
+  return { path, origin: 'env' };
+}
+
 /** A temp project whose `node_modules/react-native` pins the given engines. */
 function createProject(versionProperties?: string, rnVersion = '0.86.2'): string {
   const root = tempDir('argus-provision-');
@@ -122,7 +138,7 @@ describe('provisionHermes — engine availability', () => {
       options({
         startDir: createProject(RN_V1_ONLY),
         engine: 'legacy',
-        hermesFlagPath: createFakeHermes('0.12.0', 96),
+        explicitHermes: flag(createFakeHermes('0.12.0', 96)),
       }),
     );
 
@@ -134,7 +150,7 @@ describe('provisionHermes — engine availability', () => {
       options({
         startDir: createProject(RN_BOTH_ENGINES),
         engine: 'legacy',
-        hermesFlagPath: createFakeHermes('0.17.0', 96),
+        explicitHermes: flag(createFakeHermes('0.17.0', 96)),
       }),
     );
 
@@ -147,7 +163,7 @@ describe('provisionHermes — explicit paths', () => {
   it('uses --hermes and reports it as the source', async () => {
     const path = createFakeHermes('1.0.0', 98);
     const result = await provisionHermes(
-      options({ startDir: createProject(RN_BOTH_ENGINES), hermesFlagPath: path }),
+      options({ startDir: createProject(RN_BOTH_ENGINES), explicitHermes: flag(path) }),
     );
 
     expect(result.kind).toBe('provisioned');
@@ -155,26 +171,27 @@ describe('provisionHermes — explicit paths', () => {
     expect(result.kind === 'provisioned' && result.binary.path).toBe(path);
   });
 
-  it('uses ARGUS_HERMES when no flag was passed', async () => {
+  it('names ARGUS_HERMES as the source when the environment supplied the path', async () => {
     const result = await provisionHermes(
-      options({ hermesEnvPath: createFakeHermes('0.12.0', 96) }),
+      options({ explicitHermes: env(createFakeHermes('0.12.0', 96)) }),
     );
 
     expect(result.kind === 'provisioned' && result.summary).toContain('ARGUS_HERMES');
   });
 
-  it('prefers the flag over the environment variable', async () => {
-    const flag = createFakeHermes('1.0.0', 98);
+  it('names the config file as the source when the config supplied the path', async () => {
     const result = await provisionHermes(
-      options({ hermesFlagPath: flag, hermesEnvPath: createFakeHermes('0.12.0', 96) }),
+      options({
+        explicitHermes: { path: createFakeHermes('0.12.0', 96), origin: 'config' },
+      }),
     );
 
-    expect(result.kind === 'provisioned' && result.binary.path).toBe(flag);
+    expect(result.kind === 'provisioned' && result.summary).toContain('argus.config');
   });
 
   it('fails with the path the user named rather than falling back', async () => {
     const missing = join(tempDir('argus-missing-'), 'hermes');
-    const result = await provisionHermes(options({ hermesFlagPath: missing }));
+    const result = await provisionHermes(options({ explicitHermes: flag(missing) }));
 
     expect(result.kind).toBe('failed');
     expect(result.kind === 'failed' && result.message).toContain(missing);
@@ -186,7 +203,7 @@ describe('provisionHermes — fidelity', () => {
     const result = await provisionHermes(
       options({
         startDir: createProject(RN_V1_ONLY),
-        hermesFlagPath: createFakeHermes('0.12.0', 96),
+        explicitHermes: flag(createFakeHermes('0.12.0', 96)),
       }),
     );
 
@@ -199,7 +216,7 @@ describe('provisionHermes — fidelity', () => {
     const result = await provisionHermes(
       options({
         startDir: createProject(RN_V1_ONLY),
-        hermesFlagPath: createFakeHermes('1.0.0', 98),
+        explicitHermes: flag(createFakeHermes('1.0.0', 98)),
       }),
     );
 
@@ -208,7 +225,10 @@ describe('provisionHermes — fidelity', () => {
 
   it('stays silent when the binary reports no bytecode version', async () => {
     const result = await provisionHermes(
-      options({ startDir: createProject(RN_V1_ONLY), hermesFlagPath: createFakeHermes('1.0.0') }),
+      options({
+        startDir: createProject(RN_V1_ONLY),
+        explicitHermes: flag(createFakeHermes('1.0.0')),
+      }),
     );
 
     expect(result.kind === 'provisioned' && result.warning).toBeUndefined();
@@ -216,7 +236,7 @@ describe('provisionHermes — fidelity', () => {
 
   it('does not warn when the project pins nothing to be unfaithful to', async () => {
     const result = await provisionHermes(
-      options({ hermesFlagPath: createFakeHermes('0.12.0', 96) }),
+      options({ explicitHermes: flag(createFakeHermes('0.12.0', 96)) }),
     );
 
     expect(result.kind === 'provisioned' && result.warning).toBeUndefined();

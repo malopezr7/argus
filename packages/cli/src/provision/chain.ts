@@ -34,8 +34,12 @@ export type ProvisionSourceKind =
   | 'prebuilt'
   | 'source-build';
 
-/** Which explicit mechanism supplied a path — reported back to the user verbatim. */
-export type ExplicitOrigin = 'flag' | 'env';
+/**
+ * Which explicit mechanism supplied a path — reported back to the user
+ * verbatim, so the summary line names the file or variable to go and edit
+ * rather than just the path it produced.
+ */
+export type ExplicitOrigin = 'flag' | 'env' | 'config';
 
 export interface ExplicitPath {
   path: string;

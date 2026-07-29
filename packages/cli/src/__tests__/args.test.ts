@@ -2,6 +2,7 @@ import { availableParallelism } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_MAX_CONCURRENCY,
+  defaultConcurrency,
   ENGINE_VALUES,
   parseCliArgs,
   USAGE,
@@ -28,14 +29,20 @@ describe('parseCliArgs — --concurrency / -c', () => {
     expect(parseCliArgs(['-c', '1']).concurrency).toBe(1);
   });
 
-  it('default (no flag) → concurrency >= 1', () => {
-    const { concurrency } = parseCliArgs([]);
-    expect(concurrency).toBeGreaterThanOrEqual(1);
+  /**
+   * Absence is left absent rather than filled in with the default. A parser
+   * that returns the default is indistinguishable from a user who typed it,
+   * which would make the flag beat the config file on every run. `mergeConfig`
+   * applies the default once, after precedence has been decided.
+   */
+  it('default (no flag) → concurrency is left undefined for the merge to fill', () => {
+    expect(parseCliArgs([]).concurrency).toBeUndefined();
   });
 
-  it('default (no flag) → concurrency === clamp(availableParallelism(), 1, DEFAULT_MAX_CONCURRENCY)', () => {
+  it('the default it is filled with is clamp(availableParallelism(), 1, DEFAULT_MAX_CONCURRENCY)', () => {
     const expected = Math.max(1, Math.min(DEFAULT_MAX_CONCURRENCY, availableParallelism()));
-    expect(parseCliArgs([]).concurrency).toBe(expected);
+    expect(defaultConcurrency()).toBe(expected);
+    expect(defaultConcurrency()).toBeGreaterThanOrEqual(1);
   });
 
   // Strict validation — UsageError cases (task 2.1b / 2.2b)
@@ -79,6 +86,45 @@ describe('parseCliArgs — other options unaffected', () => {
 
   it('-t 5000 sets timeoutMs', () => {
     expect(parseCliArgs(['-t', '5000']).timeoutMs).toBe(5000);
+  });
+
+  it('leaves timeoutMs undefined when the flag is absent', () => {
+    expect(parseCliArgs([]).timeoutMs).toBeUndefined();
+  });
+
+  /**
+   * `--timeout abc` used to be silently replaced by the 10 000 ms default, so a
+   * typo produced a full green run under a timeout the user never chose and was
+   * never told about. It now fails the same way `--concurrency` always has.
+   */
+  it.each([
+    'abc',
+    '0',
+    '-1',
+    '1.5',
+    '1e3',
+    '5000ms',
+    ' 5000',
+  ])('-t %s throws UsageError instead of silently defaulting', (raw) => {
+    expect(() => parseCliArgs(['-t', raw])).toThrow(UsageError);
+  });
+
+  it('names the flag and the bad value when rejecting a timeout', () => {
+    try {
+      parseCliArgs(['--timeout', 'soon']);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect((e as UsageError).message).toContain('--timeout');
+      expect((e as UsageError).message).toContain('"soon"');
+    }
+  });
+
+  it('--config records the path', () => {
+    expect(parseCliArgs(['--config', 'custom.ts']).config).toBe('custom.ts');
+  });
+
+  it('leaves config undefined when the flag is absent', () => {
+    expect(parseCliArgs([]).config).toBeUndefined();
   });
 
   it('--help sets help flag', () => {
@@ -126,8 +172,13 @@ describe('parseCliArgs — --engine', () => {
 });
 
 describe('parseCliArgs — --provision', () => {
-  it('defaults to false so a source build is never silent', () => {
-    expect(parseCliArgs([]).provision).toBe(false);
+  /**
+   * Absent rather than `false`, so a `hermes.provision: true` in the config
+   * is not overwritten by a flag the user never passed. `mergeConfig` resolves
+   * the absence to `false` when nothing else supplies a value.
+   */
+  it('is left absent when the flag is not passed', () => {
+    expect(parseCliArgs([]).provision).toBeUndefined();
   });
 
   it('--provision sets the flag', () => {

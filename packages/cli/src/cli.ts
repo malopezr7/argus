@@ -21,7 +21,10 @@ import {
 } from '@arguslab/reporter-cli';
 import { remapStacks } from '@arguslab/sourcemap';
 import { foldOutcomes } from './aggregate.js';
-import { parseCliArgs, USAGE, UsageError } from './args.js';
+import { defaultConcurrency, parseCliArgs, USAGE, UsageError } from './args.js';
+import { loadConfig } from './config/load.js';
+import { mergeConfig } from './config/merge.js';
+import { ConfigError } from './config/validate.js';
 import { resolveFiles } from './discover.js';
 import { errMsg } from './errors.js';
 import { resolveFrameworkPaths } from './paths.js';
@@ -42,33 +45,53 @@ async function main(): Promise<void> {
     throw e;
   }
 
-  const {
-    patterns,
-    timeoutMs,
-    hermes: hermesFlagPath,
-    engine,
-    provision,
-    help,
-    concurrency,
-  } = parsed;
-
-  if (help) {
+  if (parsed.help) {
     process.stdout.write(USAGE);
     return;
   }
 
-  // 2. Resolve framework / polyfill source paths (keyed off import.meta.url)
+  // 2. Load the config file, then fold defaults, config, environment and flags
+  //    into one answer per setting. Everything below reads `settings` only —
+  //    no other step re-decides where a value came from.
+  const cwd = process.cwd();
+  let settings: ReturnType<typeof mergeConfig>;
+  try {
+    const loaded = await loadConfig({
+      startDir: cwd,
+      ...(parsed.config === undefined ? {} : { explicitPath: parsed.config }),
+    });
+    settings = mergeConfig({
+      loaded,
+      flags: parsed,
+      env: process.env,
+      fallbackConcurrency: defaultConcurrency(),
+    });
+  } catch (e) {
+    // A config that cannot be used never falls back to the defaults: running
+    // under settings the user did not choose is the failure this layer exists
+    // to prevent, and it would be invisible in the output.
+    if (e instanceof ConfigError) {
+      process.stderr.write(`✗ Config error: ${e.message}\n`);
+      process.exitCode = 2;
+      return;
+    }
+    throw e;
+  }
+
+  const { timeoutMs, concurrency } = settings;
+
+  // 3. Resolve framework / polyfill source paths (keyed off import.meta.url)
   const { componentPath, frameworkPath, polyfillPaths } = resolveFrameworkPaths();
 
-  // 3. Provision Hermes: resolve the engine this project targets, then walk the
+  // 4. Provision Hermes: resolve the engine this project targets, then walk the
   //    source chain (explicit → cache → bundled → prebuilt → source build).
-  const cwd = process.cwd();
   const provisioned = await provisionHermes({
-    ...(hermesFlagPath === undefined ? {} : { hermesFlagPath }),
-    ...(process.env.ARGUS_HERMES === undefined ? {} : { hermesEnvPath: process.env.ARGUS_HERMES }),
-    ...(engine === undefined ? {} : { engine }),
-    allowSourceBuild: provision,
-    startDir: cwd,
+    ...(settings.hermes.path === undefined || settings.hermes.pathOrigin === undefined
+      ? {}
+      : { explicitHermes: { path: settings.hermes.path, origin: settings.hermes.pathOrigin } }),
+    ...(settings.hermes.engine === undefined ? {} : { engine: settings.hermes.engine }),
+    allowSourceBuild: settings.hermes.provision,
+    startDir: settings.root,
     homeDir: homedir(),
     platform: process.platform,
     arch: process.arch,
@@ -91,8 +114,8 @@ async function main(): Promise<void> {
   if (provisioned.warning !== undefined) process.stderr.write(provisioned.warning);
   const bin = provisioned.binary;
 
-  // 4. Discover test files
-  const files = await resolveFiles(patterns, cwd);
+  // 5. Discover test files
+  const files = await resolveFiles(settings.include, settings.root, settings.exclude);
   if (files.length === 0) {
     process.stderr.write(
       `✗ INFRASTRUCTURE FAILURE [discover] No test files matched the given pattern(s).\n`,
@@ -100,7 +123,7 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
-  // 5. Per-file concurrent run via bounded pool
+  // 6. Per-file concurrent run via bounded pool
   const bundler = new EsbuildBundler();
   const spawnEngine = new HermesSpawnEngine();
 
@@ -118,7 +141,11 @@ async function main(): Promise<void> {
           componentPath,
           polyfillPaths,
           engineTarget: DEFAULT_ENGINE_TARGET,
-          projectDir: cwd,
+          // React is resolved from the project under test, which is the
+          // discovery root rather than the working directory: in a monorepo
+          // with per-package React versions, `root: 'packages/app'` must
+          // resolve that package's React. Node still walks up to a hoisted one.
+          projectDir: settings.root,
         })
         .catch((e) => {
           throw Object.assign(new Error(errMsg(e)), { stage: 'bundle' });
@@ -150,7 +177,7 @@ async function main(): Promise<void> {
   const fileResults: FileResult[] = files.map((file, i) => ({ file, outcome: outcomes[i] }));
   for (const { outcome } of fileResults) renderFileOutcome(outcome);
 
-  // 6. Aggregate + session summary + exit code
+  // 7. Aggregate + session summary + exit code
   const session = foldOutcomes(fileResults);
   renderSessionSummary(session);
   process.exitCode = exitCodeForSession(session);

@@ -29,9 +29,17 @@
   "bin": {
     "argus": "./bin/argus.js"
   },
-  "types": "./types/argus.d.ts",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./types/index.d.ts",
   "files": [
     "bin",
+    "lib",
     "runtime",
     "types",
     "README.md",

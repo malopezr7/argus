@@ -1,7 +1,8 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { CONFIG_KEYS, HERMES_CONFIG_KEYS } from '../packages/cli/src/config/validate.js';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -13,6 +14,8 @@ interface PackageJson {
   peerDependenciesMeta?: Record<string, { optional?: boolean }>;
   files?: string[];
   bin?: Record<string, string>;
+  types?: string;
+  exports?: Record<string, unknown>;
   engines?: Record<string, string>;
 }
 
@@ -45,12 +48,101 @@ describe('publishable surface', () => {
     expect(published.bin).toEqual({ argus: './bin/argus.js' });
   });
 
-  it('ships only the binary, the runtime assets and the types', () => {
-    expect(published.files).toEqual(['bin', 'runtime', 'types', 'README.md', 'LICENSE']);
+  it('ships the binary, the runtime assets, the importable entry and the types', () => {
+    expect(published.files).toEqual(['bin', 'lib', 'runtime', 'types', 'README.md', 'LICENSE']);
   });
 
   it('states the Node floor it is built for', () => {
     expect(published.engines?.node).toBe('>=24');
+  });
+});
+
+/**
+ * `defineConfig` has to be importable, which means the package needs a real
+ * Node entry point and not just a `bin`. Without one,
+ * `import { defineConfig } from '@arguslab/argus'` fails at resolution —
+ * the config file cannot be typed, and the whole config layer is unusable from
+ * an installed package however well it works from source.
+ */
+describe('the importable entry point', () => {
+  const entry = published.exports?.['.'] as Record<string, string> | undefined;
+
+  it('exposes a subpath-exports map with a root entry', () => {
+    expect(entry).toBeDefined();
+  });
+
+  it('points at an emitted JavaScript module', () => {
+    expect(entry?.import).toBe('./lib/index.js');
+  });
+
+  it('points at declarations that describe that module', () => {
+    expect(entry?.types).toBe('./types/index.d.ts');
+  });
+
+  /**
+   * Under node16/nodenext resolution the exports map governs `types` too, so
+   * the legacy top-level field must agree with it. Pointing the two at
+   * different files is how a package typechecks under one resolution mode and
+   * not the other.
+   */
+  it('agrees with the legacy top-level types field', () => {
+    expect(published.types).toBe(entry?.types);
+  });
+
+  /**
+   * Tooling reads a dependency's own package.json (npm, bundlers, `require.resolve`).
+   * An exports map without this entry makes that a hard error.
+   */
+  it('keeps package.json itself resolvable', () => {
+    expect(published.exports?.['./package.json']).toBe('./package.json');
+  });
+});
+
+/**
+ * The declarations are written by hand rather than generated, so the realistic
+ * failure is adding an option to the config contract and forgetting to declare
+ * it — leaving a documented option that does not typecheck for the user.
+ */
+describe('the published declarations', () => {
+  const declarations = readFileSync(join(REPO, 'packaging', 'index.d.ts'), 'utf8');
+
+  it('declares every option the validator accepts', () => {
+    for (const key of CONFIG_KEYS) {
+      expect(declarations, `ArgusConfig should declare "${key}"`).toContain(`${key}?:`);
+    }
+  });
+
+  it('declares every hermes option the validator accepts', () => {
+    for (const key of HERMES_CONFIG_KEYS) {
+      expect(declarations, `ArgusHermesConfig should declare "${key}"`).toContain(`${key}?:`);
+    }
+  });
+
+  it('exports defineConfig and the config type', () => {
+    expect(declarations).toContain('defineConfig');
+    expect(declarations).toContain('ArgusConfig');
+  });
+
+  /**
+   * `argus.d.ts` declares the test GLOBALS, and only works because it has no
+   * top-level import or export. Referencing it from the module entry keeps a
+   * single `types: ["@arguslab/argus"]` delivering both, without turning it
+   * into a module and silently dropping every global.
+   */
+  it('pulls in the ambient globals so one types entry delivers both', () => {
+    expect(declarations).toContain('/// <reference path="./argus.d.ts" />');
+    expect(existsSync(join(REPO, 'packaging', 'argus.d.ts'))).toBe(true);
+  });
+
+  /**
+   * Only a COLUMN-ZERO import or export makes the file a module. The indented
+   * `export`s inside `declare module 'argus' { ... }` are the ambient module's
+   * own members and are exactly what should be there.
+   */
+  it('leaves argus.d.ts a global script, with no top-level import or export', () => {
+    const globals = readFileSync(join(REPO, 'packaging', 'argus.d.ts'), 'utf8');
+
+    expect(globals).not.toMatch(/^(import|export)\s/m);
   });
 });
 

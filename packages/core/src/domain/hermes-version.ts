@@ -18,6 +18,16 @@
 /** Which Hermes engine a pin refers to. */
 export type HermesEngine = 'legacy' | 'v1';
 
+/**
+ * Every engine name, as a runtime value.
+ *
+ * The type above cannot be enumerated at run time, but both the `--engine` flag
+ * and the config file have to reject a name that does not exist rather than
+ * quietly running the other engine. Keeping the list beside the type is what
+ * stops the two validators from drifting apart.
+ */
+export const ENGINE_VALUES: readonly HermesEngine[] = ['legacy', 'v1'];
+
 /** A resolved reference to a Hermes engine build. */
 export interface HermesRef {
   /** Which engine this ref builds. */

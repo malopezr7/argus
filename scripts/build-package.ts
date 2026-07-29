@@ -57,10 +57,25 @@ const RUNTIME_DEPENDENCIES = [
 /** Workspace packages copied verbatim as `runtime/<name>/src`. */
 const RUNTIME_ASSET_PACKAGES = ['framework', 'rntl'];
 
+/**
+ * The public entry point, and the budget it has to stay inside.
+ *
+ * `defineConfig` is an identity function over a type. A user importing it to
+ * type their config file must not pay for the runner, so the entry is bundled
+ * from the ONE module that declares the config contract — a file with no value
+ * imports at all — rather than from the barrel, which would pull in the whole
+ * host graph. The ceiling is generous enough not to be brittle and tight
+ * enough that pulling in anything real would break it.
+ */
+const PUBLIC_ENTRY_SOURCE = ['packages', 'core', 'src', 'domain', 'config.ts'];
+const PUBLIC_ENTRY_OUT = ['lib', 'index.js'];
+const PUBLIC_ENTRY_MAX_BYTES = 4 * 1024;
+
 interface Manifest {
   name: string;
   version: string;
   bin: Record<string, string>;
+  exports: Record<string, { types?: string; import?: string } | string>;
   dependencies: Record<string, string>;
 }
 
@@ -105,6 +120,67 @@ async function bundleHost(manifest: Manifest): Promise<string> {
 }
 
 /**
+ * Bundle the importable entry, and prove it stayed cheap.
+ *
+ * The point of a separate entry is that `import { defineConfig } from
+ * '@arguslab/argus'` costs nothing beyond a type. That is an easy property to
+ * lose: one convenience re-export from the barrel would silently drag esbuild,
+ * Babel and the entire host graph into the import chain of a config file. So
+ * the result is MEASURED — its size, and the module specifiers it kept — rather
+ * than assumed from the shape of the source.
+ */
+async function bundlePublicEntry(manifest: Manifest): Promise<void> {
+  const rootExport = manifest.exports['.'];
+  if (typeof rootExport === 'string' || rootExport?.import === undefined) {
+    fail('packaging/package.json must declare an exports["."] entry with an "import" target');
+    return;
+  }
+
+  const outfile = join(OUT, ...PUBLIC_ENTRY_OUT);
+  const result = await build({
+    entryPoints: [join(REPO, ...PUBLIC_ENTRY_SOURCE)],
+    outfile,
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    target: 'node24',
+    legalComments: 'none',
+    metafile: true,
+  });
+
+  const emitted = readFileSync(outfile, 'utf8');
+  const size = statSync(outfile).size;
+
+  // Anything left as an import means the entry did not stay self-contained.
+  const imports = [...emitted.matchAll(/^\s*import\s.*?from\s*["']([^"']+)["']/gm)].map(
+    (match) => match[1],
+  );
+  if (imports.length > 0) {
+    fail(
+      `the public entry must not import anything, but it imports: ${imports.join(', ')}.\n` +
+        `  ${PUBLIC_ENTRY_SOURCE.join('/')} may use \`import type\` only — a value import ` +
+        'makes every consumer of defineConfig pay for the runner.',
+    );
+  }
+
+  if (size > PUBLIC_ENTRY_MAX_BYTES) {
+    fail(
+      `the public entry is ${kb(size)}, over the ${kb(PUBLIC_ENTRY_MAX_BYTES)} budget. ` +
+        'Something heavy reached it; it should contain the config contract and nothing else.',
+    );
+  }
+
+  if (!emitted.includes('defineConfig')) {
+    fail('the public entry does not export defineConfig, which is the reason it exists');
+  }
+
+  const inputs = Object.keys(result.metafile.inputs).length;
+  log(
+    `  bundled ${inputs} module -> ${PUBLIC_ENTRY_OUT.join('/')} (${kb(size)}, no runtime imports)`,
+  );
+}
+
+/**
  * A CLI whose first line is not a hashbang is not runnable through `bin`.
  *
  * esbuild carries the entry point's own hashbang through, which is a behaviour
@@ -142,9 +218,35 @@ function stageRuntimeAssets(): void {
 function stageMetadata(): void {
   cpSync(join(REPO, 'packaging', 'package.json'), join(OUT, 'package.json'));
   mkdirSync(join(OUT, 'types'), { recursive: true });
+  // Both declaration files ship, and both are needed: index.d.ts is the module
+  // entry, argus.d.ts holds the ambient test globals, and the first references
+  // the second. Staging either alone breaks half the type surface.
   cpSync(join(REPO, 'packaging', 'argus.d.ts'), join(OUT, 'types', 'argus.d.ts'));
+  cpSync(join(REPO, 'packaging', 'index.d.ts'), join(OUT, 'types', 'index.d.ts'));
   cpSync(join(REPO, 'README.md'), join(OUT, 'README.md'));
   cpSync(join(REPO, 'LICENSE'), join(OUT, 'LICENSE'));
+}
+
+/**
+ * Every path the manifest promises must actually be in the staged tree.
+ *
+ * A published `exports` map pointing at a file that was never emitted produces
+ * a package that installs cleanly and then fails at `import` with a resolution
+ * error — exactly the failure mode `assertDependenciesDeclared` exists to
+ * prevent, one level up.
+ */
+function assertExportsResolve(manifest: Manifest): void {
+  const targets = new Set<string>();
+  for (const entry of Object.values(manifest.exports)) {
+    if (typeof entry === 'string') targets.add(entry);
+    else for (const target of Object.values(entry)) targets.add(target);
+  }
+
+  const missing = [...targets].filter((target) => !existsSync(join(OUT, target)));
+  if (missing.length > 0) {
+    fail(`the exports map points at files that were not staged:\n  ${missing.join('\n  ')}`);
+  }
+  pass(`exports map resolves: ${[...targets].sort().join(', ')}`);
 }
 
 function countFiles(root: string): number {
@@ -198,9 +300,11 @@ async function main(): Promise<void> {
   mkdirSync(OUT, { recursive: true });
 
   assertExecutable(await bundleHost(manifest));
+  await bundlePublicEntry(manifest);
   stageRuntimeAssets();
   stageMetadata();
   assertNothingLeaked();
+  assertExportsResolve(manifest);
 
   const files = listFiles(OUT);
   const bytes = files.reduce((sum, file) => sum + statSync(join(OUT, file)).size, 0);

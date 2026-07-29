@@ -79,4 +79,65 @@ describe('resolveFiles', () => {
     expect(result[0]).toMatch(/math\.test\.ts$/);
     expect(result[0]).not.toMatch(/\.tsx$/);
   });
+
+  /**
+   * The exclusion used to be `path.includes('node_modules')`, a SUBSTRING test.
+   * A directory whose name merely contains the string — a fixtures directory
+   * about node_modules is the obvious one — was silently skipped, and the user
+   * got a green run over tests that never executed. Exclusion is a path-segment
+   * question, so it is asked with a glob.
+   */
+  it('keeps a directory whose name merely contains "node_modules"', async () => {
+    mkdirSync(join(tmp, 'my-node_modules-fixtures'), { recursive: true });
+    writeFileSync(join(tmp, 'my-node_modules-fixtures', 'real.test.ts'), '');
+
+    const result = await resolveFiles([], tmp);
+
+    expect(result).toEqual([join(tmp, 'my-node_modules-fixtures', 'real.test.ts')]);
+  });
+
+  it('excludes a nested node_modules, not only one at the root', async () => {
+    mkdirSync(join(tmp, 'packages', 'a', 'node_modules', 'dep'), { recursive: true });
+    writeFileSync(join(tmp, 'packages', 'a', 'node_modules', 'dep', 'sneaky.test.ts'), '');
+    writeFileSync(join(tmp, 'packages', 'a', 'real.test.ts'), '');
+
+    const result = await resolveFiles([], tmp);
+
+    expect(result).toEqual([join(tmp, 'packages', 'a', 'real.test.ts')]);
+  });
+
+  /**
+   * A test file under `dist/` is a COMPILED COPY of one already under source.
+   * Running it duplicates the test and reports stack traces pointing at
+   * generated code, so build output is excluded by default.
+   */
+  it.each(['dist', 'build', 'coverage', '.git'])('excludes %s by default', async (dir) => {
+    mkdirSync(join(tmp, dir), { recursive: true });
+    writeFileSync(join(tmp, dir, 'copy.test.ts'), '');
+    writeFileSync(join(tmp, 'source.test.ts'), '');
+
+    const result = await resolveFiles([], tmp);
+
+    expect(result).toEqual([join(tmp, 'source.test.ts')]);
+  });
+
+  it('applies caller-supplied excludes instead of the defaults', async () => {
+    mkdirSync(join(tmp, 'dist'), { recursive: true });
+    mkdirSync(join(tmp, 'fixtures'), { recursive: true });
+    writeFileSync(join(tmp, 'dist', 'emitted.test.ts'), '');
+    writeFileSync(join(tmp, 'fixtures', 'ignored.test.ts'), '');
+
+    const result = await resolveFiles([], tmp, ['**/fixtures/**']);
+
+    expect(result).toEqual([join(tmp, 'dist', 'emitted.test.ts')]);
+  });
+
+  it('excludes nothing when given an empty exclude list', async () => {
+    mkdirSync(join(tmp, 'node_modules'), { recursive: true });
+    writeFileSync(join(tmp, 'node_modules', 'dep.test.ts'), '');
+
+    const result = await resolveFiles([], tmp, []);
+
+    expect(result).toEqual([join(tmp, 'node_modules', 'dep.test.ts')]);
+  });
 });

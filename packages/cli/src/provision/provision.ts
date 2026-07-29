@@ -14,6 +14,7 @@ import {
   type AttemptedSource,
   type ChainInput,
   type ExecutableProbe,
+  type ExplicitPath,
   type SelectedSource,
   selectProvisionSource,
 } from './chain.js';
@@ -36,10 +37,15 @@ import {
  */
 
 export interface ProvisionOptions {
-  /** `--hermes <path>`. Takes precedence over the environment variable. */
-  hermesFlagPath?: string;
-  /** `ARGUS_HERMES`. */
-  hermesEnvPath?: string;
+  /**
+   * A binary path the user named outright, and which of `--hermes`,
+   * `ARGUS_HERMES` or the config file named it.
+   *
+   * Precedence between those three is settled upstream by `mergeConfig`, which
+   * is the only place that resolves competing sources. Repeating that rule here
+   * would give it two homes and one of them would eventually drift.
+   */
+  explicitHermes?: ExplicitPath;
   /** `--engine <legacy|v1>`; omit to use the default policy (prefer V1). */
   engine?: HermesEngine;
   /** `--provision` — authorises the multi-minute source build. */
@@ -182,14 +188,7 @@ async function resolveBinary(
  * renders and exits on.
  */
 export async function provisionHermes(options: ProvisionOptions): Promise<ProvisionResult> {
-  const explicitPath = options.hermesFlagPath ?? options.hermesEnvPath;
-  const explicit =
-    explicitPath === undefined
-      ? undefined
-      : {
-          path: explicitPath,
-          origin: options.hermesFlagPath === undefined ? ('env' as const) : ('flag' as const),
-        };
+  const explicit = options.explicitHermes;
 
   const outcome = resolveHermesEngine({
     startDir: options.startDir,

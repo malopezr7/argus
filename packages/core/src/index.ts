@@ -1,5 +1,14 @@
 // Hermes prebuilt binary release assets (pure)
 
+// Configuration contract (pure — also the published package's public entry)
+export type { ArgusConfig, ArgusHermesConfig } from './domain/config.js';
+export {
+  DEFAULT_CONCURRENCY_CAP,
+  DEFAULT_EXCLUDE,
+  DEFAULT_INCLUDE,
+  DEFAULT_TIMEOUT_MS,
+  defineConfig,
+} from './domain/config.js';
 // Hermes source-build configuration (pure)
 export type {
   CmakeBuildOptions,
@@ -56,6 +65,7 @@ export type {
   PinnedRefs,
 } from './domain/hermes-version.js';
 export {
+  ENGINE_VALUES,
   parseHermesTag,
   parseHermesVersionOutput,
   parseVersionProperties,
