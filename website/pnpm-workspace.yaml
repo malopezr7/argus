@@ -5,4 +5,9 @@
 # treats a refused build script as an error, so the deploy failed on esbuild
 # while a local pnpm 10 install passed.
 allowBuilds:
+  # Astro's bundler.
   esbuild: true
+  # Pulled in by wrangler, which cloudflare/wrangler-action installs into this
+  # directory at deploy time. Its native binary comes from an install script, so
+  # refusing it fails the deploy after a green build.
+  workerd: true
