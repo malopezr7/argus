@@ -447,8 +447,14 @@ jobs:
           set -euo pipefail
           url="https://registry.npmjs.org/-/npm/v1/attestations/$PKG@$VERSION"
 
+          # The attestation is indexed after the version itself, and observed
+          # taking over a minute. A minute of patience turned a successfully
+          # attested publish into a red run claiming it had no provenance, so
+          # the window is wide enough that a timeout means something is actually
+          # wrong rather than merely slow.
           code=000
-          for _ in 1 2 3 4 5 6; do
+          deadline=$(( SECONDS + 600 ))
+          while [ "$SECONDS" -lt "$deadline" ]; do
             # Assign from curl and override on failure, rather than piping the
             # two together: curl already prints 000 on a connection error, so
             # `|| echo 000` would concatenate two codes into one variable.
@@ -456,11 +462,14 @@ jobs:
             if [ "$code" = "200" ]; then
               break
             fi
-            sleep 10
+            echo "attestation not indexed yet (HTTP $code) — retrying"
+            sleep 15
           done
 
           if [ "$code" != "200" ]; then
-            echo "::error::no attestations recorded for $PKG@$VERSION (HTTP $code) — it was published without provenance."
+            echo "::error::no attestations recorded for $PKG@$VERSION after 10 minutes (HTTP $code)."
+            echo "The publish itself succeeded. Re-check the endpoint by hand before assuming it published unattested:"
+            echo "  curl -sS $url"
             exit 1
           fi
 
