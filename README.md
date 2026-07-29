@@ -9,7 +9,7 @@ Argus bundles each `*.test.ts` into a sealed IIFE with esbuild, runs it on the
 standalone `hermes` VM as a subprocess, and parses the result back on the Node
 host. That is the same engine your users run, at roughly the cost of a unit test.
 
-> **Pre-release.** Argus is at v0.1.1. It installs and runs, and the surface it
+> **Pre-release.** Argus is at v0.2.0. It installs and runs, and the surface it
 > exposes is still free to change. See [Status](#status).
 
 ## Why
