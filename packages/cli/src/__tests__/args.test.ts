@@ -97,17 +97,12 @@ describe('parseCliArgs — other options unaffected', () => {
    * typo produced a full green run under a timeout the user never chose and was
    * never told about. It now fails the same way `--concurrency` always has.
    */
-  it.each([
-    'abc',
-    '0',
-    '-1',
-    '1.5',
-    '1e3',
-    '5000ms',
-    ' 5000',
-  ])('-t %s throws UsageError instead of silently defaulting', (raw) => {
-    expect(() => parseCliArgs(['-t', raw])).toThrow(UsageError);
-  });
+  it.each(['abc', '0', '-1', '1.5', '1e3', '5000ms', ' 5000'])(
+    '-t %s throws UsageError instead of silently defaulting',
+    (raw) => {
+      expect(() => parseCliArgs(['-t', raw])).toThrow(UsageError);
+    },
+  );
 
   it('names the flag and the bad value when rejecting a timeout', () => {
     try {

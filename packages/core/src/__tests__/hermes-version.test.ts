@@ -87,14 +87,12 @@ describe('parseHermesTag', () => {
   });
 
   describe('whitespace tolerance', () => {
-    it.each([
-      '  hermes-v0.17.0  ',
-      '\thermes-v0.17.0\n',
-      'hermes-v0.17.0\r\n',
-      '\n0.17.0\n',
-    ])('trims %j', (raw) => {
-      expect(parseHermesTag(raw)?.version).toBe('0.17.0');
-    });
+    it.each(['  hermes-v0.17.0  ', '\thermes-v0.17.0\n', 'hermes-v0.17.0\r\n', '\n0.17.0\n'])(
+      'trims %j',
+      (raw) => {
+        expect(parseHermesTag(raw)?.version).toBe('0.17.0');
+      },
+    );
   });
 
   describe('commit-sha pins', () => {
@@ -383,13 +381,12 @@ describe('releaseVersionForRef', () => {
     expect(releaseVersionForRef(raw)).toBe(expected);
   });
 
-  it.each([
-    ['b2f9f5a1c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8'],
-    ['abc1234'],
-    ['hermes-abc1234'],
-  ])('returns undefined for the commit SHA %s', (raw) => {
-    expect(releaseVersionForRef(raw)).toBeUndefined();
-  });
+  it.each([['b2f9f5a1c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8'], ['abc1234'], ['hermes-abc1234']])(
+    'returns undefined for the commit SHA %s',
+    (raw) => {
+      expect(releaseVersionForRef(raw)).toBeUndefined();
+    },
+  );
 
   it('returns undefined for a ref that parses as nothing', () => {
     expect(releaseVersionForRef('not a ref')).toBeUndefined();

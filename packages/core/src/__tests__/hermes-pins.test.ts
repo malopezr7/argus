@@ -76,15 +76,12 @@ describe('lookupPinnedRefs', () => {
     expect(lookupPinnedRefs('0.85.0-rc.3')).toEqual(lookupPinnedRefs('0.85'));
   });
 
-  it.each([
-    '0.99.0',
-    '0.77.0',
-    '2.0.0',
-    'next',
-    '',
-  ])('degrades to an empty result for unknown version %j', (rn) => {
-    expect(lookupPinnedRefs(rn)).toEqual({});
-  });
+  it.each(['0.99.0', '0.77.0', '2.0.0', 'next', ''])(
+    'degrades to an empty result for unknown version %j',
+    (rn) => {
+      expect(lookupPinnedRefs(rn)).toEqual({});
+    },
+  );
 
   it('produces canonical git tags for every table row', () => {
     for (const rn of Object.keys(HERMES_PINS_BY_RN_MINOR)) {
