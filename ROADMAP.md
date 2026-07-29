@@ -198,8 +198,11 @@ nothing for a polling helper to wait on until Argus supplies its own clock.
 - [ ] Run the Hermes fixtures on CI, not just locally. They are gated on a local
       binary that is not committed, so they skip.
 - [ ] macOS and Linux matrix.
-- [ ] Release workflow for the npm package. `hermes-prebuilt.yml` publishes the
-      VM binaries; publishing `@arguslab/argus` is manual.
+- [x] Release workflow for the npm package. `npm-publish.yml` publishes
+      `@arguslab/argus` from CI with signed provenance, authenticated by npm
+      trusted publishing over OIDC so no token is stored in the repository.
+      `v0.1.0` predates it and was published by hand, so it carries no
+      attestation; every release from `v0.2.0` on does.
 
 ---
 

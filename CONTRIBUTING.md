@@ -116,6 +116,13 @@ test, tsconfig or build-info file leaked into the staged tree. Note the `./` in
 `npm pack ./dist` — without it npm resolves `dist` as a package name on the
 registry.
 
+One failure mode is invisible from in here: a dependency that is externalised
+but undeclared resolves fine inside the workspace and dies with a bare module
+resolution error on a user's machine. The release workflow catches it by
+installing the packed tarball in a clean directory and running the binary. To
+reproduce that check locally, `npm install` the `.tgz` somewhere outside the
+repo and run `argus --help`.
+
 ## Architecture rules
 
 These are load-bearing. A change that breaks one of them will be sent back even
@@ -163,6 +170,69 @@ For pull requests:
 - Explain *why*, not just what. The diff already says what.
 
 The PR template asks for these; it is a checklist, not paperwork.
+
+## Releasing
+
+**Releases are published from CI, never from a laptop.**
+`.github/workflows/npm-publish.yml` builds and publishes `@arguslab/argus` with
+a signed [provenance attestation][npm-provenance] — a public, verifiable
+statement binding the published tarball to this repository, the workflow, and
+the commit it came from. A hand-rolled `npm publish` produces bytes nobody can
+trace, which is exactly what the workflow exists to stop.
+
+`0.1.0` was published by hand before the workflow existed and carries no
+provenance. Everything from `0.2.0` on does. SECURITY.md documents how a user
+verifies it.
+
+### Cutting a release
+
+1. Bump `version` in `packaging/package.json`, and land it through a PR.
+2. Tag that commit: `git tag v0.2.0 && git push origin v0.2.0`.
+3. Actions → **Publish npm package** → *Run workflow*, select the tag as the
+   ref, and enter the version.
+4. Approve the deployment when the `npm-publish` environment asks.
+
+The workflow refuses to publish unless the version you typed matches
+`packaging/package.json`, a `v<version>` tag exists and points at the commit
+being built, the version is not already on the registry, all three gates pass,
+and the packed tarball installs and runs in a clean directory. Every one of
+those is a hard failure — an npm version is immutable, so there is no version
+of "publish now, fix it after".
+
+Dispatch is deliberate rather than automatic. Publishing on a tag push would
+make `git push --tags` — an ordinary thing to type — the thing that ships a
+release.
+
+### One-time npm setup
+
+Authentication is [trusted publishing][npm-trusted] over OIDC, so there is no
+npm token in this repository and no secret to rotate. It does need one piece of
+configuration on each side, and npm does **not** validate its half when you save
+it — a typo surfaces only as an authentication failure at publish time, so every
+field below is exact and case-sensitive.
+
+On npmjs.com → `@arguslab/argus` → **Settings** → **Trusted Publisher**, choose
+GitHub Actions and enter:
+
+| Field | Value |
+| --- | --- |
+| Organization or user | `malopezr7` |
+| Repository | `argus` |
+| Workflow filename | `npm-publish.yml` (filename only, not a path) |
+| Environment name | `npm-publish` |
+| Allowed actions | `npm publish` |
+
+On GitHub → **Settings** → **Environments**, create an environment named
+`npm-publish` and add yourself as a required reviewer. That is the gate that
+turns a dispatch into a decision.
+
+Once a release has published successfully, npmjs.com → **Settings** →
+**Publishing access** → *Require two-factor authentication and disallow tokens*
+closes the token path entirely. Trusted publishing keeps working; it uses OIDC,
+not tokens.
+
+[npm-provenance]: https://docs.npmjs.com/generating-provenance-statements
+[npm-trusted]: https://docs.npmjs.com/trusted-publishers
 
 ## Where to start reading
 

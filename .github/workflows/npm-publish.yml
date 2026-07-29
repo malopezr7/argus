@@ -1,0 +1,475 @@
+name: Publish npm package
+
+# Publishes @arguslab/argus to the npm registry with a signed provenance
+# attestation: a public, verifiable statement binding the exact tarball to this
+# repository, this workflow and the commit it was built from.
+#
+# Manual dispatch only, and anchored to a tag. An npm version is immutable and
+# unpublishing is heavily restricted, so a mistaken publish is not a mistake you
+# recover from — it is one you live with. That rules out publishing as a side
+# effect of a push: `git push --tags` is an ordinary thing to type, and it
+# should never be the thing that ships a release.
+#
+# Authentication is npm trusted publishing over OIDC. There is no npm token in
+# this repository and no secret for this workflow to read; the runner proves its
+# identity to npm directly and receives a short-lived credential in exchange.
+# See CONTRIBUTING.md for the one-time npm-side setup this depends on.
+#
+# The work is split across three jobs so that the job holding the publishing
+# credential runs no third-party code, and the job checking the result does not
+# hold the credential that produced it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Version to publish, e.g. 0.2.0. Must match packaging/package.json and
+          an existing v<version> tag pointing at the commit being built.
+        required: true
+        type: string
+
+# Read-only by default. The publish job elevates itself, and only itself.
+permissions:
+  contents: read
+
+# Two runs of the same version would race to publish identical bytes, and the
+# loser fails on a registry conflict after a full green build.
+concurrency:
+  group: npm-publish-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  PACKAGE_NAME: '@arguslab/argus'
+
+jobs:
+  build:
+    name: Gate, build and pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # Restated rather than inherited. This job installs the dependency tree and
+    # runs its build scripts, which is the widest arbitrary-code surface in the
+    # workflow, so what it is allowed to do should be readable without scrolling
+    # up and should not widen silently if the workflow default ever changes.
+    permissions:
+      contents: read
+
+    outputs:
+      tarball: ${{ steps.pack.outputs.tarball }}
+      sha256: ${{ steps.pack.outputs.sha256 }}
+
+    steps:
+      # `persist-credentials: false` keeps the job token out of .git/config.
+      # `pnpm install` runs the build scripts of esbuild and Biome, and a token
+      # left on disk is readable by any code that runs after checkout.
+      #
+      # `fetch-depth: 0` because the release is anchored to the v<version> tag
+      # and a shallow clone carries no tags to anchor it against.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      # pnpm version comes from the "packageManager" field in package.json.
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      # No `cache:` here, unlike ci.yml. A restored cache is an input nobody
+      # reviewed, and this is the job whose output gets signed and published.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      # Everything that must hold before a single byte is built. Every one of
+      # these is a hard failure, because the cheap moment to catch a release
+      # mistake is before it becomes an immutable registry entry.
+      - name: Verify release identity
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          EXPECTED_NAME: ${{ env.PACKAGE_NAME }}
+          EXPECTED_REPO: ${{ github.repository }}
+          IS_PRIVATE: ${{ github.event.repository.private }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # A malformed version would otherwise be discovered by npm, at the
+          # very end, after the gates and the build have already run.
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$VERSION' is not a valid version (expected e.g. 0.2.0 or 1.0.0-rc.1)."
+            exit 1
+          fi
+
+          manifest_name=$(node -p "require('./packaging/package.json').name")
+          manifest_version=$(node -p "require('./packaging/package.json').version")
+          manifest_repo=$(node -p "require('./packaging/package.json').repository.url")
+
+          # The operator states the version on dispatch; the manifest states it
+          # in git. Requiring both to agree turns a mistyped release into a
+          # refusal rather than a version nobody meant to cut.
+          if [ "$manifest_version" != "$VERSION" ]; then
+            echo "::error::dispatch asked for $VERSION, packaging/package.json says $manifest_version."
+            exit 1
+          fi
+
+          # Guards against an edit to the manifest quietly redirecting this
+          # workflow's publish at a different package than the one npm trusts it
+          # to publish.
+          if [ "$manifest_name" != "$EXPECTED_NAME" ]; then
+            echo "::error::packaging/package.json name is $manifest_name, expected $EXPECTED_NAME."
+            exit 1
+          fi
+
+          # npm refuses trusted publishing unless repository.url matches the
+          # repository the OIDC token came from. Checking it here produces a
+          # sentence; letting npm find it produces an authentication error at
+          # the last step that says nothing about the actual cause.
+          if [ "$manifest_repo" != "git+https://github.com/$EXPECTED_REPO.git" ]; then
+            echo "::error::repository.url is '$manifest_repo', expected 'git+https://github.com/$EXPECTED_REPO.git'."
+            exit 1
+          fi
+
+          # npm does not generate provenance from a private repository, even for
+          # a public package. A publish from one would succeed and produce
+          # exactly the unverifiable artifact this workflow exists to stop
+          # shipping, so it is refused rather than silently downgraded.
+          if [ "$IS_PRIVATE" != "false" ]; then
+            echo "::error::provenance is not generated for private repositories (private=$IS_PRIVATE)."
+            exit 1
+          fi
+
+          # Anchors the release to an immutable point in history. Without this a
+          # dispatch publishes whatever the selected branch happened to be at,
+          # and the published version has no reviewable commit behind it.
+          if ! tagged=$(git rev-parse --verify --quiet "refs/tags/v$VERSION^{commit}"); then
+            echo "::error::no tag v$VERSION in this repository — tag the release commit first."
+            exit 1
+          fi
+          if [ "$tagged" != "$COMMIT" ]; then
+            echo "::error::tag v$VERSION points at $tagged, but this run is building $COMMIT."
+            echo "Re-run the workflow with the v$VERSION tag selected as the ref."
+            exit 1
+          fi
+
+          echo "$EXPECTED_NAME@$VERSION — tag v$VERSION at $COMMIT"
+
+      # npm enforces this authoritatively and would reject the publish anyway.
+      # Doing it first costs one request and turns a 403 at the end of a long
+      # green run into a sentence at the start of it.
+      - name: Check the version is not already published
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          PKG: ${{ env.PACKAGE_NAME }}
+        run: |
+          set -euo pipefail
+          if npm view "$PKG@$VERSION" version >/dev/null 2>&1; then
+            echo "::error::$PKG@$VERSION is already on the registry. Versions are immutable — bump the version."
+            exit 1
+          fi
+          echo "$PKG@$VERSION is not on the registry"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Check (Biome lint + format)
+        run: pnpm check
+
+      # Integration tests are gated on a local Hermes binary (.hermes/hermes),
+      # which is not committed — they skip automatically in CI.
+      - name: Test
+        run: pnpm test
+
+      - name: Build the package
+        run: pnpm build
+
+      # build-package.ts stages packaging/package.json into dist/. Asserting the
+      # staged copy proves the tarball is built from the manifest just verified,
+      # rather than from a dist/ left behind by something else.
+      - name: Verify the staged package
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          PKG: ${{ env.PACKAGE_NAME }}
+        run: |
+          set -euo pipefail
+          staged_name=$(node -p "require('./dist/package.json').name")
+          staged_version=$(node -p "require('./dist/package.json').version")
+          if [ "$staged_name" != "$PKG" ] || [ "$staged_version" != "$VERSION" ]; then
+            echo "::error::dist/ holds $staged_name@$staged_version, expected $PKG@$VERSION."
+            exit 1
+          fi
+          echo "dist/ holds $staged_name@$staged_version"
+
+      - name: Pack
+        id: pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pkg"
+          npm pack ./dist --pack-destination "$RUNNER_TEMP/pkg" --json > "$RUNNER_TEMP/pack.json"
+
+          # Read the name npm actually produced rather than reconstructing the
+          # scope-flattening rule for it.
+          tarball=$(PACK_JSON="$RUNNER_TEMP/pack.json" \
+            node -p "JSON.parse(require('node:fs').readFileSync(process.env.PACK_JSON,'utf8'))[0].filename")
+          digest=$(sha256sum "$RUNNER_TEMP/pkg/$tarball" | cut -d ' ' -f 1)
+
+          {
+            echo "tarball=$tarball"
+            echo "sha256=$digest"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "$tarball  sha256:$digest"
+
+      # The strongest assertion available before publishing: install the exact
+      # tarball the way a user would, resolving its declared dependencies from
+      # the registry, and run the binary.
+      #
+      # This catches the failure build-package.ts calls the worst one available
+      # — a package that installs cleanly and then dies on a bare module
+      # resolution error — which is invisible from inside the workspace, where
+      # every dependency resolves whether it was declared or not.
+      - name: Smoke-test the tarball
+        shell: bash
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: |
+          set -euo pipefail
+          smoke="$RUNNER_TEMP/smoke"
+          mkdir -p "$smoke"
+          cd "$smoke"
+          npm init --yes > /dev/null
+          npm install --no-audit --no-fund "$RUNNER_TEMP/pkg/$TARBALL"
+          ./node_modules/.bin/argus --help
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: npm-tarball
+          path: ${{ runner.temp }}/pkg/${{ steps.pack.outputs.tarball }}
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish to npm
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # The only elevated permission in the workflow, on the only job that needs
+    # it. There is deliberately no checkout and no dependency install here: this
+    # job runs no third-party code at all, which is why it is the one that holds
+    # a credential speaking for the repository.
+    #
+    # `attestations: write` is absent on purpose. That permission writes to
+    # GitHub's own attestation store, which is what hermes-prebuilt.yml uses for
+    # the release archives. npm provenance is a different path — npm signs with
+    # Sigstore using the OIDC token, records it in the public transparency log,
+    # and stores the bundle on the registry — so `id-token: write` is the whole
+    # grant it needs.
+    permissions:
+      contents: read
+      id-token: write
+
+    # A GitHub Environment, so publishing is held behind required reviewers.
+    # The name is also registered with npm as part of the trusted publisher, so
+    # a run outside this environment cannot authenticate at all.
+    environment: npm-publish
+
+    steps:
+      # `registry-url` writes an .npmrc into RUNNER_TEMP and points
+      # NPM_CONFIG_USERCONFIG at it. That file carries a
+      # `_authToken=${NODE_AUTH_TOKEN}` line and the action exports an empty
+      # NODE_AUTH_TOKEN alongside it, which is harmless and expected here: the
+      # npm CLI detects an OIDC environment and authenticates with it before it
+      # ever falls back to looking for a token. This is npm's own documented
+      # setup for trusted publishing.
+      #
+      # No `cache:` — a release build should not restore inputs nobody reviewed.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: npm-tarball
+          path: pkg
+
+      # The tarball crossed a job boundary through the artifact store. Checking
+      # the digest is what makes the published bytes provably the bytes that
+      # were gated, built and smoke-tested.
+      - name: Verify the tarball
+        shell: bash
+        env:
+          TARBALL: ${{ needs.build.outputs.tarball }}
+          EXPECTED: ${{ needs.build.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          actual=$(sha256sum "pkg/$TARBALL" | cut -d ' ' -f 1)
+          if [ "$actual" != "$EXPECTED" ]; then
+            echo "::error::tarball digest changed across the job boundary: expected $EXPECTED, got $actual."
+            exit 1
+          fi
+          echo "$TARBALL  sha256:$actual"
+
+      # Trusted publishing has no secret to check for, so what is worth
+      # asserting is the capability itself. Without `id-token: write` the runner
+      # never receives these variables, npm falls back to looking for a token it
+      # will not find, and the run dies on an authentication error that says
+      # nothing about the actual cause.
+      - name: Verify the OIDC credential and npm version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            echo "::error::no OIDC token available — this job is missing 'id-token: write'."
+            exit 1
+          fi
+
+          # Trusted publishing needs npm 11.5.1 or newer; provenance needs
+          # 9.5.0. Node 24 ships a new enough npm, but the runner image is not
+          # ours to pin, so the requirement is asserted rather than assumed.
+          npm_version=$(npm --version)
+          if ! printf '%s\n%s\n' '11.5.1' "$npm_version" | sort -C -V; then
+            echo "::error::npm $npm_version is too old for trusted publishing (needs 11.5.1 or newer)."
+            exit 1
+          fi
+          echo "OIDC token available, npm $npm_version"
+
+      # No NODE_AUTH_TOKEN: authentication is the OIDC token, which npm
+      # exchanges for a short-lived publish credential.
+      #
+      # `--provenance` is redundant under trusted publishing, which attests by
+      # default. It is passed anyway because it changes the failure mode: with
+      # the flag, an environment that cannot produce provenance is an error;
+      # without it, that same run publishes quietly and unattested, which is
+      # precisely the outcome this workflow exists to prevent.
+      - name: Publish
+        id: publish
+        shell: bash
+        env:
+          TARBALL: ${{ needs.build.outputs.tarball }}
+        run: npm publish "pkg/$TARBALL" --provenance --access public
+
+      # npm does not validate a trusted publisher configuration when it is
+      # saved, so a mismatch is only ever discovered here, as ENEEDAUTH. That
+      # error names nothing useful, so the fields that have to match are spelled
+      # out rather than left for someone to rediscover.
+      - name: Explain a failed publish
+        if: ${{ failure() && steps.publish.conclusion == 'failure' }}
+        shell: bash
+        env:
+          REPO: ${{ github.repository }}
+          PKG: ${{ env.PACKAGE_NAME }}
+        run: |
+          echo "::error::publish failed. If npm reported ENEEDAUTH, the trusted publisher for $PKG does not match this run."
+          echo "On npmjs.com -> $PKG -> Settings -> Trusted Publisher, every field is exact and case-sensitive:"
+          echo "  Organization or user: ${REPO%%/*}"
+          echo "  Repository:           ${REPO##*/}"
+          echo "  Workflow filename:    npm-publish.yml   (filename only, not a path)"
+          echo "  Environment name:     npm-publish"
+          echo "  Allowed actions:      npm publish"
+
+  verify:
+    name: Verify the published version
+    needs: [build, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Reads the public registry and nothing else. Deliberately no `id-token`: a
+    # check sharing the publishing job's credential is not an independent check,
+    # and nothing here needs to speak for the repository.
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      # A publish that reports success is not evidence the package is usable, or
+      # that the attestation actually landed. Both are observable from outside,
+      # so both are checked from outside.
+      #
+      # The retries are for registry propagation, not for flakiness: a version
+      # can take a few seconds to become readable after the publish returns.
+      - name: Verify the registry has the version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          PKG: ${{ env.PACKAGE_NAME }}
+        run: |
+          set -euo pipefail
+          for _ in 1 2 3 4 5 6; do
+            published=$(npm view "$PKG@$VERSION" version 2> /dev/null || true)
+            if [ "$published" = "$VERSION" ]; then
+              echo "registry serves $PKG@$VERSION"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::registry does not serve $PKG@$VERSION after publishing."
+          exit 1
+
+      # The point of the entire workflow, and the one thing a successful publish
+      # does not prove on its own. This endpoint 404s for a version published
+      # without provenance — it does so for 0.1.0, which was published by hand —
+      # so a 200 carrying a SLSA provenance predicate is the actual deliverable.
+      - name: Verify the provenance attestation
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          PKG: ${{ env.PACKAGE_NAME }}
+        run: |
+          set -euo pipefail
+          url="https://registry.npmjs.org/-/npm/v1/attestations/$PKG@$VERSION"
+
+          code=000
+          for _ in 1 2 3 4 5 6; do
+            # Assign from curl and override on failure, rather than piping the
+            # two together: curl already prints 000 on a connection error, so
+            # `|| echo 000` would concatenate two codes into one variable.
+            code=$(curl -sS -o "$RUNNER_TEMP/attestations.json" -w '%{http_code}' "$url") || code=000
+            if [ "$code" = "200" ]; then
+              break
+            fi
+            sleep 10
+          done
+
+          if [ "$code" != "200" ]; then
+            echo "::error::no attestations recorded for $PKG@$VERSION (HTTP $code) — it was published without provenance."
+            exit 1
+          fi
+
+          ATTESTATIONS="$RUNNER_TEMP/attestations.json" node -e '
+            const file = require("node:fs").readFileSync(process.env.ATTESTATIONS, "utf8");
+            const types = (JSON.parse(file).attestations || []).map((a) => a.predicateType);
+            for (const type of types) console.log(type);
+            if (!types.includes("https://slsa.dev/provenance/v1")) {
+              console.error("::error::no SLSA provenance predicate in the published attestations.");
+              process.exit(1);
+            }
+          '
+
+      # Installs what the registry serves, not what CI built, and runs it. The
+      # build job smoke-tested a local tarball; this proves the same thing about
+      # the artifact a user actually receives.
+      - name: Install from the registry and run it
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          PKG: ${{ env.PACKAGE_NAME }}
+        run: |
+          set -euo pipefail
+          check="$RUNNER_TEMP/from-registry"
+          mkdir -p "$check"
+          cd "$check"
+          npm init --yes > /dev/null
+          npm install --no-audit --no-fund "$PKG@$VERSION"
+          ./node_modules/.bin/argus --help
