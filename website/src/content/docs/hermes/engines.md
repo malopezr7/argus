@@ -80,13 +80,37 @@ Loud, immediate, unmistakable — never a silent degradation.
 
 ## Choosing an engine
 
-By default Argus uses whichever engine your project pins, preferring V1 when both are
-pinned. Override it explicitly:
+By default Argus runs the engine your React Native version **ships by default** — the one
+your app actually loads.
+
+That is not always the newest engine your project pins. React Native 0.82 and 0.83 pin both
+engines but ship legacy: V1 was an experimental opt-in there, reachable only by building
+React Native from source with `hermesV1Enabled=true` (Android) or `RCT_HERMES_V1_ENABLED=1`
+(iOS). V1 became the default in 0.84, and legacy was dropped in 0.87.
+
+| React Native | Pins legacy | Pins V1 | Runs by default |
+|---|---|---|---|
+| 0.78 – 0.81 | yes | — | legacy |
+| 0.82 | yes | opt-in | **legacy** |
+| 0.83 | yes | opt-in | **legacy** |
+| 0.84 – 0.86 | yes | yes | **V1** |
+| 0.87 | — | yes | V1 |
+
+Override it explicitly — this is also how you reach V1 on 0.82 or 0.83:
 
 ```bash
 argus --engine v1 "src/**/*.test.ts"
 argus --engine legacy "src/**/*.test.ts"
 ```
+
+If your React Native release is newer than Argus knows about and pins more than one engine,
+Argus cannot tell which one ships. It picks V1, and says so:
+
+```text
+⚠ Assumed the v1 engine: react-native 0.99.0 is not in Argus's engine table, and the project pins more than one Hermes engine.
+```
+
+Pass `--engine` to settle it.
 
 Asking for an engine your project does not pin is a usage error, not a silent fallback:
 

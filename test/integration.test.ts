@@ -191,6 +191,72 @@ describe('argus harness integration (needs .hermes/hermes)', () => {
   );
 });
 
+/**
+ * Regression: a class in the user's own test file.
+ *
+ * Legacy Hermes cannot parse `class` in any form, and the bundler used to be
+ * handed a hardcoded es2020 target regardless of the engine that had actually
+ * been resolved — so `class Punto {}` in a `.test.ts` reached the VM verbatim
+ * and killed the whole file with an infrastructure failure before any test ran.
+ */
+describe('argus CLI — class syntax on the resolved engine (needs .hermes/hermes)', () => {
+  gated(
+    "a class in the user's own test file runs -> exit 0",
+    () => {
+      expect(runArgus(['examples/class-syntax.test.ts'])).toBe(0);
+    },
+    30_000,
+  );
+
+  gated(
+    'every class form reports as a passing test, not an engine failure',
+    () => {
+      const result = runArgusCapture(['examples/class-syntax.test.ts']);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('9 passed');
+      // The old failure mode. It is an INFRASTRUCTURE failure, so asserting the
+      // exit code alone would not distinguish it from an ordinary test failure.
+      expect(result.stderr).not.toContain('INFRASTRUCTURE FAILURE');
+    },
+    30_000,
+  );
+});
+
+/**
+ * Regression: the result channel and the C0 range.
+ *
+ * The serializer escaped only `"`, `\` and the five control characters with
+ * short JSON forms. Any other C0 character went out raw, the envelope would not
+ * parse, and every result in the file was discarded — so a test that merely
+ * COMPARED strings containing an ESC took down its whole file.
+ */
+describe('argus CLI — control characters in the result channel (needs .hermes/hermes)', () => {
+  gated(
+    'the whole C0 range survives the result channel -> exit 0',
+    () => {
+      const result = runArgusCapture(['examples/control-chars.test.ts']);
+      expect(result.status).toBe(0);
+      // The old failure mode was a protocol failure for the entire file.
+      expect(result.stdout).not.toContain('PROTOCOL FAILURE');
+    },
+    30_000,
+  );
+
+  gated(
+    'every C0 character comes back byte-identical, not merely parseable',
+    () => {
+      const result = runArgusCapture(['examples/control-chars.test.ts']);
+      // Each name was built inside Hermes, hand-serialized, framed on one line,
+      // JSON.parsed on the host and rendered. Matching the exact bytes here is
+      // what proves the round trip, rather than just that the envelope parsed.
+      for (let code = 0; code < 0x20; code++) {
+        expect(result.stdout).toContain(`C0 ${code} [ ${String.fromCharCode(code)} ] round-trips`);
+      }
+    },
+    30_000,
+  );
+});
+
 // ---------------------------------------------------------------------------
 // Phase 3 (item 3): Matcher integration tests (task 5.10)
 // ---------------------------------------------------------------------------

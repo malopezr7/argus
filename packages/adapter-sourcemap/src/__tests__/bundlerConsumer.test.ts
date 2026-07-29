@@ -32,7 +32,7 @@ describe('EsbuildBundler map → SourceMapConsumer position resolution (REQ-13-C
       frameworkPath: FRAMEWORK_PATH,
       componentPath: COMPONENT_PATH,
       polyfillPaths: [POLYFILL_PATH],
-      engineTarget: ['es2020'],
+      engine: 'legacy',
     });
 
     expect(typeof bundle.map).toBe('string');

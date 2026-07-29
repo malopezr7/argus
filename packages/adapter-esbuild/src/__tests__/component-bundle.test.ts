@@ -16,7 +16,7 @@ function bundleFixture(name: string) {
     frameworkPath: FRAMEWORK_PATH,
     componentPath: COMPONENT_PATH,
     polyfillPaths: [POLYFILL_PATH],
-    engineTarget: ['es2020'],
+    engine: 'legacy',
   });
 }
 
@@ -26,7 +26,7 @@ function bundleAliasFixture() {
     frameworkPath: resolve(FIXTURES, 'framework', 'index'),
     componentPath: COMPONENT_PATH,
     polyfillPaths: [],
-    engineTarget: ['es2020'],
+    engine: 'legacy',
   });
 }
 

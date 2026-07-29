@@ -44,7 +44,7 @@ export interface ArgusHermesConfig {
 
 /** Everything Argus can be configured with. Every field is optional. */
 export interface ArgusConfig {
-  /** Globs selecting test files, relative to `root`. */
+  /** Globs selecting test files, relative to `root`. Absolute globs also work. */
   include?: string[];
   /** Globs excluded from discovery, applied to every `include` result. */
   exclude?: string[];

@@ -51,7 +51,7 @@ export interface ArgusHermesConfig {
  */
 export interface ArgusConfig {
   /**
-   * Globs selecting test files, relative to `root`.
+   * Globs selecting test files, relative to `root` — or absolute.
    * Default: `['**\/*.test.ts', '**\/*.test.tsx']`.
    * Positional CLI arguments override this.
    */

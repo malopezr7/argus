@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
+  defaultEngineForRn,
   type EngineResolution,
   type HermesEngine,
   type HermesPinSource,
@@ -43,7 +44,7 @@ const HERMES_COMPILER_DEP = 'hermes-compiler';
 export interface ResolveEngineOptions {
   /** Directory to start the upward walk from. Defaults to `process.cwd()`. */
   startDir?: string;
-  /** Explicit engine preference. Omit to use the default policy (prefer V1). */
+  /** Explicit engine preference. Omit to run the engine the project's RN ships. */
   engine?: HermesEngine;
   /**
    * React Native version to fall back on when no install can be found on disk.
@@ -111,14 +112,24 @@ export function resolveHermesEngine(options: ResolveEngineOptions = {}): EngineR
   const rnVersion = readRnVersion(pkg) ?? options.rnVersion;
   const pins = collectPins(reactNativeDir, pkg);
 
-  const selection = selectHermesEngine(toPinnedRefs(pins), options.engine);
+  // The install's own version is what says which engine it SHIPS. Without it
+  // the pins alone cannot answer that — 0.82 and 0.83 pin both and ship legacy.
+  const selection = selectHermesEngine(toPinnedRefs(pins), {
+    ...(options.engine === undefined ? {} : { preference: options.engine }),
+    ...defaultEngineOption(rnVersion),
+  });
 
   if (selection.kind === 'selected') {
     const chosen = pins[selection.ref.engine];
     if (chosen !== undefined) {
       return {
         kind: 'resolved',
-        resolution: { ref: chosen.ref, source: chosen.source, rnVersion },
+        resolution: {
+          ref: chosen.ref,
+          source: chosen.source,
+          rnVersion,
+          ...(selection.assumedDefault === undefined ? {} : { assumedDefault: true as const }),
+        },
         reactNativeDir,
       };
     }
@@ -145,18 +156,38 @@ export function resolveHermesEngine(options: ResolveEngineOptions = {}): EngineR
   return { kind: 'unresolved', reason: 'no-pins-found', reactNativeDir };
 }
 
+/**
+ * The `rnDefault` selection option for a version, omitted when unknown.
+ *
+ * Spread rather than passed as `undefined` so `exactOptionalPropertyTypes`
+ * keeps "not known" distinct from "known to be nothing".
+ */
+function defaultEngineOption(rnVersion: string | undefined): { rnDefault?: HermesEngine } {
+  if (rnVersion === undefined) return {};
+  const rnDefault = defaultEngineForRn(rnVersion);
+  return rnDefault === undefined ? {} : { rnDefault };
+}
+
 /** Resolve from the offline lookup table alone. */
 function fromFallbackTable(
   rnVersion: string,
   engine: HermesEngine | undefined,
   reactNativeDir: string | undefined,
 ): EngineResolutionOutcome {
-  const selection = selectHermesEngine(lookupPinnedRefs(rnVersion), engine);
+  const selection = selectHermesEngine(lookupPinnedRefs(rnVersion), {
+    ...(engine === undefined ? {} : { preference: engine }),
+    ...defaultEngineOption(rnVersion),
+  });
 
   if (selection.kind === 'selected') {
     return {
       kind: 'resolved',
-      resolution: { ref: selection.ref, source: 'fallback-table', rnVersion },
+      resolution: {
+        ref: selection.ref,
+        source: 'fallback-table',
+        rnVersion,
+        ...(selection.assumedDefault === undefined ? {} : { assumedDefault: true as const }),
+      },
       ...(reactNativeDir === undefined ? {} : { reactNativeDir }),
     };
   }

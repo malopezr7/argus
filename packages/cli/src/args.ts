@@ -13,7 +13,7 @@ Options:
   -c, --concurrency <n>      Max files to run in parallel (default: CPU-based, capped at 8; 1 = sequential)
       --config <path>        Config file to use, instead of searching for one
       --hermes <path>        Hermes binary path (overrides ARGUS_HERMES)
-      --engine <name>        Hermes engine to target: legacy or v1 (default: the engine the project pins, preferring v1)
+      --engine <name>        Hermes engine to target: legacy or v1 (default: the engine your react-native version ships)
       --provision            Allow building Hermes from source when no binary is available (needs git, cmake, ninja)
   -h, --help                 Show this help
 

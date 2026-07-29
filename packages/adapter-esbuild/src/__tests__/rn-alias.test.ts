@@ -27,7 +27,7 @@ describe('EsbuildBundler react-native alias', () => {
       frameworkPath: FRAMEWORK_PATH,
       componentPath: COMPONENT_PATH,
       polyfillPaths: [POLYFILL_PATH],
-      engineTarget: ['es2020'],
+      engine: 'legacy',
     });
 
     expect(bundle.code).toContain('TurboModuleRegistry');

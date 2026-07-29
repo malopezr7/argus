@@ -243,6 +243,113 @@ describe('provisionHermes — fidelity', () => {
   });
 });
 
+/**
+ * The bundle has to be built for the engine that will actually PARSE it, and
+ * the binary on disk is the only thing that knows which that is. Reporting the
+ * targeted engine instead would hand `class` to a legacy VM whenever the two
+ * disagree — the mismatch the fidelity warning above exists to describe.
+ */
+describe('provisionHermes — the engine the bundle must be built for', () => {
+  it("reports the binary's own engine, read from its bytecode version", async () => {
+    const result = await provisionHermes(
+      options({
+        startDir: createProject(RN_V1_ONLY),
+        explicitHermes: flag(createFakeHermes('1.0.0', 98)),
+      }),
+    );
+
+    expect(result.kind === 'provisioned' && result.engine).toBe('v1');
+  });
+
+  it('follows the BINARY, not the pin, when the two disagree', async () => {
+    // The project targets v1; the binary handed over is legacy. Building for v1
+    // here would emit `class` into a bundle a bytecode-96 VM cannot parse.
+    const result = await provisionHermes(
+      options({
+        startDir: createProject(RN_V1_ONLY),
+        explicitHermes: flag(createFakeHermes('0.12.0', 96)),
+      }),
+    );
+
+    expect(result.kind === 'provisioned' && result.engine).toBe('legacy');
+  });
+
+  it('falls back to the pinned engine when the binary reports no bytecode version', async () => {
+    const result = await provisionHermes(
+      options({
+        startDir: createProject(RN_V1_ONLY),
+        explicitHermes: flag(createFakeHermes('1.0.0')),
+      }),
+    );
+
+    expect(result.kind === 'provisioned' && result.engine).toBe('v1');
+  });
+
+  it('falls back to legacy when neither the binary nor the project says', async () => {
+    // Nothing is known, so the only safe answer is the engine whose output runs
+    // on both VMs.
+    const result = await provisionHermes(
+      options({ explicitHermes: flag(createFakeHermes('1.0.0')) }),
+    );
+
+    expect(result.kind === 'provisioned' && result.engine).toBe('legacy');
+  });
+});
+
+describe('provisionHermes — the engine the project ships', () => {
+  it('runs legacy on RN 0.83, which pins both engines but ships legacy', async () => {
+    const result = await provisionHermes(
+      options({
+        startDir: createProject(
+          'HERMES_VERSION_NAME=0.14.1\nHERMES_V1_VERSION_NAME=250829098.0.4\n',
+          '0.83.4',
+        ),
+        explicitHermes: flag(createFakeHermes('0.12.0', 96)),
+      }),
+    );
+
+    expect(result.kind).toBe('provisioned');
+    expect(result.kind === 'provisioned' && result.summary).toContain('legacy');
+    // The binary IS legacy, so selecting legacy must not trip the mismatch warning.
+    expect(result.kind === 'provisioned' && result.warning).toBeUndefined();
+  });
+
+  it('runs v1 on RN 0.86, which ships v1', async () => {
+    const result = await provisionHermes(
+      options({
+        startDir: createProject(RN_BOTH_ENGINES, '0.86.2'),
+        explicitHermes: flag(createFakeHermes('1.0.0', 98)),
+      }),
+    );
+
+    expect(result.kind === 'provisioned' && result.summary).toContain('v1');
+  });
+
+  it('warns when the release is unknown and the engine had to be assumed', async () => {
+    const result = await provisionHermes(
+      options({
+        startDir: createProject(RN_BOTH_ENGINES, '0.99.0'),
+        explicitHermes: flag(createFakeHermes('1.0.0', 98)),
+      }),
+    );
+
+    expect(result.kind).toBe('provisioned');
+    expect(result.kind === 'provisioned' && result.warning).toContain('--engine');
+    expect(result.kind === 'provisioned' && result.warning).toContain('0.99.0');
+  });
+
+  it('stays silent on a known release that pins both engines', async () => {
+    const result = await provisionHermes(
+      options({
+        startDir: createProject(RN_BOTH_ENGINES, '0.86.2'),
+        explicitHermes: flag(createFakeHermes('1.0.0', 98)),
+      }),
+    );
+
+    expect(result.kind === 'provisioned' && result.warning).toBeUndefined();
+  });
+});
+
 describe('provisionHermes — prebuilt download', () => {
   // A fixed target rather than the host's, so the asset name is the same
   // wherever this suite runs.

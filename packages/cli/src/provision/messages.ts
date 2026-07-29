@@ -19,6 +19,8 @@ export interface EngineContext {
   rnVersion?: string;
   /** Why nothing could be resolved, when nothing was. */
   unresolvedReason?: 'no-react-native-install' | 'no-pins-found';
+  /** Set when the engine was guessed because the release's default is unknown. */
+  assumedDefault?: true;
   /** Directory the search started from — quoted so the user can orient. */
   startDir?: string;
 }
@@ -173,6 +175,35 @@ export function formatFidelityWarning(fidelity: EngineFidelity, binary: HermesBi
     '    Fix: drop --hermes/ARGUS_HERMES to provision the pinned engine, or pass ' +
     `--engine ${fidelity.actualEngine ?? '<engine>'} if this project pins ` +
     `${fidelity.actualEngine ?? 'it'} too.\n`
+  );
+}
+
+/**
+ * The warning shown when the engine had to be guessed.
+ *
+ * A release outside Argus's table that pins several engines gives no way to
+ * know which one the app ships. Argus picks one so the run still happens, but
+ * saying nothing would hand back exactly the false confidence this project
+ * exists to remove — the results might come from an engine the app never loads.
+ *
+ * A warning rather than a failure: the guess is almost certainly right (only
+ * releases newer than the table reach here, and every one since 0.84 defaults
+ * to V1), and hard-failing would break Argus on every new React Native until
+ * the table caught up.
+ */
+export function formatAssumedEngineWarning(context: EngineContext): string {
+  if (context.assumedDefault !== true || context.ref === undefined) return '';
+
+  const project =
+    context.rnVersion === undefined
+      ? 'This project'
+      : `react-native ${context.rnVersion} is not in Argus's engine table, and`;
+  const subject = context.rnVersion === undefined ? 'pins' : 'the project pins';
+
+  return (
+    `⚠ Assumed the ${context.ref.engine} engine: ${project} ${subject} more than one Hermes engine.\n` +
+    `    Argus cannot tell which one your app ships, so these results may come from an engine you do not run.\n` +
+    `    Fix: pass --engine legacy or --engine v1 to say which engine this project ships.\n`
   );
 }
 

@@ -140,4 +140,126 @@ describe('resolveFiles', () => {
 
     expect(result).toEqual([join(tmp, 'node_modules', 'dep.test.ts')]);
   });
+
+  /**
+   * Absolute patterns used to be joined onto the root unconditionally, which
+   * produced `<root><root>/file.test.ts` — a path that cannot exist, so the run
+   * died in the bundler. Anyone pasting a full path out of an editor, or
+   * scripting Argus, hit it on the first try.
+   */
+  describe('absolute patterns', () => {
+    it('runs an absolute path to a single file', async () => {
+      const file = join(tmp, 'abs.test.ts');
+      writeFileSync(file, '');
+
+      expect(await resolveFiles([file], tmp)).toEqual([file]);
+    });
+
+    it('resolves an absolute glob', async () => {
+      mkdirSync(join(tmp, 'sub'), { recursive: true });
+      writeFileSync(join(tmp, 'sub', 'a.test.ts'), '');
+      writeFileSync(join(tmp, 'b.test.ts'), '');
+
+      const result = await resolveFiles([join(tmp, '**/*.test.ts')], tmp);
+
+      expect(result).toEqual([join(tmp, 'b.test.ts'), join(tmp, 'sub', 'a.test.ts')]);
+    });
+
+    it('never prepends the root to a path that already has one', async () => {
+      const file = join(tmp, 'abs.test.ts');
+      writeFileSync(file, '');
+
+      for (const hit of await resolveFiles([file], tmp)) {
+        expect(hit.indexOf(tmp)).toBe(hit.lastIndexOf(tmp));
+      }
+    });
+
+    it('deduplicates a file named both absolutely and relatively', async () => {
+      const file = join(tmp, 'same.test.ts');
+      writeFileSync(file, '');
+
+      expect(await resolveFiles([file, 'same.test.ts'], tmp)).toEqual([file]);
+    });
+
+    it('is still subject to exclusion', async () => {
+      mkdirSync(join(tmp, 'node_modules', 'pkg'), { recursive: true });
+      writeFileSync(join(tmp, 'node_modules', 'pkg', 'sneaky.test.ts'), '');
+      writeFileSync(join(tmp, 'real.test.ts'), '');
+
+      expect(await resolveFiles([join(tmp, '**/*.test.ts')], tmp)).toEqual([
+        join(tmp, 'real.test.ts'),
+      ]);
+    });
+
+    it('honours a root-anchored exclude', async () => {
+      mkdirSync(join(tmp, 'fixtures'), { recursive: true });
+      writeFileSync(join(tmp, 'fixtures', 'f.test.ts'), '');
+      writeFileSync(join(tmp, 'real.test.ts'), '');
+
+      const result = await resolveFiles([join(tmp, '**/*.test.ts')], tmp, ['fixtures/**']);
+
+      expect(result).toEqual([join(tmp, 'real.test.ts')]);
+    });
+  });
+
+  /**
+   * A pattern may point outside `root` — an absolute path from another
+   * directory, or a `../` glob. Returning nothing would be the worst answer:
+   * the user named a file that exists and got a silent empty run. The file is
+   * returned, and exclusion still applies to it.
+   */
+  describe('patterns that escape the root', () => {
+    let outside: string;
+
+    beforeEach(() => {
+      outside = mkdtempSync(join(tmpdir(), 'argus-outside-'));
+      mkdirSync(join(outside, 'node_modules', 'pkg'), { recursive: true });
+      writeFileSync(join(outside, 'o.test.ts'), '');
+      writeFileSync(join(outside, 'node_modules', 'pkg', 'sneaky.test.ts'), '');
+    });
+
+    afterEach(() => {
+      rmSync(outside, { recursive: true, force: true });
+    });
+
+    it('returns a file named by an absolute path outside the root', async () => {
+      const result = await resolveFiles([join(outside, '**/*.test.ts')], tmp);
+
+      expect(result).toEqual([join(outside, 'o.test.ts')]);
+    });
+
+    it('excludes node_modules outside the root too', async () => {
+      const result = await resolveFiles([join(outside, '**/*.test.ts')], tmp);
+
+      expect(result.some((f) => f.includes('node_modules'))).toBe(false);
+    });
+
+    it('applies exclusion to a relative pattern that climbs out of the root', async () => {
+      const nested = join(outside, 'root');
+      mkdirSync(nested, { recursive: true });
+
+      const result = await resolveFiles(['../**/*.test.ts'], nested);
+
+      expect(result.some((f) => f.includes('node_modules'))).toBe(false);
+      expect(result).toContain(join(outside, 'o.test.ts'));
+    });
+
+    /**
+     * `relative()` yields '..dotted/real.test.ts' here — two leading dots, yet
+     * the file sits INSIDE the root. It is named literally because a `**` glob
+     * never descends into a dot-directory.
+     *
+     * This pins that such a file is still discovered. It does NOT pin how
+     * `escapesRoot` classifies it: for a hit under the root, Node's own
+     * exclusion has already run and is a superset of ours, so classifying it as
+     * an escape changes no output. The segment-wise check there is defensive.
+     */
+    it('discovers a file inside a directory whose name starts with two dots', async () => {
+      mkdirSync(join(tmp, '..dotted'), { recursive: true });
+      const file = join(tmp, '..dotted', 'real.test.ts');
+      writeFileSync(file, '');
+
+      expect(await resolveFiles([file], tmp)).toEqual([file]);
+    });
+  });
 });

@@ -32,7 +32,7 @@ describe('EsbuildBundler source-map generation (ADR-1)', () => {
       frameworkPath: FRAMEWORK_PATH,
       componentPath: COMPONENT_PATH,
       polyfillPaths: [POLYFILL_PATH],
-      engineTarget: ['es2020'],
+      engine: 'legacy',
     });
 
     expect(typeof bundle.map).toBe('string');
@@ -56,7 +56,7 @@ describe('EsbuildBundler source-map generation (ADR-1)', () => {
       frameworkPath: FRAMEWORK_PATH,
       componentPath: COMPONENT_PATH,
       polyfillPaths: [POLYFILL_PATH],
-      engineTarget: ['es2020'],
+      engine: 'legacy',
     });
 
     expect(bundle.code).not.toContain('sourceMappingURL');
@@ -69,11 +69,39 @@ describe('EsbuildBundler source-map generation (ADR-1)', () => {
       frameworkPath: FRAMEWORK_PATH,
       componentPath: COMPONENT_PATH,
       polyfillPaths: [POLYFILL_PATH],
-      engineTarget: ['es2020'],
+      engine: 'legacy',
     });
 
     const { Buffer } = await import('node:buffer');
     expect(bundle.sizeBytes).toBe(Buffer.byteLength(bundle.code, 'utf8'));
     expect(bundle.map?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  /**
+   * A file that gets its classes lowered takes a detour through two extra
+   * transforms (esbuild strips the TypeScript, Babel removes `class`), so its
+   * mapping is composed rather than emitted in one pass. If that composition
+   * were dropped, stack frames from the user's own class would point into
+   * generated code and `remapStacks` would silently produce nonsense.
+   */
+  it('keeps the user file in the map when its classes were lowered', async () => {
+    const lowered = resolve(REPO_ROOT, 'examples', 'class-syntax.test.ts');
+    const bundle = await new EsbuildBundler().bundle({
+      testPaths: [lowered],
+      frameworkPath: FRAMEWORK_PATH,
+      componentPath: COMPONENT_PATH,
+      polyfillPaths: [POLYFILL_PATH],
+      engine: 'legacy',
+    });
+
+    // Lowering really happened, so the map below is the composed one.
+    expect(bundle.code).toContain('_classCallCheck');
+
+    const parsed = JSON.parse(bundle.map as string) as { sources: string[]; mappings: string };
+    expect(parsed.sources.some((s) => s.includes('class-syntax.test.ts'))).toBe(true);
+    expect(parsed.mappings.length).toBeGreaterThan(0);
+    // Babel emits its map inline; it must be consumed by esbuild, never leak
+    // into the bundle Hermes runs.
+    expect(bundle.code).not.toContain('sourceMappingURL');
   });
 });

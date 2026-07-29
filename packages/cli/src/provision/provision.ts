@@ -1,6 +1,6 @@
 import { accessSync, constants, statSync } from 'node:fs';
 import type { EngineTarget, HermesBinary, HermesEngine, HermesProvisioner } from '@arguslab/core';
-import { checkEngineFidelity } from '@arguslab/core';
+import { checkEngineFidelity, engineForBytecodeVersion } from '@arguslab/core';
 import {
   type EngineResolutionOutcome,
   resolveHermesEngine,
@@ -21,6 +21,7 @@ import {
 import { detectHostTarget } from './host-target.js';
 import {
   type EngineContext,
+  formatAssumedEngineWarning,
   formatEngineUnavailable,
   formatFidelityWarning,
   formatProvisionFailure,
@@ -46,7 +47,7 @@ export interface ProvisionOptions {
    * would give it two homes and one of them would eventually drift.
    */
   explicitHermes?: ExplicitPath;
-  /** `--engine <legacy|v1>`; omit to use the default policy (prefer V1). */
+  /** `--engine <legacy|v1>`; omit to run the engine the project's RN ships. */
   engine?: HermesEngine;
   /** `--provision` — authorises the multi-minute source build. */
   allowSourceBuild: boolean;
@@ -71,6 +72,14 @@ export type ProvisionResult =
   | {
       kind: 'provisioned';
       binary: HermesBinary;
+      /**
+       * The engine the bundle must be built for — see `effectiveEngine`.
+       *
+       * Distinct from the engine the project TARGETS: when a binary turns up
+       * that is not the targeted engine, the bundle still has to be parseable
+       * by the binary that will run it.
+       */
+      engine: HermesEngine;
       /** One-line record of engine, tag, source and path. */
       summary: string;
       /** Engine-mismatch warning, when the binary is not the targeted engine. */
@@ -97,11 +106,12 @@ export function isExecutableFile(path: string): boolean {
 /** Flatten a resolver outcome into the context every message needs. */
 function toEngineContext(outcome: EngineResolutionOutcome, startDir: string): EngineContext {
   if (outcome.kind === 'resolved') {
-    const { ref, source, rnVersion } = outcome.resolution;
+    const { ref, source, rnVersion, assumedDefault } = outcome.resolution;
     return {
       ref: { engine: ref.engine, tag: ref.tag },
       pinSource: source,
       ...(rnVersion === undefined ? {} : { rnVersion }),
+      ...(assumedDefault === undefined ? {} : { assumedDefault }),
       startDir,
     };
   }
@@ -133,6 +143,27 @@ function adapterFor(source: SelectedSource, options: ProvisionOptions): HermesPr
     });
   }
   return new LocalPathAdapter(source.path);
+}
+
+/**
+ * The engine whose syntax the bundle has to be written in.
+ *
+ * The BINARY wins over the pin. Whatever the project targets, the binary on
+ * disk is the process that will parse the bundle, and its bytecode version is
+ * the one field that identifies it reliably. When those two disagree the run
+ * already carries a fidelity warning; building for the pin as well would turn
+ * that warning into a hard parse error on legacy.
+ *
+ * With no bytecode version the pin is the next best evidence, and with neither
+ * the answer is legacy: its output runs on both VMs, so an unidentified binary
+ * has exactly one choice that cannot produce a file nothing can parse.
+ */
+function effectiveEngine(binary: HermesBinary, targeted: HermesEngine | undefined): HermesEngine {
+  const reported =
+    binary.bytecodeVersion === undefined
+      ? undefined
+      : engineForBytecodeVersion(binary.bytecodeVersion);
+  return reported ?? targeted ?? 'legacy';
 }
 
 /** Outcome of walking the chain and running whichever adapter it selected. */
@@ -242,10 +273,17 @@ export async function provisionHermes(options: ProvisionOptions): Promise<Provis
   }
 
   const { binary } = resolved;
-  const warning = formatFidelityWarning(checkEngineFidelity(ref?.engine, binary), binary);
+  // Both warnings can apply at once — a guessed engine says nothing about
+  // whether the binary that turned up matches it — so neither hides the other.
+  const warning = [
+    formatAssumedEngineWarning(context),
+    formatFidelityWarning(checkEngineFidelity(ref?.engine, binary), binary),
+  ].join('');
+
   return {
     kind: 'provisioned',
     binary,
+    engine: effectiveEngine(binary, ref?.engine),
     summary: formatProvisionSummary(resolved.source, context, binary),
     ...(warning === '' ? {} : { warning }),
   };

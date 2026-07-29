@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { HERMES_PINS_BY_RN_MINOR, lookupPinnedRefs, rnMinor } from '../domain/hermes-pins.js';
+import {
+  defaultEngineForRn,
+  HERMES_PINS_BY_RN_MINOR,
+  lookupPinnedRefs,
+  rnMinor,
+} from '../domain/hermes-pins.js';
 
 describe('rnMinor', () => {
   it.each([
@@ -98,5 +103,66 @@ describe('lookupPinnedRefs', () => {
     expect(Object.keys(HERMES_PINS_BY_RN_MINOR).sort()).toEqual(
       rows.map((r) => r.rn as string).sort(),
     );
+  });
+});
+
+describe('defaultEngineForRn', () => {
+  /**
+   * Which engine each release SHIPS BY DEFAULT — a different question from
+   * which engines it pins, and the one that decides what Argus must run.
+   *
+   * 0.82 and 0.83 pin both engines yet ship legacy: V1 was an experimental
+   * opt-in there, reachable only by building React Native from source with
+   * `hermesV1Enabled=true` / `RCT_HERMES_V1_ENABLED=1`. Verified against the
+   * release posts:
+   *   0.82 — "ships with an experimental opt-in to a newer version of Hermes"
+   *   0.83 — "While Hermes V1 is in the experimental phase, you'll need to
+   *           build React Native from source to try it out"
+   *   0.84 — "React Native 0.84 - Hermes V1 by Default"
+   */
+  it.each([
+    ['0.78', 'legacy'],
+    ['0.79', 'legacy'],
+    ['0.80', 'legacy'],
+    ['0.81', 'legacy'],
+    ['0.82', 'legacy'],
+    ['0.83', 'legacy'],
+    ['0.84', 'v1'],
+    ['0.85', 'v1'],
+    ['0.86', 'v1'],
+    ['0.87', 'v1'],
+  ])('RN %s ships %s by default', (rn, engine) => {
+    expect(defaultEngineForRn(rn)).toBe(engine);
+  });
+
+  it('resolves a patch version to its minor row', () => {
+    expect(defaultEngineForRn('0.83.4')).toBe('legacy');
+    expect(defaultEngineForRn('0.84.1')).toBe('v1');
+  });
+
+  it('resolves a prerelease version to its minor row', () => {
+    expect(defaultEngineForRn('0.83.0-rc.2')).toBe('legacy');
+    expect(defaultEngineForRn('0.84.0-nightly-20260101')).toBe('v1');
+  });
+
+  it.each(['0.99.0', '0.77.0', '2.0.0', 'next', ''])(
+    'returns undefined for unknown version %j',
+    (rn) => {
+      expect(defaultEngineForRn(rn)).toBeUndefined();
+    },
+  );
+
+  /**
+   * A row that names a default it does not pin would resolve to nothing and
+   * fall through to the other engine — silently, which is the failure the
+   * default column exists to prevent.
+   */
+  it('never names a default engine the same row does not pin', () => {
+    for (const rn of Object.keys(HERMES_PINS_BY_RN_MINOR)) {
+      const engine = defaultEngineForRn(rn);
+      expect(engine).toBeDefined();
+      const pins = lookupPinnedRefs(rn);
+      expect(engine === 'v1' ? pins.v1 : pins.legacy).toBeDefined();
+    }
   });
 });

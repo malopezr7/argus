@@ -7,6 +7,8 @@
  * No runtime-specific imports allowed here.
  */
 
+import type { HermesEngine } from './hermes-version.js';
+
 // ---------------------------------------------------------------------------
 // Transform pipeline
 // ---------------------------------------------------------------------------
@@ -28,15 +30,17 @@ export interface SourceFile {
 /** Options controlling how a source file is transformed before bundling. */
 export interface TransformOptions {
   /**
-   * esbuild target. Example: ['es2020'].
+   * Which Hermes engine the output has to parse.
    *
-   * FINDING (Phase 1): esbuild's `hermes*` target is unusable (it errors lowering
-   * const/let/class). Use a standard ES level Hermes V1 supports. The target is
-   * SYNTAX-ONLY — it lowers syntax, not APIs (console/global come from polyfills).
-   * Per-Hermes-version gaps (e.g. native async on old builds) are handled by the
-   * esbuild adapter's `supported` override, not here.
+   * Named as an ENGINE rather than an esbuild target on purpose: the two
+   * engines differ in ways no single ES level describes (legacy runs async
+   * functions but not async arrows; V1 runs every class form but still rejects
+   * async generators), and encoding that as a target string here would put the
+   * policy in every caller. The adapter owns the encoding; callers state which
+   * VM will run the code. The policy is SYNTAX-ONLY — it lowers syntax, not
+   * APIs (console/global come from polyfills).
    */
-  engineTarget: string[];
+  engine: HermesEngine;
   /** Strip TypeScript types but leave JSX as-is (false) or transform JSX (true). */
   transformJsx: boolean;
   /** Loader hint. Flow intentionally absent — unsupported in Phase 1. */
@@ -77,8 +81,15 @@ export interface BundleInput {
   componentPath: string;
   /** Absolute paths to env polyfill modules, evaluated before anything else. */
   polyfillPaths: string[];
-  /** esbuild target forwarded to the bundler, e.g. ['es2020'] (see SPEC §3.4). */
-  engineTarget: string[];
+  /**
+   * Which Hermes engine will run this bundle — the engine of the binary that
+   * was actually provisioned, not the one the project nominally targets.
+   *
+   * It decides the esbuild target and whether classes are lowered, so getting
+   * it from a constant rather than from the resolved engine is what let `class`
+   * in a user's own test file reach a VM that cannot parse it.
+   */
+  engine: HermesEngine;
   /**
    * Root of the project under test — where packages the project OWNS (React) are
    * resolved from, so the bundle is built against the same React the user's

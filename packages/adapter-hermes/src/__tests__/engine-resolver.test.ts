@@ -73,6 +73,126 @@ function isCaseInsensitiveFs(dir: string): boolean {
 const RN_086_PROPERTIES = 'HERMES_VERSION_NAME=0.17.0\nHERMES_V1_VERSION_NAME=250829098.0.16\n';
 
 describe('resolveHermesEngine', () => {
+  /**
+   * The engine a project resolves to must be the one its React Native SHIPS,
+   * not merely one it pins. RN 0.82 and 0.83 pin both engines and ship legacy —
+   * V1 was an experimental opt-in needing a from-source build. Running V1 there
+   * would report results from a VM the app never executes.
+   *
+   * One row per published release, because a suite that only covered 0.86
+   * passed while 0.82 and 0.83 were silently wrong.
+   */
+  describe("resolves the engine the project's React Native ships by default", () => {
+    const rows = [
+      { rn: '0.78.0', legacy: '2025-01-13-RNv0.78.0', v1: undefined, engine: 'legacy' },
+      { rn: '0.79.3', legacy: '2025-06-04-RNv0.79.3', v1: undefined, engine: 'legacy' },
+      { rn: '0.80.2', legacy: '2025-07-24-RNv0.80.2', v1: undefined, engine: 'legacy' },
+      { rn: '0.81.0', legacy: '2025-07-07-RNv0.81.0', v1: undefined, engine: 'legacy' },
+      { rn: '0.82.1', legacy: '2025-09-01-RNv0.82.0', v1: '76dc3793', engine: 'legacy' },
+      { rn: '0.83.4', legacy: '0.14.1', v1: '250829098.0.4', engine: 'legacy' },
+      { rn: '0.84.0', legacy: '0.15.1', v1: '250829098.0.9', engine: 'v1' },
+      { rn: '0.85.0', legacy: '0.16.0', v1: '250829098.0.10', engine: 'v1' },
+      { rn: '0.86.2', legacy: '0.17.0', v1: '250829098.0.16', engine: 'v1' },
+      { rn: '0.87.0', legacy: undefined, v1: '250829098.0.16', engine: 'v1' },
+    ] as const;
+
+    /** The `version.properties` such a release would ship. */
+    function propertiesFor(row: (typeof rows)[number]): string {
+      const lines: string[] = [];
+      if (row.legacy !== undefined) lines.push(`HERMES_VERSION_NAME=${row.legacy}`);
+      if (row.v1 !== undefined) lines.push(`HERMES_V1_VERSION_NAME=${row.v1}`);
+      return `${lines.join('\n')}\n`;
+    }
+
+    it.each(rows)('RN $rn runs on $engine', (row) => {
+      const startDir = createProject({
+        versionProperties: propertiesFor(row),
+        packageJson: { version: row.rn },
+      });
+
+      const outcome = resolveHermesEngine({ startDir });
+
+      expect(outcome.kind).toBe('resolved');
+      expect(outcome.kind === 'resolved' && outcome.resolution.ref.engine).toBe(row.engine);
+    });
+
+    it.each(rows.filter((r) => r.legacy !== undefined && r.v1 !== undefined))(
+      'RN $rn does not flag an assumption — its default is known',
+      (row) => {
+        const startDir = createProject({
+          versionProperties: propertiesFor(row),
+          packageJson: { version: row.rn },
+        });
+
+        const outcome = resolveHermesEngine({ startDir });
+
+        expect(outcome.kind === 'resolved' && outcome.resolution.assumedDefault).toBeUndefined();
+      },
+    );
+
+    it('still reaches V1 on RN 0.83 when the user opts in with --engine v1', () => {
+      const startDir = createProject({
+        versionProperties: 'HERMES_VERSION_NAME=0.14.1\nHERMES_V1_VERSION_NAME=250829098.0.4\n',
+        packageJson: { version: '0.83.4' },
+      });
+
+      expect(resolveHermesEngine({ startDir, engine: 'v1' })).toMatchObject({
+        kind: 'resolved',
+        resolution: { ref: { engine: 'v1', version: '250829098.0.4' } },
+      });
+    });
+
+    it('picks the pinned engine when the default one is missing from the files', () => {
+      // RN 0.84 ships v1, but this install exposes only a legacy pin. One
+      // engine is available and it is the one that runs.
+      const startDir = createProject({
+        versionProperties: 'HERMES_VERSION_NAME=0.15.1\n',
+        packageJson: { version: '0.84.0' },
+      });
+
+      expect(resolveHermesEngine({ startDir })).toMatchObject({
+        kind: 'resolved',
+        resolution: { ref: { engine: 'legacy' } },
+      });
+    });
+  });
+
+  describe('an RN release outside the table', () => {
+    const BOTH = 'HERMES_VERSION_NAME=0.17.0\nHERMES_V1_VERSION_NAME=250829098.0.16\n';
+
+    it('assumes v1 and flags the assumption when both engines are pinned', () => {
+      const startDir = createProject({
+        versionProperties: BOTH,
+        packageJson: { version: '0.99.0' },
+      });
+
+      expect(resolveHermesEngine({ startDir })).toMatchObject({
+        kind: 'resolved',
+        resolution: { ref: { engine: 'v1' }, assumedDefault: true },
+      });
+    });
+
+    it('flags the assumption when the install reports no version at all', () => {
+      const startDir = createProject({ versionProperties: BOTH });
+
+      expect(resolveHermesEngine({ startDir })).toMatchObject({
+        kind: 'resolved',
+        resolution: { ref: { engine: 'v1' }, assumedDefault: true },
+      });
+    });
+
+    it('does not flag an assumption when only one engine is pinned', () => {
+      const startDir = createProject({
+        versionProperties: 'HERMES_VERSION_NAME=0.17.0\n',
+        packageJson: { version: '0.99.0' },
+      });
+
+      const outcome = resolveHermesEngine({ startDir });
+
+      expect(outcome.kind === 'resolved' && outcome.resolution.assumedDefault).toBeUndefined();
+    });
+  });
+
   describe('version.properties (RN 0.82+)', () => {
     it('reads both engines and defaults to v1', () => {
       const startDir = createProject({

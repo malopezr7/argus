@@ -12,40 +12,28 @@ import type {
 import { build, transform } from 'esbuild';
 import { hermesClassLowering } from './hermes-class-lowering.js';
 import { projectPackageAliases } from './project-packages.js';
+import { hermesSyntaxPolicy } from './syntax-policy.js';
+
+export { type HermesSyntaxPolicy, hermesSyntaxPolicy } from './syntax-policy.js';
 
 /**
- * Default esbuild target.
+ * JSX settings for the bundle.
  *
- * FINDING (Phase 1): esbuild's `hermes*` target is UNUSABLE — its feature table
- * marks const/let/class as unsupported on all hermes versions and then errors
- * trying to lower them. Use a standard ES level Hermes V1 supports.
+ * Shared with the class-lowering pass, which has to re-run the JSX transform on
+ * any file it strips: a `.tsx` that takes the lowering detour must come out of
+ * it identical to one that did not.
  */
-export const DEFAULT_ENGINE_TARGET = ['es2020'];
-
-/**
- * Centralized Hermes syntax policy — used by BOTH the bundler and the
- * transformer so behaviour cannot diverge.
- *
- * FINDING (Phase 1): the spike build (Hermes 0.12.0, shipped in the v0.13.0
- * release) rejects native `async` functions. es2020 leaves async in place, so
- * we lower async/await (and async generators) to generator+Promise via the
- * per-feature `supported` override. This set is PER-HERMES-VERSION — Hermes V1
- * (RN 0.86) likely supports async natively (revisit with a probe-backed policy).
- */
-const HERMES_SUPPORTED: Record<string, boolean> = {
-  'async-await': false,
-  'async-generator': false,
-};
+const JSX_OPTIONS = {
+  jsx: 'automatic',
+  jsxImportSource: 'react',
+  jsxDev: true,
+} as const;
 
 const ESBUILD_LIVE_BINDING_GETTER = 'get: () => from[key]';
 const HERMES_SAFE_LIVE_BINDING_GETTER = 'get: ((capturedKey) => () => from[capturedKey])(key)';
 
 function captureCommonJsLiveBindingKeys(code: string): string {
   return code.replaceAll(ESBUILD_LIVE_BINDING_GETTER, HERMES_SAFE_LIVE_BINDING_GETTER);
-}
-
-function targetFor(engineTarget: string[]): string[] {
-  return engineTarget.length > 0 ? engineTarget : DEFAULT_ENGINE_TARGET;
 }
 
 /**
@@ -59,6 +47,10 @@ export class EsbuildBundler implements Bundler {
     const frameworkSourceDir = dirname(input.frameworkPath);
     const projectDir = input.projectDir ?? process.cwd();
     const rnShim = join(frameworkSourceDir, 'rn-shim');
+    // One engine, one answer: the target, the per-feature overrides and whether
+    // Babel runs at all all come from here, so the bundle can never be built
+    // for a different VM than the one that will parse it.
+    const policy = hermesSyntaxPolicy(input.engine);
     const result = await build({
       stdin: {
         contents: entry,
@@ -68,15 +60,13 @@ export class EsbuildBundler implements Bundler {
       },
       bundle: true,
       format: 'iife',
-      target: targetFor(input.engineTarget),
-      supported: HERMES_SUPPORTED,
+      target: policy.target,
+      supported: policy.supported,
       platform: 'neutral',
       write: false,
       outfile: 'run.argus-bundle.js',
       sourcemap: 'external',
-      jsx: 'automatic',
-      jsxImportSource: 'react',
-      jsxDev: true,
+      ...JSX_OPTIONS,
       define: {
         __DEV__: 'true',
         'process.env.NODE_ENV': '"development"',
@@ -86,7 +76,17 @@ export class EsbuildBundler implements Bundler {
         'react-native': rnShim,
         ...projectPackageAliases(projectDir),
       },
-      plugins: [hermesClassLowering()],
+      // An engine that parses `class` gets no Babel pass at all, so its bundle
+      // is the code the user wrote rather than a rewrite of it.
+      plugins: policy.lowerClasses
+        ? [
+            hermesClassLowering({
+              target: policy.target,
+              supported: policy.supported,
+              jsx: JSX_OPTIONS,
+            }),
+          ]
+        : [],
       legalComments: 'none',
     });
     // D1: select by explicit suffix (esbuild output ordering is not contractual).
@@ -133,14 +133,13 @@ function generateVirtualEntry(input: BundleInput, resultNonce: string): string {
  */
 export class EsbuildTransformer implements Transformer {
   async transform(input: SourceFile, opts: TransformOptions): Promise<TransformedCode> {
+    const policy = hermesSyntaxPolicy(opts.engine);
     const result = await transform(input.content, {
       loader: opts.loader ?? 'ts',
-      target: targetFor(opts.engineTarget),
-      supported: HERMES_SUPPORTED,
+      target: policy.target,
+      supported: policy.supported,
       sourcefile: input.path,
-      jsx: 'automatic',
-      jsxImportSource: 'react',
-      jsxDev: true,
+      ...JSX_OPTIONS,
       define: {
         __DEV__: 'true',
         'process.env.NODE_ENV': '"development"',

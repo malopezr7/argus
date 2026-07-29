@@ -11,10 +11,10 @@
 
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_ENGINE_TARGET, EsbuildBundler } from '../packages/adapter-esbuild/src/index.js';
+import { EsbuildBundler } from '../packages/adapter-esbuild/src/index.js';
 import { HermesSpawnEngine } from '../packages/adapter-hermes/src/hermes-spawn-engine.js';
 import { LocalPathAdapter } from '../packages/adapter-hermes/src/local-path-adapter.js';
-import type { RunOutcome } from '../packages/core/src/index.js';
+import { engineForBytecodeVersion, type RunOutcome } from '../packages/core/src/index.js';
 import { parseHermesOutput } from '../packages/core/src/result-protocol.js';
 import { CliReporter, exitCodeFor } from '../packages/reporter-cli/src/index.js';
 
@@ -51,7 +51,13 @@ async function main(): Promise<void> {
         frameworkPath: join(REPO, 'packages/framework/src/index'),
         componentPath: join(REPO, 'packages/rntl/src/index'),
         testPaths,
-        engineTarget: DEFAULT_ENGINE_TARGET,
+        // This harness is pointed at a binary directly, with no project to
+        // resolve a pin from, so the binary's own bytecode version is the only
+        // evidence of which engine will parse the bundle.
+        engine:
+          (bin.bytecodeVersion === undefined
+            ? undefined
+            : engineForBytecodeVersion(bin.bytecodeVersion)) ?? 'legacy',
       })
       .catch((e) => {
         throw Object.assign(new Error(errMsg(e)), { stage: 'bundle' });

@@ -35,7 +35,12 @@ export {
   PROJECT_VENDORED_VM_SEGMENTS,
 } from './domain/hermes-locations.js';
 // Hermes engine/version domain (pure)
-export { HERMES_PINS_BY_RN_MINOR, lookupPinnedRefs, rnMinor } from './domain/hermes-pins.js';
+export {
+  defaultEngineForRn,
+  HERMES_PINS_BY_RN_MINOR,
+  lookupPinnedRefs,
+  rnMinor,
+} from './domain/hermes-pins.js';
 export type {
   HermesBinCpu,
   HermesBinOs,
@@ -58,6 +63,7 @@ export {
 export type {
   EngineResolution,
   EngineSelection,
+  EngineSelectionOptions,
   HermesEngine,
   HermesPinSource,
   HermesRef,

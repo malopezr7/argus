@@ -19,6 +19,9 @@
  *     `JSON.stringify` (which consults `Object.prototype.toJSON`), array methods
  *     (`push`/`map`), or the iterator protocol (`for..of`). So prototype
  *     pollution cannot forge a passing envelope or skip registered tests.
+ *     String escaping covers the WHOLE C0 range (U+0000–U+001F) via a
+ *     null-prototype table built at module-eval; leaving any of it raw makes the
+ *     envelope unparseable and discards the whole file's results.
  *  (Full isolation against an adversarial test that pollutes deep language
  *   primitives is only achievable with realm/process isolation — see SPEC §9.)
  *
@@ -157,6 +160,54 @@ function serTest(t: TestCaseResult): string {
   return `${out}}`;
 }
 
+/** Lowercase hex digits, indexed by value. A string literal, so un-pollutable. */
+const HEX_DIGITS = '0123456789abcdef';
+
+/** U+0000–U+001F: the range JSON forbids raw inside a string. */
+const CONTROL_END = 0x20;
+
+/**
+ * Escape for every C0 control character, keyed by the character itself.
+ *
+ * Built at MODULE-EVAL time — before any user code runs — for the same reason
+ * `safePrint` is captured there: it is the only moment the primordials it needs
+ * (`Object.create`, `String.fromCharCode`) are guaranteed to be the real ones.
+ * `serStr` itself then calls NOTHING; it only indexes this table.
+ *
+ * The prototype is null on purpose. The table is only ever read by index, so it
+ * must not be able to answer for a key it does not own — with `Object.prototype`
+ * in the chain, polluting a single-character property there would corrupt the
+ * escape of that character. A null prototype removes the question entirely.
+ */
+function buildControlEscapes(): Record<string, string> {
+  const table = Object.create(null) as Record<string, string>;
+  for (let code = 0; code < CONTROL_END; code++) {
+    table[String.fromCharCode(code)] =
+      `\\u00${HEX_DIGITS[code >> 4]}${HEX_DIGITS[code % HEX_DIGITS.length]}`;
+  }
+  // The five characters JSON gives a shorter conventional form.
+  table['\b'] = '\\b';
+  table['\t'] = '\\t';
+  table['\n'] = '\\n';
+  table['\f'] = '\\f';
+  table['\r'] = '\\r';
+  return table;
+}
+
+const CONTROL_ESCAPES = buildControlEscapes();
+
+/**
+ * Serialize one JSON string.
+ *
+ * Escapes the WHOLE C0 range, not just the five characters with short forms. A
+ * raw control character — an ESC compared in a terminal-output assertion, a NUL
+ * from a binary fixture — makes the envelope unparseable, and because the
+ * envelope carries the entire file, one such character in one test name or one
+ * failure message discards every result in that file.
+ *
+ * `c < ' '` is a plain string comparison, so it identifies exactly the 32
+ * characters the table owns: the lookup below can never miss.
+ */
 function serStr(value: string): string {
   const s = typeof value === 'string' ? value : `${value as never}`;
   let out = '"';
@@ -164,11 +215,7 @@ function serStr(value: string): string {
     const c = s[i];
     if (c === '"') out += '\\"';
     else if (c === '\\') out += '\\\\';
-    else if (c === '\n') out += '\\n';
-    else if (c === '\r') out += '\\r';
-    else if (c === '\t') out += '\\t';
-    else if (c === '\b') out += '\\b';
-    else if (c === '\f') out += '\\f';
+    else if (c < ' ') out += CONTROL_ESCAPES[c];
     else out += c;
   }
   return `${out}"`;

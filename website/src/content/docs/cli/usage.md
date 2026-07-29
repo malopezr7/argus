@@ -20,7 +20,7 @@ are `**/*.test.ts` and `**/*.test.tsx`.
 | `--concurrency <n>` | `-c` | CPU count, capped at 8 | Max files in flight |
 | `--config <path>` | | searched for | Config file to use, instead of searching |
 | `--hermes <path>` | | — | Hermes binary to use, overrides `ARGUS_HERMES` |
-| `--engine <name>` | | project's pin, preferring V1 | `legacy` or `v1` |
+| `--engine <name>` | | the engine your react-native ships | `legacy` or `v1` |
 | `--provision` | | off | Authorise building Hermes from source |
 | `--help` | `-h` | | Print usage and exit 0 |
 

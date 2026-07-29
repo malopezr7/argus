@@ -60,6 +60,11 @@ export interface EngineResolution {
   source: HermesPinSource;
   /** Detected React Native version, when known. */
   rnVersion?: string;
+  /**
+   * Set when the release's default engine could not be determined and one was
+   * assumed. The user is told, so a guess never passes for a fact.
+   */
+  assumedDefault?: true;
 }
 
 /**
@@ -69,9 +74,40 @@ export interface EngineResolution {
  * does not pin can warn, instead of silently getting the other engine.
  */
 export type EngineSelection =
-  | { kind: 'selected'; ref: HermesRef }
+  | {
+      kind: 'selected';
+      ref: HermesRef;
+      /**
+       * Set when the release's default engine was NOT known and more than one
+       * engine was pinned, so this choice is a guess. Callers must surface it;
+       * an unreported guess is the failure this flag exists to prevent.
+       */
+      assumedDefault?: true;
+    }
   | { kind: 'unavailable'; requested: HermesEngine; available: HermesEngine[] }
   | { kind: 'none' };
+
+/** What the caller knows that narrows the engine choice. */
+export interface EngineSelectionOptions {
+  /** `--engine <name>`, or the config file's `hermes.engine`. */
+  preference?: HermesEngine;
+  /**
+   * The engine the project's React Native release ships by DEFAULT, when
+   * known. Supplied by the caller rather than looked up here: the lookup table
+   * imports this module, so reaching back into it would close an import cycle.
+   */
+  rnDefault?: HermesEngine;
+}
+
+/**
+ * The engine assumed when a release pins several and its default is unknown.
+ *
+ * Pinning more than one engine only started with RN 0.82, so an unknown
+ * multi-engine release is always NEWER than the table, never older — and every
+ * release since 0.84 defaults to V1, with legacy dropped entirely at 0.87.
+ * V1 is therefore the only guess the trend supports.
+ */
+const ASSUMED_DEFAULT_ENGINE: HermesEngine = 'v1';
 
 const TAG_PREFIX = 'hermes-';
 
@@ -243,14 +279,26 @@ export function parseVersionProperties(contents: string): { legacy?: string; v1?
 /**
  * Decide which engine to use given what a project pins.
  *
- * Default policy: prefer V1 when one is pinned, fall back to legacy. An
- * explicit preference wins, but asking for an engine that is not pinned yields
- * `unavailable` rather than silently succeeding with the other engine.
+ * The default is the engine the project's React Native release SHIPS, not
+ * whichever is newest. Those differ: RN 0.82 and 0.83 pin both engines and ship
+ * legacy, so "prefer V1 when V1 is pinned" ran those projects' tests on a VM
+ * their apps never load — engine fidelity lost precisely where the two engines
+ * disagree most.
+ *
+ * An explicit preference always wins, and asking for an engine the project does
+ * not pin yields `unavailable` rather than silently succeeding with the other
+ * one. When the release's default is unknown and several engines are pinned,
+ * the choice is a guess and says so via `assumedDefault`.
  */
-export function selectHermesEngine(pins: PinnedRefs, preference?: HermesEngine): EngineSelection {
+export function selectHermesEngine(
+  pins: PinnedRefs,
+  options: EngineSelectionOptions = {},
+): EngineSelection {
   const available: HermesEngine[] = [];
   if (pins.v1 !== undefined) available.push('v1');
   if (pins.legacy !== undefined) available.push('legacy');
+
+  const { preference, rnDefault } = options;
 
   if (preference !== undefined) {
     const ref = pins[preference];
@@ -258,7 +306,25 @@ export function selectHermesEngine(pins: PinnedRefs, preference?: HermesEngine):
     return { kind: 'unavailable', requested: preference, available };
   }
 
-  if (pins.v1 !== undefined) return { kind: 'selected', ref: pins.v1 };
-  if (pins.legacy !== undefined) return { kind: 'selected', ref: pins.legacy };
-  return { kind: 'none' };
+  // The release's own default, whenever the project pins it.
+  if (rnDefault !== undefined) {
+    const ref = pins[rnDefault];
+    if (ref !== undefined) return { kind: 'selected', ref };
+  }
+
+  // Either the default is unknown, or the release does not pin the engine it
+  // defaults to. With exactly one engine pinned there is nothing to guess.
+  if (available.length === 1) {
+    const ref = pins.v1 ?? pins.legacy;
+    if (ref !== undefined) return { kind: 'selected', ref };
+  }
+
+  if (available.length === 0) return { kind: 'none' };
+
+  // Several engines, no known default: a guess, and flagged as one.
+  const assumed = pins[ASSUMED_DEFAULT_ENGINE] ?? pins.legacy;
+  if (assumed === undefined) return { kind: 'none' };
+  return rnDefault === undefined
+    ? { kind: 'selected', ref: assumed, assumedDefault: true }
+    : { kind: 'selected', ref: assumed };
 }

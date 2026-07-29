@@ -12,7 +12,7 @@
 import { homedir } from 'node:os';
 import type { FileResult, RunOutcome } from '@arguslab/core';
 import { parseHermesOutput } from '@arguslab/core';
-import { DEFAULT_ENGINE_TARGET, EsbuildBundler } from '@arguslab/esbuild';
+import { EsbuildBundler } from '@arguslab/esbuild';
 import { HermesSpawnEngine } from '@arguslab/hermes/hermes-spawn-engine.js';
 import {
   exitCodeForSession,
@@ -113,6 +113,9 @@ async function main(): Promise<void> {
   process.stdout.write(provisioned.summary);
   if (provisioned.warning !== undefined) process.stderr.write(provisioned.warning);
   const bin = provisioned.binary;
+  // Which engine will parse the bundle. Read once here, beside the binary it
+  // describes, because the two must never come from different runs.
+  const engine = provisioned.engine;
 
   // 5. Discover test files
   const files = await resolveFiles(settings.include, settings.root, settings.exclude);
@@ -140,7 +143,10 @@ async function main(): Promise<void> {
           frameworkPath,
           componentPath,
           polyfillPaths,
-          engineTarget: DEFAULT_ENGINE_TARGET,
+          // The engine that was actually provisioned, NOT a constant: it is
+          // what decides whether `class` survives into the bundle, and the
+          // legacy VM cannot parse `class` in any form.
+          engine,
           // React is resolved from the project under test, which is the
           // discovery root rather than the working directory: in a monorepo
           // with per-package React versions, `root: 'packages/app'` must

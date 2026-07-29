@@ -226,16 +226,62 @@ describe('selectHermesEngine', () => {
   };
   const both: PinnedRefs = { legacy, v1 };
 
-  describe('default policy', () => {
-    it('prefers v1 when both are pinned', () => {
-      expect(selectHermesEngine(both)).toEqual({ kind: 'selected', ref: v1 });
+  /**
+   * Pinning both engines does NOT mean either is a valid choice. RN 0.82 and
+   * 0.83 pin both and ship legacy; selecting v1 there would run the tests on a
+   * VM the app never executes, which is the exact promise Argus makes.
+   */
+  describe("the RN release's default engine decides", () => {
+    it('selects legacy when the release ships legacy, even though v1 is pinned', () => {
+      expect(selectHermesEngine(both, { rnDefault: 'legacy' })).toEqual({
+        kind: 'selected',
+        ref: legacy,
+      });
     });
 
-    it('falls back to legacy when only legacy is pinned', () => {
+    it('selects v1 when the release ships v1', () => {
+      expect(selectHermesEngine(both, { rnDefault: 'v1' })).toEqual({
+        kind: 'selected',
+        ref: v1,
+      });
+    });
+
+    it('falls back to the only pinned engine when the default one is absent', () => {
+      expect(selectHermesEngine({ legacy }, { rnDefault: 'v1' })).toEqual({
+        kind: 'selected',
+        ref: legacy,
+      });
+      expect(selectHermesEngine({ v1 }, { rnDefault: 'legacy' })).toEqual({
+        kind: 'selected',
+        ref: v1,
+      });
+    });
+
+    it('never flags an assumption when the default is known', () => {
+      expect(selectHermesEngine(both, { rnDefault: 'legacy' })).not.toHaveProperty(
+        'assumedDefault',
+      );
+    });
+  });
+
+  /**
+   * An RN outside the table (a future minor, a fork) leaves the default
+   * unknowable. Guessing silently is what this whole change exists to stop, so
+   * the guess is made explicit instead: v1 — the ambiguity only arises from
+   * 0.82 onward, where the trend runs one way — and flagged for the caller to
+   * report.
+   */
+  describe('unknown RN release', () => {
+    it('assumes v1 and flags the assumption when both are pinned', () => {
+      expect(selectHermesEngine(both)).toEqual({
+        kind: 'selected',
+        ref: v1,
+        assumedDefault: true,
+      });
+    });
+
+    it('does not flag an assumption when only one engine is pinned', () => {
       expect(selectHermesEngine({ legacy })).toEqual({ kind: 'selected', ref: legacy });
-    });
-
-    it('selects v1 when only v1 is pinned', () => {
       expect(selectHermesEngine({ v1 })).toEqual({ kind: 'selected', ref: v1 });
     });
 
@@ -245,18 +291,32 @@ describe('selectHermesEngine', () => {
   });
 
   describe('explicit preference', () => {
-    it('honours an explicit legacy request over the v1 default', () => {
-      expect(selectHermesEngine(both, 'legacy')).toEqual({ kind: 'selected', ref: legacy });
+    it('honours an explicit legacy request over an RN default of v1', () => {
+      expect(selectHermesEngine(both, { preference: 'legacy', rnDefault: 'v1' })).toEqual({
+        kind: 'selected',
+        ref: legacy,
+      });
     });
 
-    it('honours an explicit v1 request', () => {
-      expect(selectHermesEngine(both, 'v1')).toEqual({ kind: 'selected', ref: v1 });
+    it('honours an explicit v1 request over an RN default of legacy', () => {
+      // The opt-in path: RN 0.83 ships legacy, `--engine v1` still reaches V1.
+      expect(selectHermesEngine(both, { preference: 'v1', rnDefault: 'legacy' })).toEqual({
+        kind: 'selected',
+        ref: v1,
+      });
+    });
+
+    it('never flags an assumption — a request typed by the user is not a guess', () => {
+      expect(selectHermesEngine(both, { preference: 'v1' })).toEqual({
+        kind: 'selected',
+        ref: v1,
+      });
     });
   });
 
   describe('requested engine is not pinned', () => {
     it('reports unavailable rather than silently returning the other engine', () => {
-      expect(selectHermesEngine({ legacy }, 'v1')).toEqual({
+      expect(selectHermesEngine({ legacy }, { preference: 'v1' })).toEqual({
         kind: 'unavailable',
         requested: 'v1',
         available: ['legacy'],
@@ -264,7 +324,7 @@ describe('selectHermesEngine', () => {
     });
 
     it('reports unavailable when legacy is requested on a v1-only project', () => {
-      expect(selectHermesEngine({ v1 }, 'legacy')).toEqual({
+      expect(selectHermesEngine({ v1 }, { preference: 'legacy' })).toEqual({
         kind: 'unavailable',
         requested: 'legacy',
         available: ['v1'],
@@ -272,10 +332,18 @@ describe('selectHermesEngine', () => {
     });
 
     it('reports an empty available list when nothing is pinned at all', () => {
-      expect(selectHermesEngine({}, 'v1')).toEqual({
+      expect(selectHermesEngine({}, { preference: 'v1' })).toEqual({
         kind: 'unavailable',
         requested: 'v1',
         available: [],
+      });
+    });
+
+    it('stays unavailable even when the RN default names the missing engine', () => {
+      expect(selectHermesEngine({ legacy }, { preference: 'v1', rnDefault: 'v1' })).toEqual({
+        kind: 'unavailable',
+        requested: 'v1',
+        available: ['legacy'],
       });
     });
   });

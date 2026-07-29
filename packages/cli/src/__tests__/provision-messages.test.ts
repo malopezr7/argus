@@ -5,6 +5,7 @@ import type { AttemptedSource } from '../provision/chain.js';
 import {
   describeSource,
   type EngineContext,
+  formatAssumedEngineWarning,
   formatEngineUnavailable,
   formatFidelityWarning,
   formatProvisionFailure,
@@ -217,6 +218,42 @@ describe('formatFidelityWarning', () => {
     );
 
     expect(warning).toContain('bytecode 120 (unrecognised engine)');
+  });
+});
+
+describe('formatAssumedEngineWarning', () => {
+  const assumed: EngineContext = {
+    ref: { engine: 'v1', tag: 'hermes-v250829098.0.16' },
+    pinSource: 'version.properties',
+    rnVersion: '0.99.0',
+    assumedDefault: true,
+    startDir: '/proj',
+  };
+
+  it('says nothing when the default engine was known', () => {
+    expect(formatAssumedEngineWarning(V1_CONTEXT)).toBe('');
+  });
+
+  it('says nothing when no engine was resolved at all', () => {
+    expect(formatAssumedEngineWarning({ startDir: '/proj' })).toBe('');
+  });
+
+  it('names the assumed engine, the unknown release and the way to settle it', () => {
+    const warning = formatAssumedEngineWarning(assumed);
+
+    expect(warning).toContain('v1');
+    expect(warning).toContain('0.99.0');
+    expect(warning).toContain('--engine');
+    expect(warning.endsWith('\n')).toBe(true);
+  });
+
+  it('still warns when the release version itself is unknown', () => {
+    const warning = formatAssumedEngineWarning({
+      ref: { engine: 'v1', tag: 'hermes-v250829098.0.16' },
+      assumedDefault: true,
+    });
+
+    expect(warning).toContain('--engine');
   });
 });
 

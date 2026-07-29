@@ -1,11 +1,13 @@
 import { promises as fsPromises } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, matchesGlob, relative, sep } from 'node:path';
 import { DEFAULT_EXCLUDE, DEFAULT_INCLUDE } from '@arguslab/core';
 
 /**
  * Resolves test file paths from glob patterns relative to the given root.
  *
  * - Empty `patterns` falls back to the default TS and TSX patterns.
+ * - A pattern may be relative to `root` or ABSOLUTE. An absolute one is
+ *   honoured as written, including when it points outside `root`.
  * - `exclude` is a list of GLOB PATTERNS, matched against paths relative to
  *   `root`. Passing `[]` disables exclusion entirely.
  * - Results are deduplicated across overlapping patterns.
@@ -32,10 +34,50 @@ export async function resolveFiles(
       cwd: root,
       exclude: [...exclude],
     })) {
-      // hits are relative to root — resolve to absolute
-      seen.add(join(root, hit));
+      // A relative pattern yields hits relative to root; an ABSOLUTE pattern
+      // yields absolute ones. Joining the root onto those produced
+      // `<root><root>/file.test.ts`, a path that cannot exist — so every
+      // absolute pattern died in the bundler, unable to resolve its own entry.
+      const file = isAbsolute(hit) ? hit : join(root, hit);
+
+      if (escapesRoot(root, file) && matchesAny(file, exclude)) continue;
+
+      seen.add(file);
     }
   }
 
   return [...seen].sort();
+}
+
+/**
+ * True when `file` lies outside `root`.
+ *
+ * Compared segment-wise rather than by string prefix: a sibling directory
+ * named `..dotted/` produces a root-relative path starting with `..` while
+ * sitting firmly INSIDE the root, and treating it as an escape would apply the
+ * wrong exclusion basis to it.
+ */
+function escapesRoot(root: string, file: string): boolean {
+  const rootRelative = relative(root, file);
+  return rootRelative === '..' || rootRelative.startsWith(`..${sep}`) || isAbsolute(rootRelative);
+}
+
+/**
+ * Whether an escaping hit is excluded.
+ *
+ * Node applies its own `exclude` only while walking below `cwd`; a pattern that
+ * reaches outside the root bypasses it completely, so `**​/node_modules/**` would
+ * stop working exactly where a stray dependency tree is most likely to be
+ * picked up. Those hits are therefore filtered here.
+ *
+ * Matched against the ABSOLUTE path, because the root-relative form of a file
+ * outside the root is a `../..` chain that `**` does not match — and because a
+ * root-anchored pattern like `fixtures/**` is meaningless for a file that is
+ * not under the root in the first place.
+ */
+function matchesAny(file: string, exclude: readonly string[]): boolean {
+  for (const pattern of exclude) {
+    if (matchesGlob(file, pattern)) return true;
+  }
+  return false;
 }
