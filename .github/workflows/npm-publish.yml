@@ -350,31 +350,48 @@ jobs:
       # the flag, an environment that cannot produce provenance is an error;
       # without it, that same run publishes quietly and unattested, which is
       # precisely the outcome this workflow exists to prevent.
+      # The leading ./ is load-bearing. An argument containing a slash and no
+      # ./ is a package spec to npm, not a path, so `pkg/name.tgz` is read as
+      # the GitHub repository `pkg/name.tgz` and npm tries to clone it — which
+      # fails as a git authentication error that looks nothing like the real
+      # cause.
       - name: Publish
         id: publish
         shell: bash
         env:
           TARBALL: ${{ needs.build.outputs.tarball }}
-        run: npm publish "pkg/$TARBALL" --provenance --access public
+        run: npm publish "./pkg/$TARBALL" --provenance --access public
 
       # npm does not validate a trusted publisher configuration when it is
       # saved, so a mismatch is only ever discovered here, as ENEEDAUTH. That
       # error names nothing useful, so the fields that have to match are spelled
       # out rather than left for someone to rediscover.
+      #
+      # Only for that error, though: a diagnostic that blames the publisher
+      # configuration for every failure sends people to re-check settings that
+      # were already correct, which is worse than staying quiet.
       - name: Explain a failed publish
         if: ${{ failure() && steps.publish.conclusion == 'failure' }}
         shell: bash
         env:
           REPO: ${{ github.repository }}
           PKG: ${{ env.PACKAGE_NAME }}
+          LOG_DIR: ${{ runner.temp }}/../.npm/_logs
         run: |
-          echo "::error::publish failed. If npm reported ENEEDAUTH, the trusted publisher for $PKG does not match this run."
-          echo "On npmjs.com -> $PKG -> Settings -> Trusted Publisher, every field is exact and case-sensitive:"
-          echo "  Organization or user: ${REPO%%/*}"
-          echo "  Repository:           ${REPO##*/}"
-          echo "  Workflow filename:    npm-publish.yml   (filename only, not a path)"
-          echo "  Environment name:     npm-publish"
-          echo "  Allowed actions:      npm publish"
+          set -uo pipefail
+
+          if grep -rqiE 'ENEEDAUTH|E401|E403|Unable to authenticate' "$HOME/.npm/_logs" 2>/dev/null; then
+            echo "::error::npm rejected the credential, so the trusted publisher for $PKG does not match this run."
+            echo "On npmjs.com -> $PKG -> Settings -> Trusted Publisher, every field is exact and case-sensitive:"
+            echo "  Organization or user: ${REPO%%/*}"
+            echo "  Repository:           ${REPO##*/}"
+            echo "  Workflow filename:    npm-publish.yml   (filename only, not a path)"
+            echo "  Environment name:     npm-publish"
+            echo "  Allowed actions:      npm publish"
+          else
+            echo "::error::publish failed for a reason other than authentication — read the npm error above."
+            echo "The trusted publisher configuration is NOT implicated; do not go changing it."
+          fi
 
   verify:
     name: Verify the published version
