@@ -135,10 +135,11 @@ argus "src/**/*.test.ts" "lib/**/*.test.tsx"
 argus src/cart.test.ts                 # a single file
 ```
 
-`node_modules` is excluded. Discovery order is preserved in the report, which keeps output
-stable even though execution is parallel.
+`node_modules`, `dist`, `build`, `coverage` and `.git` are excluded. Discovery order is
+preserved in the report, which keeps output stable even though execution is parallel.
 
 :::note
-Include and exclude patterns are not configurable yet — there is no config file. It is the
-next thing after distribution on the [roadmap](/reference/roadmap/).
+Both lists are configurable. Set [`include`](/cli/configuration/#include) and
+[`exclude`](/cli/configuration/#exclude) in `argus.config.ts` — note that `exclude`
+replaces the defaults rather than adding to them.
 :::

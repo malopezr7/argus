@@ -79,6 +79,7 @@ export default defineConfig({
 					label: 'The CLI',
 					items: [
 						{ label: 'Command and flags', slug: 'cli/usage' },
+						{ label: 'Configuration', slug: 'cli/configuration' },
 						{ label: 'Reporting and exit codes', slug: 'cli/reporting' },
 					],
 				},

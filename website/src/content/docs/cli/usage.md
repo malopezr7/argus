@@ -18,6 +18,7 @@ are `**/*.test.ts` and `**/*.test.tsx`.
 |---|---|---|---|
 | `--timeout <ms>` | `-t` | `10000` | Per-file Hermes timeout |
 | `--concurrency <n>` | `-c` | CPU count, capped at 8 | Max files in flight |
+| `--config <path>` | | searched for | Config file to use, instead of searching |
 | `--hermes <path>` | | — | Hermes binary to use, overrides `ARGUS_HERMES` |
 | `--engine <name>` | | project's pin, preferring V1 | `legacy` or `v1` |
 | `--provision` | | off | Authorise building Hermes from source |
@@ -41,6 +42,15 @@ kills the process and reports the file as `timeout`, exit code 2.
 
 There is no per-test timeout. The unit of isolation is the file, so the unit of timeout is
 too.
+
+Only a strict positive integer is accepted, the same rule `--concurrency` has always had:
+
+```text
+✗ Usage error: Invalid --timeout value: "abc". Must be a positive integer (e.g. 5000, 30000).
+```
+
+Before 0.1.1 an unparseable value was silently replaced by the 10 000 ms default, so a typo
+produced a full green run under a timeout nobody chose.
 
 ## `--concurrency`
 
@@ -106,21 +116,31 @@ argus "src/**/*.test.ts" "lib/**/*.test.tsx"   # ✓ several
 argus src/cart.test.ts                         # ✓ a literal path
 ```
 
-`node_modules` is excluded from discovery. Report order follows discovery order even though
-execution is parallel, so output is stable run to run.
+Positional globs override the config file's `include` entirely. `node_modules`, `dist`,
+`build`, `coverage` and `.git` are excluded from discovery by default — see
+[`exclude`](/cli/configuration/#exclude) to change that.
+
+Report order follows discovery order even though execution is parallel, so output is stable
+run to run.
 
 A run that matches **zero** files exits 2. There is no `passWithNoTests` yet — it is on the
 [roadmap](/reference/roadmap/).
 
-## No config file yet
+## `--config`
 
-Test globs, ignore patterns, timeout, concurrency, esbuild target, module aliases and the
-JSX runtime are all either flags or built-in defaults. There is no `argus.config.ts`.
+```bash
+argus --config config/ci.config.ts
+```
 
-The design is settled — first match wins across `--config <path>`, `argus.config.ts`,
-`.mts`, `.js`, `.mjs`, `.config/argus.config.ts`, then a `package.json` field, then
-built-in defaults; precedence lowest to highest is defaults → `package.json` → config file
-→ environment → CLI flags. It is not implemented.
+Names a config file instead of searching for one. A path that does not exist is an error,
+not a fall back to the defaults.
+
+Without it, Argus searches upward from the working directory for `argus.config.ts`,
+`.mts`, `.js`, `.mjs`, `.config/argus.config.ts`, then a `package.json` field — first hit
+wins, and the walk stops at the first `package.json`.
+
+Everything a config file can set, and which source wins when two disagree:
+[Configuration](/cli/configuration/).
 
 ## Exit codes
 

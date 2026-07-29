@@ -1,11 +1,11 @@
 ---
 title: Roadmap
-description: What shipped in v0.1.0, what comes next, and what is deliberately deferred.
+description: What shipped in v0.1.x and v0.2.0, what comes next, and what is deliberately deferred.
 sidebar:
   order: 2
 ---
 
-Status: **`v0.1.0`** — installable from npm as `@arguslab/argus`. Pre-1.0: the surface is
+Status: **`v0.1.1`** — installable from npm as `@arguslab/argus`. Pre-1.0: the surface is
 still free to change between minor versions.
 
 The runner works and ships. What is missing is test-authoring surface.
@@ -30,7 +30,9 @@ The runner works and ships. What is missing is test-authoring surface.
   `hermes-compiler` — with the first release cut:
   [`hermes-bin-v250829098.0.16`](https://github.com/malopezr7/argus/releases/tag/hermes-bin-v250829098.0.16),
   V1, all four platforms, covering React Native 0.86 and 0.87.
-- 747 host-side unit tests across 65 files (2 skipped), plus 15 Hermes fixtures — 6 passing,
+- A [configuration file](/cli/configuration/) — `argus.config.ts` loaded through Node's own
+  type stripping, so it needs no transpiler and adds no dependency.
+- 875 host-side unit tests across 70 files (2 skipped), plus 15 Hermes fixtures — 6 passing,
   2 intentionally failing, 7 adversarial.
 
 ## Shipped in v0.1.0 — distribution
@@ -41,8 +43,8 @@ Argus is installable. This was the milestone everything else waited behind.
   workspace packages are private and never reach the registry — see
   [Package map](/internals/packages/).
 - A build pipeline staging the tarball: host code bundled to a single ESM binary, the
-  Hermes-side sources copied verbatim as TypeScript runtime assets. 28 files, 54 kB packed,
-  202 kB unpacked, 256 kB installed.
+  Hermes-side sources copied verbatim as TypeScript runtime assets. 30 files, 59 kB packed,
+  219 kB unpacked, 276 kB installed.
 - Path resolution anchored to the CLI module's own location instead of the monorepo layout,
   so the framework and polyfills are found in both the development and installed shapes.
 - React resolved from the **user's project** rather than relative to the component-testing
@@ -71,34 +73,39 @@ so consumers add `"types": ["@arguslab/argus"]` or one triple-slash reference. S
   published, so the prebuilt step 404s on React Native 0.83–0.85 and on every legacy pin,
   falling through to `--provision`.
 
+## Shipped in v0.2.0 — configuration
+
+Globs, ignores, timeout, concurrency and engine selection were hardcoded or reachable only
+as flags. That blocked everything below, because snapshots, coverage and watch all need
+somewhere to be configured. Full reference: [Configuration](/cli/configuration/).
+
+- `ArgusConfig` and `defineConfig` exported from the package, with documented defaults.
+- Loader, validator and merge layer, wired through discovery, bundling and provisioning.
+  Loading uses native `import()` — Node type-strips `argus.config.ts` directly, so this
+  needed no dependency and no bundler.
+- First hit wins across `argus.config.ts`, `.mts`, `.js`, `.mjs`, `.config/argus.config.ts`
+  and a `package.json` field; configs are never merged, and the upward walk stops at the
+  first `package.json`. `--config <path>` names one directly.
+- Precedence, lowest to highest: defaults → `package.json` field → config file →
+  environment → CLI flags.
+- `include` / `exclude` replacing the hardcoded globs — and the hardcoded `node_modules`
+  **substring** check, which had been silently skipping any directory whose name merely
+  contained that string.
+
+Two behaviour changes came with it, both covered in
+[Changes in 0.2.0](/cli/configuration/#changes-in-020): discovery now excludes `dist`,
+`build` and `coverage` by default, and `--timeout` rejects a value it cannot parse instead
+of falling back to 10 000 ms.
+
+Still open here:
+
+- `passWithNoTests` — a zero-match run currently exits 2.
+- esbuild target, module aliases and the JSX runtime are still fixed.
+
 ## v0.2.0 — Test-authoring features
 
 The next milestone. None of these blocked installability; all of them are the reason
 someone would ask for a v0.2.
-
-### Configuration
-
-There is no config file today. The design is settled:
-
-```text
---config <path>
-argus.config.ts
-argus.config.mts
-argus.config.js
-argus.config.mjs
-.config/argus.config.ts
-package.json → "argus"
-built-in defaults
-```
-
-Precedence, lowest to highest: defaults → `package.json` field → config file → environment
-→ CLI flags. Loading uses native `import()`; Node type-strips `argus.config.ts` directly,
-so this needs no dependency and no bundler.
-
-- `ArgusConfig` type and documented defaults.
-- Config loader and merge layer, wired through discovery, bundling and provisioning.
-- `include` / `exclude` replacing the hardcoded globs.
-- `passWithNoTests` — a zero-match run currently exits 2.
 
 ### Snapshots, coverage, watch
 
@@ -127,8 +134,11 @@ helper to wait on until Argus supplies its own clock.
 - Run the Hermes fixtures there, not just locally. They are gated on a local binary that is
   not committed, so they skip.
 - macOS and Linux matrix.
-- Release workflow for the npm package. The Hermes VM binaries are published by a workflow;
-  publishing `@arguslab/argus` is manual.
+
+Done: the release workflow for the npm package. `@arguslab/argus` is published from CI with
+signed provenance, authenticated by npm trusted publishing over OIDC so no token is stored
+in the repository. `v0.1.0` predates it and was published by hand, so it carries no
+attestation; `v0.1.1` and everything after does.
 
 ## v0.3.0 and beyond
 

@@ -9,7 +9,7 @@ Argus bundles each `*.test.ts` into a sealed IIFE with esbuild, runs it on the
 standalone `hermes` VM as a subprocess, and parses the result back on the Node
 host. That is the same engine your users run, at roughly the cost of a unit test.
 
-> **Pre-release.** Argus is at v0.1.0. It installs and runs, and the surface it
+> **Pre-release.** Argus is at v0.1.1. It installs and runs, and the surface it
 > exposes is still free to change. See [Status](#status).
 
 ## Why
@@ -43,7 +43,7 @@ You need **Node 24 or newer**.
 npm install --save-dev @arguslab/argus
 ```
 
-One package, one binary — 28 files, 54 kB packed, 256 kB installed. `core`, the
+One package, one binary — 30 files, 59 kB packed, 276 kB installed. `core`, the
 adapters, and the Hermes-side framework are internal seams rather than an API,
 so they are not published separately.
 
@@ -305,13 +305,75 @@ time. After an update, re-query through `screen` before asserting again.
 
 ### Not there yet
 
-Snapshots, coverage, watch mode, `waitFor` / `findBy*`, `userEvent`, fake
-timers, and a config file. Globs, timeout, concurrency and aliases are CLI flags
-and defaults for now. See the [roadmap](ROADMAP.md).
+Snapshots, coverage, watch mode, `waitFor` / `findBy*`, `userEvent` and fake
+timers. The esbuild target, module aliases and the JSX runtime are still fixed,
+and a zero-match run exits 2 — there is no `passWithNoTests`. See the
+[roadmap](ROADMAP.md).
 
 Argus is also not a React Native runtime: no Metro semantics, no native
 lifecycle, no device APIs, no layout. The target is engine fidelity for
 unit-level tests.
+
+## Configuring
+
+Optional. Without a config file Argus uses built-in defaults, so most projects
+need nothing.
+
+```ts
+// argus.config.ts
+import { defineConfig } from '@arguslab/argus';
+
+export default defineConfig({
+  include: ['src/**/*.test.ts'],
+  timeout: 30000,
+});
+```
+
+TypeScript, with no build step and no added dependency — Node strips the types
+itself. `defineConfig` is an identity function; it exists so your editor checks
+the object.
+
+Argus searches upward from the working directory for `argus.config.ts`, `.mts`,
+`.js`, `.mjs`, `.config/argus.config.ts`, then an `argus` field in
+`package.json`. First hit wins, configs are never merged, and the walk stops at
+the first `package.json` so a stray config elsewhere on the machine cannot
+govern your run. `--config <path>` names one directly.
+
+| Option | Default |
+| --- | --- |
+| `include` | `**/*.test.ts`, `**/*.test.tsx` |
+| `exclude` | `node_modules`, `dist`, `build`, `coverage`, `.git` |
+| `root` | the config file's own directory |
+| `timeout` | `10000` ms |
+| `concurrency` | CPU count, capped at 8 |
+| `hermes` | `{ path, engine, provision }` |
+
+Precedence runs defaults → `package.json` → config file → environment → CLI
+flags, so a flag always wins. A config that is invalid stops the run with exit
+2 rather than falling back to defaults.
+
+One restriction worth knowing before you start: type stripping erases types
+without compiling, so `enum` and `namespace` cannot appear in `argus.config.ts`.
+Argus catches that and says so; `argus.config.js` is the escape hatch.
+
+Full reference: **[Configuration](https://argus-hermes.pages.dev/cli/configuration/)**.
+
+### Upgrading from 0.1.x
+
+Two behaviour changes came with the config work.
+
+- **Discovery now excludes `dist`, `build` and `coverage`.** Previously anything
+  matching the globs ran, wherever it lived, so a test compiled into a build
+  directory was discovered and executed alongside its source. If you keep tests
+  in one of those directories on purpose, set `exclude` explicitly — note that
+  it *replaces* the defaults rather than adding to them.
+- **`--timeout` rejects a value it cannot parse.** `--timeout abc` used to be
+  silently replaced by the 10 000 ms default, so a typo produced a green run
+  under a timeout nobody chose.
+
+Also fixed: `node_modules` was matched as a substring rather than a path
+segment, so a directory named `my-node_modules-fixtures/` was silently skipped
+and its tests reported as a pass.
 
 ## CLI
 
@@ -325,12 +387,14 @@ Globs default to `**/*.test.ts` and `**/*.test.tsx`.
 | --- | --- | --- |
 | `-t, --timeout <ms>` | `10000` | Per-file Hermes timeout |
 | `-c, --concurrency <n>` | CPU-based, capped at 8 | Files in parallel; `1` is sequential |
+| `--config <path>` | searched for | Config file to use, instead of searching |
 | `--hermes <path>` | — | Hermes binary; overrides `ARGUS_HERMES` |
 | `--engine <legacy\|v1>` | The engine the project pins, preferring `v1` | Target engine |
 | `--provision` | off | Allow building Hermes from source |
 | `-h, --help` | — | Show help |
 
-`ARGUS_HERMES` sets the binary path from the environment.
+`ARGUS_HERMES` sets the binary path from the environment. Flags override
+everything a config file sets — see [Configuring](#configuring).
 
 Exit codes are worst-case across the run: **0** all passed, **1** a test failed,
 **2** infrastructure — timeout, protocol violation, or no binary available. Test

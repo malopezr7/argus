@@ -95,6 +95,9 @@ import { Steps, Aside } from '@astrojs/starlight/components';
    }
    ```
 
+   Or move the globs into an optional `argus.config.ts` and leave the script as plain
+   `argus` — see [Configuration](/cli/configuration/).
+
 </Steps>
 
 ## What just happened
@@ -117,6 +120,7 @@ For that one file, Argus:
 - [Mocks & spies](/tests/mocks/) — `argus.fn()`, `argus.spyOn()`, call matchers.
 - [Component testing](/tests/components/) — `render`, `screen`, `fireEvent`.
 - [Command and flags](/cli/usage/) — timeouts, concurrency, engine selection.
+- [Configuration](/cli/configuration/) — `argus.config.ts`, and which source wins.
 
 <Aside type="caution">
 `argus` and Jest are not interchangeable. There is no `jest` global, no `jest.mock()`

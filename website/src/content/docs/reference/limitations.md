@@ -13,8 +13,8 @@ On the [roadmap](/reference/roadmap/), in priority order.
 
 | Missing | Notes |
 |---|---|
-| Config file | No `argus.config.ts`. Globs, timeout, concurrency and aliases are flags or defaults. |
 | `passWithNoTests` | A zero-match run exits 2. |
+| esbuild target, module aliases, JSX runtime | Not configurable. [`argus.config.ts`](/cli/configuration/) covers globs, timeout, concurrency and engine selection; the bundler's own settings are still fixed. |
 | Snapshots | `toMatchSnapshot`, `.snap` files, `--update`, obsolete pruning. Designed, not implemented. |
 | Coverage | No provider, thresholds or reporters. |
 | Watch mode | No file watching or re-run on change. |

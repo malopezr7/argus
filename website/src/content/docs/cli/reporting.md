@@ -2,7 +2,7 @@
 title: Reporting and exit codes
 description: How output is split across stdout and stderr, what each outcome means, and why a failing test is not a broken runner.
 sidebar:
-  order: 2
+  order: 3
 ---
 
 ## Output

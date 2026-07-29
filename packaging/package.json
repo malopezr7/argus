@@ -1,6 +1,6 @@
 {
   "name": "@arguslab/argus",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Run React Native unit tests on the real Hermes engine, at unit-test speed.",
   "license": "MIT",
   "author": "Manuel Lopez <malopezr7@gmail.com>",

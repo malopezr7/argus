@@ -48,7 +48,7 @@ release — esbuild only ever needs one.
 A release on a public repository also needs no authentication to download, has no practical
 size limit, and is CDN-served. npm stays reserved for the Argus package itself, which is a
 separate concern — `@arguslab/argus` carries no VM at all, which is why it installs in
-256 kB.
+276 kB.
 
 The `hermes-bin-v` prefix keeps the two tag namespaces separable: Argus tags its own
 releases `v0.1.0`, and both live on the same repository. A hyphen rather than a slash keeps

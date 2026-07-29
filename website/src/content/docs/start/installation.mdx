@@ -38,7 +38,7 @@ downloaded on first use.
   </TabItem>
 </Tabs>
 
-One package, one binary — 28 files, 54 kB packed, 256 kB installed. Everything the runner
+One package, one binary — 30 files, 59 kB packed, 276 kB installed. Everything the runner
 needs on the host comes with it: the bundler, the Hermes adapter, the source-map remapper,
 the reporter.
 
@@ -122,6 +122,35 @@ works either way, because the bundler never consults your tsconfig.
 
 Quote your globs. Leaving them unquoted lets the shell expand them before Argus sees them,
 which usually works and occasionally does something surprising with `**`.
+
+### Or put it in a config file
+
+Anything you would otherwise repeat on the command line can live in an optional
+`argus.config.ts` at the project root:
+
+```ts title="argus.config.ts"
+import { defineConfig } from '@arguslab/argus';
+
+export default defineConfig({
+  include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+  timeout: 30000,
+});
+```
+
+```json title="package.json"
+{
+  "scripts": {
+    "test:hermes": "argus"
+  }
+}
+```
+
+No transpiler and no extra dependency — Node strips the types itself. Because `root`
+defaults to the config file's own directory, `argus` then behaves identically whether you
+run it from the repo root or from a subdirectory.
+
+Every option, the search order, and precedence against flags:
+[Configuration](/cli/configuration/).
 
 ## First run
 

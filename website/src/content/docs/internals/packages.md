@@ -35,7 +35,7 @@ The two halves are handled differently, and the difference is the whole design:
 | Shipped as | One bundled ESM file, `bin/argus.js` | **TypeScript, copied verbatim**, under `runtime/<name>/src` |
 | Why | Nobody imports it — it is a binary, not a library, so it needs no declarations and the internal seam costs the user nothing at install time | esbuild compiles them on the user's machine, against the engine their project pins. Compiling them here would bake in one engine's syntax envelope and defeat the point |
 
-The result is 28 files: 54 kB packed, 202 kB unpacked, 256 kB installed. Four dependencies
+The result is 30 files: 59 kB packed, 219 kB unpacked, 276 kB installed. Four dependencies
 stay external because none of them survives being inlined — `esbuild` ships a
 platform-specific native binary, `@babel/core` and `@babel/plugin-transform-classes`
 resolve plugins dynamically, and `source-map` loads a WASM file.
