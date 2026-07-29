@@ -30,7 +30,8 @@ const CLI_ENTRY = resolve(REPO_ROOT, 'packages', 'cli', 'src', 'cli.ts');
 // react-native install, so nothing pins an engine and the provisioning chain has
 // nothing to resolve — the run exits 2 before producing a stack. Skipping is
 // honest about that; asserting on output that was never generated is not.
-const hasHermes = process.env.ARGUS_HERMES !== undefined || existsSync(resolve(REPO_ROOT, '.hermes/hermes'));
+const hasHermes =
+  process.env.ARGUS_HERMES !== undefined || existsSync(resolve(REPO_ROOT, '.hermes/hermes'));
 const gated = hasHermes ? it : it.skip;
 
 // ---------------------------------------------------------------------------
@@ -38,26 +39,30 @@ const gated = hasHermes ? it : it.skip;
 // ---------------------------------------------------------------------------
 
 describe('source-map integration (AC-11, AC-21, REQ-15-A)', () => {
-  gated('failing example renders a user-code frame with the source file name and original line (not run.argus-bundle.js)', {
-    timeout: 30_000,
-  }, () => {
-    // Run tsx directly (same as pnpm argus) to avoid pnpm recursion issues in test env
-    const result = spawnSync('node', ['--import', 'tsx/esm', CLI_ENTRY, FAILING_FIXTURE], {
-      cwd: REPO_ROOT,
-      encoding: 'utf8',
-    });
+  gated(
+    'failing example renders a user-code frame with the source file name and original line (not run.argus-bundle.js)',
+    {
+      timeout: 30_000,
+    },
+    () => {
+      // Run tsx directly (same as pnpm argus) to avoid pnpm recursion issues in test env
+      const result = spawnSync('node', ['--import', 'tsx/esm', CLI_ENTRY, FAILING_FIXTURE], {
+        cwd: REPO_ROOT,
+        encoding: 'utf8',
+      });
 
-    const combined = (result.stdout ?? '') + (result.stderr ?? '');
+      const combined = (result.stdout ?? '') + (result.stderr ?? '');
 
-    // AC-21: the user-code frame must reference the source file AND its original
-    // line (not just the basename, and not the bundle path).
-    const lines = combined.split('\n');
-    const userFrame = lines.find((l) => l.includes('math-failing.test.ts'));
-    expect(userFrame).toBeDefined();
-    expect(userFrame).not.toContain('run.argus-bundle.js');
-    // The failing assertion lives at line 12 of the fixture → frame shows :12:
-    expect(userFrame).toMatch(/math-failing\.test\.ts:12:\d+/);
-  });
+      // AC-21: the user-code frame must reference the source file AND its original
+      // line (not just the basename, and not the bundle path).
+      const lines = combined.split('\n');
+      const userFrame = lines.find((l) => l.includes('math-failing.test.ts'));
+      expect(userFrame).toBeDefined();
+      expect(userFrame).not.toContain('run.argus-bundle.js');
+      // The failing assertion lives at line 12 of the fixture → frame shows :12:
+      expect(userFrame).toMatch(/math-failing\.test\.ts:12:\d+/);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
