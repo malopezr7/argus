@@ -1,0 +1,8 @@
+# Makes this directory its own workspace root. The repository root only claims
+# packages/*, so the docs site was never part of it — but without this file pnpm
+# walks up, finds the root manifest, and the site has to be installed with
+# --ignore-workspace. That flag also discards the allowBuilds list, and pnpm 11
+# treats a refused build script as an error, so the deploy failed on esbuild
+# while a local pnpm 10 install passed.
+allowBuilds:
+  esbuild: true

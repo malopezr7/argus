@@ -61,7 +61,7 @@ jobs:
       - name: Install dependencies
         if: env.HAS_CLOUDFLARE_CREDENTIALS == 'true'
         working-directory: website
-        run: pnpm install --frozen-lockfile --ignore-workspace
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         if: env.HAS_CLOUDFLARE_CREDENTIALS == 'true'
