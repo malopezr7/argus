@@ -282,7 +282,13 @@ export function readTar(archive: Buffer): TarEntry[] {
       );
     }
 
-    const magic = readString(header, MAGIC_OFFSET, MAGIC.length);
+    // POSIX ustar writes "ustar\0" then version "00"; GNU tar writes "ustar "
+    // then " \0", so the field has no terminator and reads back with a trailing
+    // space. Both are tar, and the fields this reader goes on to use are laid
+    // out identically in each, so accept either. Nothing about the archive is
+    // trusted because of this check — path and type are still validated per
+    // entry below, which is where the actual safety lives.
+    const magic = readString(header, MAGIC_OFFSET, MAGIC.length).trimEnd();
     if (magic !== 'ustar') {
       throw new TarError(`unsupported archive format: magic ${JSON.stringify(magic)}`);
     }

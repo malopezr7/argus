@@ -42,7 +42,62 @@ jobs:
       - name: Check (Biome lint + format)
         run: pnpm check
 
-      # Integration tests are gated on a local Hermes binary (.hermes/hermes),
-      # which is not committed — they skip automatically in CI.
+      # The integration tests and the Hermes fixtures need a real VM. Until
+      # prebuilts existed they could only skip here, which meant the paths most
+      # likely to break were the ones CI never ran. Fetch the same archive a
+      # user gets, verify it, and let them run for real.
+      - name: Fetch the Hermes VM
+        env:
+          HERMES_RELEASE: hermes-bin-v250829098.0.16
+          HERMES_ASSET: hermes-250829098.0.16-linux-x64.tar.gz
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download "$HERMES_RELEASE" --repo "$GITHUB_REPOSITORY" \
+            --pattern "$HERMES_ASSET" --pattern "$HERMES_ASSET.sha256"
+          sha256sum -c "$HERMES_ASSET.sha256"
+          mkdir -p .hermes
+          tar -xzf "$HERMES_ASSET" -C .hermes
+          chmod +x .hermes/hermes
+          .hermes/hermes --version
+
       - name: Test
         run: pnpm test
+
+      # A green unit suite does not prove the runner works: the harness in
+      # packages/framework/__tests__ reimplements it. These fixtures are the only
+      # check that runs the real thing, and the adversarial ones are the only
+      # check that the result channel still cannot be forged.
+      - name: Hermes fixtures
+        env:
+          ARGUS_HERMES: .hermes/hermes
+        run: |
+          set -euo pipefail
+
+          expect_exit() {
+            local expected="$1" file="$2" actual=0
+            pnpm argus "$file" > /dev/null 2>&1 || actual=$?
+            if [ "$actual" != "$expected" ]; then
+              echo "✗ $file — expected exit $expected, got $actual"
+              return 1
+            fi
+            echo "✓ $file — exit $actual"
+          }
+
+          expect_exit 0 examples/math.test.ts
+          expect_exit 0 examples/matchers.test.ts
+          expect_exit 0 examples/jest-api.test.ts
+          expect_exit 0 examples/rn-mocks.test.ts
+
+          # Designed to fail: they prove failures are reported, not swallowed.
+          expect_exit 1 examples/math-failing.test.ts
+
+          # Adversarial: user code trying to forge or hijack the result channel.
+          # A zero here would mean the forgery worked.
+          expect_exit 1 examples/robustness.test.ts
+          expect_exit 1 examples/print-hijack.test.ts
+          expect_exit 1 examples/json-hijack.test.ts
+          expect_exit 1 examples/tojson-hijack.test.ts
+          expect_exit 1 examples/push-hijack.test.ts
+          expect_exit 1 examples/iterator-hijack.test.ts
+          expect_exit 2 examples/forge.test.ts
