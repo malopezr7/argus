@@ -240,7 +240,15 @@ describe('readTarGz — hostile archives', () => {
   });
 
   it('rejects a truncated archive', () => {
-    const truncated = valid.subarray(0, valid.length - BLOCK_SIZE * 3);
+    // Built here rather than by cutting blocks off the system tar's output: how
+    // much trailing padding that leaves is implementation-specific (GNU pads to
+    // a 20-block factor, bsdtar does not), so a fixed cut removes only zeros on
+    // some platforms and the archive stays perfectly valid. Declaring a body and
+    // withholding it truncates the entry itself, on every platform.
+    const complete = writeTar([
+      { path: 'hermes', mode: 0o755, data: Buffer.alloc(BLOCK_SIZE * 2, 7) },
+    ]);
+    const truncated = complete.subarray(0, BLOCK_SIZE * 2);
 
     expect(() => readTar(truncated)).toThrow(/truncated/);
   });

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -113,18 +114,40 @@ const V1_BINARY = join(
   'hermes',
 );
 
-describe('readHermesVersionInfo against real binaries', () => {
-  it.skipIf(!existsSync(LEGACY_BINARY))('reports bytecode 96 for the legacy engine', () => {
-    const info = readHermesVersionInfo(LEGACY_BINARY);
-    expect(info.bytecodeVersion).toBe(96);
-    expect(info.releaseVersion).toBeDefined();
-    expect(info.releaseVersion).not.toBe('8.0.0svn');
-  });
+/**
+ * Which engine sits at a given path is not something a test can assume: the
+ * vendored `.hermes/hermes` is legacy on the maintainer's machine and V1 in CI,
+ * which downloads a prebuilt. Asserting on the path rather than the binary made
+ * the suite pass for a reason that had nothing to do with the parser.
+ *
+ * What is actually under test is that the parser reads whatever Hermes printed,
+ * so the expectation comes from the engine the binary reports, and the pair only
+ * has to be self-consistent.
+ */
+const ENGINE_BYTECODE: Record<string, number> = { legacy: 96, v1: 98 };
 
-  it.skipIf(!existsSync(V1_BINARY))('reports bytecode 98 for Hermes V1', () => {
-    const info = readHermesVersionInfo(V1_BINARY);
-    expect(info.bytecodeVersion).toBe(98);
-    expect(info.releaseVersion).toBeDefined();
-    expect(info.releaseVersion).not.toBe('8.0.0svn');
-  });
+function engineOf(binary: string): string | undefined {
+  const version = execFileSync(binary, ['--version'], { encoding: 'utf8' });
+  if (/bytecode version:\s*98/i.test(version)) return 'v1';
+  if (/bytecode version:\s*96/i.test(version)) return 'legacy';
+  return undefined;
+}
+
+describe('readHermesVersionInfo against real binaries', () => {
+  for (const [label, binary] of [
+    ['the vendored binary', LEGACY_BINARY],
+    ['the provisioned V1 build', V1_BINARY],
+  ] as const) {
+    it.skipIf(!existsSync(binary))(`reads the engine and release ${label} reports`, () => {
+      const engine = engineOf(binary);
+      expect(engine, `${binary} reported no recognised bytecode version`).toBeDefined();
+
+      const info = readHermesVersionInfo(binary);
+      expect(info.bytecodeVersion).toBe(ENGINE_BYTECODE[engine as string]);
+      expect(info.releaseVersion).toBeDefined();
+      // The LLVM preamble also contains the word "version"; matching it would
+      // return the toolchain's version for every binary.
+      expect(info.releaseVersion).not.toBe('8.0.0svn');
+    });
+  }
 });
