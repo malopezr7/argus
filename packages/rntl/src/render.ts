@@ -1,15 +1,31 @@
 import React from 'react';
 import { createRoot, type Root } from 'test-renderer';
-import { type HostNode, materializeTree } from './tree.js';
+import { type HostNode, hostNode } from './tree.js';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
+/**
+ * A mounted root.
+ *
+ * There is no cached tree here on purpose. The root is derived from
+ * `renderer.container` on every read, so an update is visible through nodes the
+ * test already holds instead of only through a freshly queried one.
+ *
+ * `detached` is the exception, and only after unmount: `test-renderer` throws on
+ * `.container` once a root is unmounted, so the empty tree a test can still read
+ * from `render(...).root` has to be held here instead of derived.
+ */
 interface ActiveRender {
   renderer: Root;
-  tree: HostNode;
   mounted: boolean;
+  detached: HostNode | null;
+}
+
+/** The tree of an unmounted root: nothing, in the shape of an empty container. */
+function detachedRoot(): HostNode {
+  return { type: '', props: {}, parent: null, children: [] };
 }
 
 export interface RenderResult {
@@ -26,14 +42,6 @@ function latestRender(): ActiveRender {
   return latest;
 }
 
-function refresh(record: ActiveRender): void {
-  record.tree = materializeTree(record.renderer.container);
-}
-
-export function refreshActiveRenders(): void {
-  for (let i = 0; i < activeRenders.length; i++) refresh(activeRenders[i]);
-}
-
 function remove(record: ActiveRender): void {
   const index = activeRenders.indexOf(record);
   if (index >= 0) activeRenders.splice(index, 1);
@@ -41,9 +49,14 @@ function remove(record: ActiveRender): void {
 
 function unmountRecord(record: ActiveRender): void {
   if (!record.mounted) return;
-  React.act(() => record.renderer.unmount());
+  // Detach BEFORE unmounting. `test-renderer` clears its container as soon as
+  // `unmount()` is called, while React flushes the cleanup effects after it
+  // returns — so a cleanup effect that reads a root would hit the cleared
+  // container. Flipping first means it reads the detached tree instead of
+  // throwing, and re-entrant unmounts hit the guard above.
   record.mounted = false;
-  record.tree = { type: '', props: {}, parent: null, children: [] };
+  record.detached = detachedRoot();
+  React.act(() => record.renderer.unmount());
   remove(record);
 }
 
@@ -53,30 +66,25 @@ export function cleanupActiveRenders(): void {
 
 export const screen = {
   get root(): HostNode {
-    return latestRender().tree;
+    const record = latestRender();
+    return record.detached ?? hostNode(record.renderer.container);
   },
 };
 
 export function render(element: React.ReactElement): RenderResult {
   const renderer = createRoot({ textComponentTypes: ['Text'] });
-  const record: ActiveRender = {
-    renderer,
-    tree: materializeTree(renderer.container),
-    mounted: true,
-  };
+  const record: ActiveRender = { renderer, mounted: true, detached: null };
 
   React.act(() => renderer.render(element));
-  refresh(record);
   activeRenders.push(record);
 
   return {
     get root(): HostNode {
-      return record.tree;
+      return record.detached ?? hostNode(renderer.container);
     },
     rerender(nextElement: React.ReactElement): void {
       if (!record.mounted) throw new Error('Cannot rerender an unmounted component');
       React.act(() => renderer.render(nextElement));
-      refresh(record);
     },
     unmount(): void {
       unmountRecord(record);

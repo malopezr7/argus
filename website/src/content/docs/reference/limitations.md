@@ -93,7 +93,9 @@ Covered in full on [Component testing](/tests/components/#what-is-not-supported)
 `waitFor`, `findBy*`, `userEvent`, fake timers, Suspense guarantees, layout, and native
 platform fidelity beyond the four shim components.
 
-Held node references go stale after an update — re-query through `screen`.
+Held node references stay live across an update, so a node queried once can be asserted on
+and dispatched into after the tree changes. A node whose element an update removed detaches
+and keeps reporting what it last rendered.
 
 ## The honest summary
 

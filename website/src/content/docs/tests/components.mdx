@@ -170,26 +170,30 @@ expect(screen.getByText(nextUser.name)).toBeDefined();
 Synchronous only. Async `act` is not supported, because there is nothing asynchronous to
 flush without timers.
 
-## Held nodes go stale
+## Held nodes stay live
 
-<Aside type="caution">
-A node reference and a `within(scope)` are **snapshots of the tree at query time**. After
-an update, re-query through `screen` and build a fresh `within` scope before asserting or
-dispatching again.
-</Aside>
+A query result is a **live view of the element**, not a snapshot of the tree at the moment
+you queried it. Hold a node across an update and it reports the current props and fires the
+current handler, so you can press the same button twice without re-querying:
 
 ```tsx
-// ✗ stale — `button` points at the tree from before the press
 const button = screen.getByText('+');
-fireEvent.press(button);
-fireEvent.press(button);
-
-// ✓ re-query after every update
-fireEvent.press(screen.getByText('+'));
-fireEvent.press(screen.getByText('+'));
+fireEvent.press(button);   // 0 -> 1
+fireEvent.press(button);   // 1 -> 2, the handler from the second render
 ```
 
-The same applies to `result.root` and to any scope captured from `within`.
+The same holds for `result.root` and for a scope captured from `within` — the scope keeps
+resolving against the current tree after it re-renders.
+
+<Aside type="note">
+A node whose element an update removed is **detached**. It stops tracking the tree and
+keeps reporting what it last rendered, so an assertion about a node that should be gone
+describes the last state it had rather than throwing.
+</Aside>
+
+Before v0.2.1 these were snapshots, and a node held across an update silently dispatched
+into the previous render's closure — the counter above went 0 → 1 → 1. If you wrote
+re-queries to work around that, they are still correct; they are just no longer required.
 
 ## What is not supported
 

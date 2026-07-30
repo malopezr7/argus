@@ -22,6 +22,32 @@ describe('component render lifecycle', () => {
     result.unmount();
   });
 
+  it('leaves the result root readable and empty after unmount', () => {
+    const result = render(React.createElement('Text', null, 'gone'));
+
+    result.unmount();
+
+    expect(result.root.children).toEqual([]);
+    expect(result.root.type).toBe('');
+    expect(result.root.parent).toBeNull();
+  });
+
+  it('serves the detached root to a cleanup effect running during unmount', () => {
+    let observed = 'never ran';
+    function Probe(): React.ReactElement {
+      React.useEffect(() => {
+        return () => {
+          observed = `type=${JSON.stringify(screen.root.type)}`;
+        };
+      }, []);
+      return React.createElement('Text', null, 'x');
+    }
+
+    render(React.createElement(Probe)).unmount();
+
+    expect(observed).toBe('type=""');
+  });
+
   it('targets the latest active render and falls back after unmount', () => {
     const first = render(React.createElement('Text', null, 'first'));
     const second = render(React.createElement('Text', null, 'second'));

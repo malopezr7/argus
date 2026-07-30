@@ -300,8 +300,11 @@ Available: `render`, `rerender`, `unmount`, `screen`, `within`, `fireEvent`,
 `act`, and `getBy*` / `getAllBy*` / `queryBy*` / `queryAllBy*` over text, test
 ID, role, placeholder text and display value.
 
-Held node references and `within(scope)` are snapshots of the tree at query
-time. After an update, re-query through `screen` before asserting again.
+Query results are live views of the element, not snapshots. A held node and a
+`within(scope)` handle stay valid across an update: the node reports the current
+props and fires the current handler, so a button can be pressed twice without
+re-querying. A node whose element an update removed is detached and keeps
+reporting what it last rendered.
 
 ### Not there yet
 

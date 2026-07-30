@@ -1,5 +1,4 @@
 import React from 'react';
-import { refreshActiveRenders } from './render.js';
 import type { HostNode } from './tree.js';
 
 type EventHandler = (payload?: unknown) => unknown;
@@ -49,10 +48,12 @@ function dispatch(node: HostNode, event: string, payload?: unknown): void {
   if (resolved === null) throw new Error(`No handler found for ${name}`);
   if (isDisabled(resolved.node, name)) return;
 
+  // `React.act` flushes the update before returning, and host nodes read through
+  // to the fiber, so the committed tree is already visible to every node the
+  // test holds — including `node` itself. Nothing has to be re-materialized.
   React.act(() => {
     resolved.handler(payload);
   });
-  refreshActiveRenders();
 }
 
 export const fireEvent: FireEvent = Object.assign(dispatch, {

@@ -245,12 +245,21 @@ declare const argus: ArgusNamespace;
 // ---------------------------------------------------------------------------
 
 declare module 'argus' {
-  /** A rendered host element: the tree Argus asserts against. */
+  /**
+   * A rendered host element: the tree Argus asserts against.
+   *
+   * A node is a live view of the element, not a copy of it. Holding one across
+   * an update is safe — every property reads the current render, so a retained
+   * handle fires the current handler and reports the current props.
+   *
+   * The properties are `readonly` because they read through to React: a write
+   * cannot reach it, and would be discarded without an error.
+   */
   export interface HostNode {
-    type: string;
-    props: Record<string, unknown>;
-    parent: HostNode | null;
-    children: HostChild[];
+    readonly type: string;
+    readonly props: Record<string, unknown>;
+    readonly parent: HostNode | null;
+    readonly children: HostChild[];
   }
 
   /** A child of a host element — either another element or a text run. */
