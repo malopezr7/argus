@@ -22,9 +22,15 @@
  *     itself ships must produce a byte-identical `.hbc`. This is the strongest
  *     evidence available that a build is faithful rather than merely working,
  *     and it is why the whole pipeline exists.
+ *  5. On Linux, the glibc version the binary demands. Every gate above runs on
+ *     the machine that produced the binary, so all of them pass for a build
+ *     nobody else can start: linking against a newer glibc than the user has is
+ *     a hard refusal by the loader, and the build host silently sets that floor.
+ *     Builds made on 24.04 required 2.38 and could not run on Ubuntu 22.04 LTS
+ *     or Debian 12, and CI reported success throughout.
  */
 
-import { existsSync, mkdtempSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -101,6 +107,58 @@ function verifyBinariesPresent(binDir: string): void {
     if ((stat.mode & 0o111) === 0) fail(`not executable: ${path}`);
 
     pass(`${target} present, executable, ${stat.size} bytes`);
+  }
+}
+
+/**
+ * The oldest glibc a published Linux binary may demand.
+ *
+ * 2.35 is Ubuntu 22.04 LTS, which also clears Debian 12 (2.36) and everything
+ * newer. Raising this number strands users on distributions that are still
+ * supported, and does so with a loader error before any Argus code runs, so it
+ * is deliberately a build failure rather than a note in the release.
+ */
+const MAX_GLIBC = { major: 2, minor: 35 };
+
+/** Gate 5 — the binary can start on a distribution somebody actually runs. */
+function verifyGlibcFloor(binDir: string, os: HermesBinOs): void {
+  if (os !== 'linux') return;
+
+  for (const target of HERMES_BUILD_TARGETS) {
+    const path = join(binDir, target);
+    // `strings` is not guaranteed present; read the bytes and scan for the
+    // symbol-version strings the dynamic linker matches on.
+    const bytes = readFileSync(path);
+    const found = [...bytes.toString('latin1').matchAll(/GLIBC_(\d+)\.(\d+)/g)].map((m) => ({
+      major: Number(m[1]),
+      minor: Number(m[2]),
+    }));
+
+    if (found.length === 0) {
+      fail(`${target}: no GLIBC symbol versions found — is this a dynamically linked ELF?`);
+    }
+
+    let highest = found[0];
+    for (const v of found) {
+      if (v.major > highest.major || (v.major === highest.major && v.minor > highest.minor)) {
+        highest = v;
+      }
+    }
+
+    const tooNew =
+      highest.major > MAX_GLIBC.major ||
+      (highest.major === MAX_GLIBC.major && highest.minor > MAX_GLIBC.minor);
+
+    if (tooNew) {
+      fail(
+        `${target} requires glibc ${highest.major}.${highest.minor}, above the ` +
+          `${MAX_GLIBC.major}.${MAX_GLIBC.minor} floor.\n` +
+          '  It will refuse to start on Ubuntu 22.04 LTS and Debian 12.\n' +
+          '  Build on the oldest supported runner (ubuntu-22.04), not ubuntu-latest.',
+      );
+    }
+
+    pass(`${target} requires at most glibc ${highest.major}.${highest.minor}`);
   }
 }
 
@@ -244,6 +302,7 @@ function main(): void {
   log(`  bin dir: ${options.binDir}`);
 
   verifyBinariesPresent(options.binDir);
+  verifyGlibcFloor(options.binDir, options.os);
   verifySelfReport(options.binDir, options.tag);
   verifySmokeRun(options.binDir, fixture);
   verifyBytecodeParity(options, fixture, workDir);
