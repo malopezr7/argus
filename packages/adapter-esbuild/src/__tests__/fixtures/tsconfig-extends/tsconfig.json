@@ -1,0 +1,6 @@
+{
+  // A bare, extensionless package specifier — the shape React Native and Expo
+  // projects actually use. Nothing that decides emit is declared locally.
+  "extends": "@tsconfig/argus-fixture-preset/tsconfig.json",
+  "compilerOptions": { "target": "ES2022" }
+}

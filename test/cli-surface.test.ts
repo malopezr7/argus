@@ -48,21 +48,48 @@ function runArgus(args: string[]): Run {
   };
 }
 
+/**
+ * Every case here boots a fresh `tsx` process, which is orders of magnitude
+ * slower than an in-process assertion and — crucially — slows down FURTHER the
+ * busier the machine is. Measured on this suite: ~300 ms per case when the file
+ * runs alone, but 447-2426 ms for the very same cases under full-suite
+ * parallelism, an inflation of up to 8x. Vitest's default budget is 5000 ms, so
+ * the margin at that peak is barely 2x and evaporates entirely on a loaded
+ * machine or a CI box, failing `pnpm test` non-deterministically.
+ *
+ * The number is not a delay — it is a ceiling, reached only on failure — so it
+ * costs a passing run nothing. Same mechanism and same value as the sibling
+ * subprocess suite, `integration.test.ts`.
+ */
+const SUBPROCESS_TIMEOUT_MS = 30_000;
+
 describe('argus --version', () => {
-  it('exits 0', () => {
-    expect(runArgus(['--version']).status).toBe(0);
-  });
+  it(
+    'exits 0',
+    () => {
+      expect(runArgus(['--version']).status).toBe(0);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
 
-  it('reports the version the package publishes', () => {
-    expect(runArgus(['--version']).stdout.trim()).toBe(publishedVersion);
-  });
+  it(
+    'reports the version the package publishes',
+    () => {
+      expect(runArgus(['--version']).stdout.trim()).toBe(publishedVersion);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
 
-  it('writes it to stdout, so it can be captured', () => {
-    const { stdout, stderr } = runArgus(['--version']);
+  it(
+    'writes it to stdout, so it can be captured',
+    () => {
+      const { stdout, stderr } = runArgus(['--version']);
 
-    expect(stdout).toContain(publishedVersion);
-    expect(stderr.trim()).toBe('');
-  });
+      expect(stdout).toContain(publishedVersion);
+      expect(stderr.trim()).toBe('');
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
 });
 
 /**
@@ -72,41 +99,65 @@ describe('argus --version', () => {
  * typo is the user's, and it should read that way and show them the flags.
  */
 describe('argus with an unknown flag', () => {
-  it('exits 2', () => {
-    expect(runArgus(['--nope']).status).toBe(2);
-  });
+  it(
+    'exits 2',
+    () => {
+      expect(runArgus(['--nope']).status).toBe(2);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
 
-  it('names the flag it did not recognise', () => {
-    expect(runArgus(['--nope']).stderr).toContain('--nope');
-  });
+  it(
+    'names the flag it did not recognise',
+    () => {
+      expect(runArgus(['--nope']).stderr).toContain('--nope');
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
 
-  it('calls it a usage error, not an infrastructure failure', () => {
-    const { stderr } = runArgus(['--nope']);
+  it(
+    'calls it a usage error, not an infrastructure failure',
+    () => {
+      const { stderr } = runArgus(['--nope']);
 
-    expect(stderr).toContain('Usage error');
-    expect(stderr).not.toContain('INFRASTRUCTURE FAILURE');
-  });
+      expect(stderr).toContain('Usage error');
+      expect(stderr).not.toContain('INFRASTRUCTURE FAILURE');
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
 
-  it('prints the usage text, so the user can see the real flags', () => {
-    const { stderr } = runArgus(['--nope']);
+  it(
+    'prints the usage text, so the user can see the real flags',
+    () => {
+      const { stderr } = runArgus(['--nope']);
 
-    expect(stderr).toContain('Usage:');
-    expect(stderr).toContain('--engine');
-    expect(stderr).toContain('--version');
-  });
+      expect(stderr).toContain('Usage:');
+      expect(stderr).toContain('--engine');
+      expect(stderr).toContain('--version');
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
 
-  it('leaks no stack trace', () => {
-    expect(runArgus(['--nope']).stderr).not.toContain('    at ');
-  });
+  it(
+    'leaks no stack trace',
+    () => {
+      expect(runArgus(['--nope']).stderr).not.toContain('    at ');
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
 });
 
 describe('argus --help', () => {
-  it('exits 0 and writes usage to stdout', () => {
-    const { status, stdout } = runArgus(['--help']);
+  it(
+    'exits 0 and writes usage to stdout',
+    () => {
+      const { status, stdout } = runArgus(['--help']);
 
-    expect(status).toBe(0);
-    expect(stdout).toContain('Usage:');
-  });
+      expect(status).toBe(0);
+      expect(stdout).toContain('Usage:');
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
 });
 
 /**
@@ -120,12 +171,62 @@ describe('argus --help', () => {
 describe('the bug report form matches the shipped CLI', () => {
   const form = readFileSync(join(REPO, '.github', 'ISSUE_TEMPLATE', 'bug_report.yml'), 'utf8');
 
-  it('asks for the version using a flag the CLI actually has', () => {
-    expect(form).toContain('argus --version');
-    expect(runArgus(['--version']).status).toBe(0);
-  });
+  it(
+    'asks for the version using a flag the CLI actually has',
+    () => {
+      expect(form).toContain('argus --version');
+      expect(runArgus(['--version']).status).toBe(0);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
 
-  it('does not tell people Argus is unpublished', () => {
-    expect(form.toLowerCase()).not.toContain('unpublished');
-  });
+  it(
+    'does not tell people Argus is unpublished',
+    () => {
+      expect(form.toLowerCase()).not.toContain('unpublished');
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
+});
+
+/**
+ * The guard that keeps the budget honest.
+ *
+ * Every case in this file was written against Vitest's default 5000 ms and
+ * passed in isolation, which is exactly how the defect reached `main`: it only
+ * shows up under the contention of a full-suite run, and only sometimes. A new
+ * subprocess case added here would inherit the same trap silently.
+ *
+ * So the budget is asserted rather than assumed. The timeout is read from the
+ * live task tree — the value Vitest will actually enforce — not from the source
+ * text, so it cannot be satisfied by a comment or drift out of sync with what
+ * the runner does.
+ */
+describe('the subprocess budget', () => {
+  interface TimedTask {
+    type: string;
+    name: string;
+    timeout?: number;
+    tasks?: TimedTask[];
+  }
+
+  function everyTest(task: TimedTask, found: TimedTask[] = []): TimedTask[] {
+    if (task.type === 'test') found.push(task);
+    for (const child of task.tasks ?? []) everyTest(child, found);
+    return found;
+  }
+
+  it(
+    'is raised above the default for every case in this file',
+    (ctx) => {
+      const file = (ctx.task as unknown as { file: TimedTask }).file;
+
+      const underBudgeted = everyTest(file)
+        .filter((t) => (t.timeout ?? 0) < SUBPROCESS_TIMEOUT_MS)
+        .map((t) => t.name);
+
+      expect(underBudgeted).toEqual([]);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
 });

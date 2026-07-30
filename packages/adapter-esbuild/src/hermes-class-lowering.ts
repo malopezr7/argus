@@ -3,6 +3,7 @@ import { dirname, extname } from 'node:path';
 import { transformAsync } from '@babel/core';
 import transformClasses from '@babel/plugin-transform-classes';
 import { type Loader, type Plugin, transform } from 'esbuild';
+import { projectTsconfigRaw, type TsconfigRaw } from './project-tsconfig.js';
 
 /**
  * Class lowering for the legacy Hermes engine, which cannot parse `class` in
@@ -62,6 +63,9 @@ export interface ClassLoweringOptions {
 }
 
 export function hermesClassLowering(options: ClassLoweringOptions): Plugin {
+  /** One filesystem walk and one config read per directory, not per file. */
+  const tsconfigByDir = new Map<string, TsconfigRaw | undefined>();
+
   return {
     name: 'hermes-class-lowering',
     setup(build): void {
@@ -72,6 +76,8 @@ export function hermesClassLowering(options: ClassLoweringOptions): Plugin {
         if (!hasClassSyntax(source)) return undefined;
 
         const loader = LOADERS[extname(args.path)] ?? 'js';
+        const sourceDir = dirname(args.path);
+        const tsconfigRaw = projectTsconfigRaw(sourceDir, tsconfigByDir);
 
         // Stage 1 — esbuild strips TypeScript and transforms JSX, so Babel only
         // ever sees plain JavaScript. `sourcemap: 'inline'` is what lets stage 2
@@ -82,6 +88,16 @@ export function hermesClassLowering(options: ClassLoweringOptions): Plugin {
           supported: options.supported,
           sourcefile: args.path,
           sourcemap: 'inline',
+          // The project's TypeScript settings, which `transform()` will not go
+          // looking for on its own. Without this the legacy path emitted a
+          // different decorator protocol and different class-field semantics
+          // from the V1 path, for the same source and the same tsconfig.
+          ...(tsconfigRaw === undefined ? {} : { tsconfigRaw }),
+          // Spread in the same order the main build receives them — tsconfig
+          // first, the build's JSX settings after — so esbuild resolves the two
+          // against each other exactly once. Whichever it settles on, a file
+          // that took the lowering detour comes out transformed like one that
+          // did not, which is the only property that matters here.
           ...options.jsx,
         });
 

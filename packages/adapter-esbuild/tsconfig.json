@@ -4,5 +4,7 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src"]
+  "include": ["src"],
+  "comment": "fixtures/tsconfig-* are FIXTURE PROJECTS: each carries its own tsconfig and is compiled by esbuild under it, to prove the bundler honours the settings of the project under test rather than its own. Checking them against THIS package's config would assert the opposite of what they exist to prove — TypeScript rightly rejects a legacy-protocol decorator when experimentalDecorators is off, which is precisely the setting under test.",
+  "exclude": ["src/__tests__/fixtures/tsconfig-*"]
 }
