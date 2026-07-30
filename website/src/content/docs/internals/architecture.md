@@ -83,16 +83,18 @@ Every package named below is **internal**: only `@arguslab/argus` is published, 
 host side of it is bundled into one file at build time. The seam is a source-tree boundary,
 not an installable one — see [Package map](/internals/packages/).
 
-Four ports, four adapters:
+Three ports, three adapters:
 
 | Port | Adapter | Responsibility |
 |---|---|---|
 | `Bundler` | `@arguslab/esbuild` | Virtual entry → sealed IIFE, syntax lowering, source map |
 | `Engine` | `@arguslab/hermes` | Spawn `hermes` on a temp file, capture stdout |
-| `Transformer` | `@arguslab/esbuild` | Single-file transform, same syntax policy |
-| `Reporter` | `@arguslab/reporter-cli` | Terminal rendering, exit-code policy |
+| `HermesProvisioner` | `@arguslab/hermes` | Turn a pin into a binary — explicit path, cache, prebuilt, or source build |
 
-Plus `HermesProvisioner`, which turns a pin into a binary.
+Terminal rendering and exit-code policy live in `@arguslab/reporter-cli`, which the CLI calls
+directly as functions. It has no port: a port earns its place when something might be swapped
+behind it, and there has only ever been one way to render to a terminal. A second reporter —
+JSON, JUnit — is the change that would justify introducing one.
 
 This is why the provisioning chain could be developed against a local binary long before
 any prebuilt existed: the prebuilt adapter is a swap-in behind the port.

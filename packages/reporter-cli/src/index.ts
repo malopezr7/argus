@@ -1,8 +1,8 @@
-import type { Reporter, RunOutcome, RunResult, SessionResult, Suite } from '@arguslab/core';
+import type { RunOutcome, RunResult, SessionResult, Suite } from '@arguslab/core';
 
 /**
- * Render a single RunOutcome to the terminal. Extracted from CliReporter.report
- * so cli.ts can call it directly in discovery order after mapPool resolves.
+ * Render a single RunOutcome to the terminal. cli.ts calls it directly, in
+ * discovery order, as mapPool resolves.
  *
  * STREAM ASSIGNMENT follows the outcome taxonomy the exit codes already encode:
  *
@@ -37,17 +37,6 @@ export function renderFileOutcome(outcome: RunOutcome): void {
         `✗ PROTOCOL FAILURE [${outcome.reason}]\n--- raw stdout ---\n${outcome.rawStdout}\n`,
       );
       return;
-  }
-}
-
-/**
- * CliReporter renders a RunOutcome to the terminal. It handles ALL outcome
- * kinds — test results AND infrastructure/timeout/protocol failures. See
- * `renderFileOutcome` for how the two streams are divided.
- */
-export class CliReporter implements Reporter {
-  async report(outcome: RunOutcome): Promise<void> {
-    renderFileOutcome(outcome);
   }
 }
 

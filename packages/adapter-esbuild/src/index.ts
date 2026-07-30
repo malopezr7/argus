@@ -1,15 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
-import type {
-  BundleInput,
-  Bundler,
-  SealedBundle,
-  SourceFile,
-  TransformedCode,
-  Transformer,
-  TransformOptions,
-} from '@arguslab/core';
-import { build, transform } from 'esbuild';
+import type { BundleInput, Bundler, SealedBundle } from '@arguslab/core';
+import { build } from 'esbuild';
 import { hermesClassLowering } from './hermes-class-lowering.js';
 import { projectPackageAliases } from './project-packages.js';
 import { hermesSyntaxPolicy } from './syntax-policy.js';
@@ -124,27 +116,4 @@ function generateVirtualEntry(input: BundleInput, resultNonce: string): string {
     ...input.testPaths.map(imp),
     `run(${JSON.stringify(resultNonce)});`,
   ].join('\n');
-}
-
-/**
- * Transformer adapter (esbuild). Single-file transform — NOT used by the Phase 1
- * bundle path (which transforms+bundles in one build()). Uses the SAME Hermes
- * syntax policy as the bundler.
- */
-export class EsbuildTransformer implements Transformer {
-  async transform(input: SourceFile, opts: TransformOptions): Promise<TransformedCode> {
-    const policy = hermesSyntaxPolicy(opts.engine);
-    const result = await transform(input.content, {
-      loader: opts.loader ?? 'ts',
-      target: policy.target,
-      supported: policy.supported,
-      sourcefile: input.path,
-      ...JSX_OPTIONS,
-      define: {
-        __DEV__: 'true',
-        'process.env.NODE_ENV': '"development"',
-      },
-    });
-    return { code: result.code };
-  }
 }

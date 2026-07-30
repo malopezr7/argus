@@ -1,7 +1,7 @@
 /**
  * Adversarial: can user code read the nonce (injected via esbuild `define`) and
  * forge the EXACT result frame? If this reports a false green, the nonce design
- * is broken. Run: pnpm exec tsx scripts/run-phase1.ts examples/forge.test.ts
+ * is broken. Run: pnpm argus examples/forge.test.ts
  */
 declare const describe: (name: string, fn: () => void) => void;
 declare const test: (name: string, fn: () => void) => void;

@@ -16,19 +16,6 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const HERMES = resolve(REPO, '.hermes/hermes');
 const gated = existsSync(HERMES) ? it : it.skip;
 
-function runFixture(file: string): number {
-  try {
-    execFileSync('pnpm', ['exec', 'tsx', 'scripts/run-phase1.ts', file], {
-      cwd: REPO,
-      stdio: 'ignore',
-    });
-    return 0;
-  } catch (e) {
-    const status = (e as { status?: number }).status;
-    return typeof status === 'number' ? status : 1;
-  }
-}
-
 function runArgus(args: string[]): number {
   try {
     execFileSync('pnpm', ['argus', ...args], {
@@ -125,69 +112,72 @@ describe('argus CLI integration (needs .hermes/hermes)', () => {
   );
 });
 
-describe('argus harness integration (needs .hermes/hermes)', () => {
+/**
+ * Result-channel integrity, asserted through the SHIPPED entry point.
+ *
+ * These lock in that user code cannot forge a false green — not by writing a
+ * result frame to stdout, not by replacing `print`, `JSON.stringify`,
+ * `Object.prototype.toJSON`, `Array.prototype.push` or the array iterator.
+ *
+ * They drive `pnpm argus`, the same command a user runs. They previously drove
+ * a parallel harness script that duplicated the CLI's wiring, which meant this
+ * block could stay green while the pipeline users actually execute regressed.
+ */
+describe('argus CLI — result-channel integrity (needs .hermes/hermes)', () => {
   gated(
-    'passing sample -> exit 0',
+    'a genuinely failing test is reported as a test failure -> exit 1',
     () => {
-      expect(runFixture('examples/math.test.ts')).toBe(0);
+      expect(runArgus(['examples/robustness.test.ts'])).toBe(1);
     },
-    20_000,
-  );
-
-  gated(
-    'failing test -> exit 1',
-    () => {
-      expect(runFixture('examples/robustness.test.ts')).toBe(1);
-    },
-    20_000,
+    30_000,
   );
 
   gated(
     'nonce forge attempt -> infrastructure-failure exit 2',
     () => {
-      expect(runFixture('examples/forge.test.ts')).toBe(2);
+      expect(runArgus(['examples/forge.test.ts'])).toBe(2);
     },
-    20_000,
+    30_000,
   );
 
   gated(
     'print() hijack cannot force a false green',
     () => {
-      expect(runFixture('examples/print-hijack.test.ts')).not.toBe(0);
+      expect(runArgus(['examples/print-hijack.test.ts'])).not.toBe(0);
     },
-    20_000,
+    30_000,
   );
 
   gated(
     'JSON.stringify hijack cannot force a false green',
     () => {
-      expect(runFixture('examples/json-hijack.test.ts')).not.toBe(0);
+      expect(runArgus(['examples/json-hijack.test.ts'])).not.toBe(0);
     },
-    20_000,
+    30_000,
   );
 
   gated(
     'Object.prototype.toJSON pollution cannot force a false green',
     () => {
-      expect(runFixture('examples/tojson-hijack.test.ts')).not.toBe(0);
+      expect(runArgus(['examples/tojson-hijack.test.ts'])).not.toBe(0);
     },
-    20_000,
+    30_000,
   );
 
   gated(
     'Array.prototype[Symbol.iterator] pollution cannot force a false green',
     () => {
-      expect(runFixture('examples/iterator-hijack.test.ts')).not.toBe(0);
+      expect(runArgus(['examples/iterator-hijack.test.ts'])).not.toBe(0);
     },
-    20_000,
+    30_000,
   );
 
   gated(
     'Array.prototype.push pollution cannot force a false green',
     () => {
-      expect(runFixture('examples/push-hijack.test.ts')).not.toBe(0);
+      expect(runArgus(['examples/push-hijack.test.ts'])).not.toBe(0);
     },
-    20_000,
+    30_000,
   );
 });
 

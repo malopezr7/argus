@@ -13,48 +13,6 @@ import type { HermesEngine } from './hermes-version.js';
 // Transform pipeline
 // ---------------------------------------------------------------------------
 
-/**
- * A single source file to be transformed.
- *
- * Phase 1 supports TypeScript + JSX. Flow is NOT supported by the esbuild
- * adapter (esbuild does not strip Flow types); Flow fidelity would require a
- * future RN-Babel transform adapter. See SPEC §9.1.
- */
-export interface SourceFile {
-  /** Absolute path on the host filesystem. */
-  path: string;
-  /** Raw source text. */
-  content: string;
-}
-
-/** Options controlling how a source file is transformed before bundling. */
-export interface TransformOptions {
-  /**
-   * Which Hermes engine the output has to parse.
-   *
-   * Named as an ENGINE rather than an esbuild target on purpose: the two
-   * engines differ in ways no single ES level describes (legacy runs async
-   * functions but not async arrows; V1 runs every class form but still rejects
-   * async generators), and encoding that as a target string here would put the
-   * policy in every caller. The adapter owns the encoding; callers state which
-   * VM will run the code. The policy is SYNTAX-ONLY — it lowers syntax, not
-   * APIs (console/global come from polyfills).
-   */
-  engine: HermesEngine;
-  /** Strip TypeScript types but leave JSX as-is (false) or transform JSX (true). */
-  transformJsx: boolean;
-  /** Loader hint. Flow intentionally absent — unsupported in Phase 1. */
-  loader?: 'ts' | 'tsx' | 'js' | 'jsx';
-}
-
-/** The result of transforming a single source file. */
-export interface TransformedCode {
-  /** Hermes-safe plain JavaScript — no TS/JSX/Flow syntax. */
-  code: string;
-  /** Inline source map JSON string, if requested. */
-  map?: string;
-}
-
 // ---------------------------------------------------------------------------
 // Bundle pipeline
 // ---------------------------------------------------------------------------

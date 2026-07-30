@@ -1,7 +1,7 @@
 /**
  * Adversarial fixture: proves the result protocol is unforgeable (nonce) and
  * that a real failure is reported with a stack. Run with:
- *   pnpm exec tsx scripts/run-phase1.ts examples/robustness.test.ts
+ *   pnpm argus examples/robustness.test.ts
  * Expected: forged frame ignored (shown as a user log), 1 passed / 1 failed,
  * exit code 1.
  */
