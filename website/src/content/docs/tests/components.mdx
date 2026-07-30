@@ -191,9 +191,11 @@ keeps reporting what it last rendered, so an assertion about a node that should 
 describes the last state it had rather than throwing.
 </Aside>
 
-Before v0.2.1 these were snapshots, and a node held across an update silently dispatched
-into the previous render's closure — the counter above went 0 → 1 → 1. If you wrote
-re-queries to work around that, they are still correct; they are just no longer required.
+These became live views after v0.2.0. On v0.2.0 — the current release on npm — they are
+still snapshots, and a node held across an update silently dispatches into the previous
+render's closure: the counter above goes 0 → 1 → 1. Live views land in the next patch
+release. If you wrote re-queries to work around that, they stay correct either way; they
+are just no longer required once you upgrade.
 
 ## What is not supported
 

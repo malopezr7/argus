@@ -21,3 +21,6 @@ coverage
 
 # Agent handoff / working context — local only, never committed
 AGENTS.md
+
+# JetBrains IDEs
+.idea/

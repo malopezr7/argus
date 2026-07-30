@@ -56,12 +56,37 @@ function unmountRecord(record: ActiveRender): void {
   // throwing, and re-entrant unmounts hit the guard above.
   record.mounted = false;
   record.detached = detachedRoot();
-  React.act(() => record.renderer.unmount());
-  remove(record);
+  try {
+    React.act(() => record.renderer.unmount());
+  } finally {
+    // Leave the list even when the unmount throws. The record has to stay in it
+    // for the duration of the unmount — a cleanup effect reading a root has to
+    // resolve to this record's detached tree — but `mounted` is already false,
+    // so every later `unmountRecord` returns at the guard above without ever
+    // reaching here. Stranding it would make it unremovable, and the loop below
+    // would spin forever on a list that never shrinks.
+    remove(record);
+  }
 }
 
 export function cleanupActiveRenders(): void {
-  while (activeRenders.length > 0) unmountRecord(activeRenders[activeRenders.length - 1]);
+  let failure: unknown;
+  let failed = false;
+  // Each pass removes the last record whether or not its teardown threw, so the
+  // list strictly shrinks and this terminates. A throw is remembered rather than
+  // propagated immediately: bailing out here would leave the renders behind the
+  // failing one mounted, and the next test would resolve `screen` against one.
+  while (activeRenders.length > 0) {
+    try {
+      unmountRecord(activeRenders[activeRenders.length - 1]);
+    } catch (error) {
+      if (!failed) {
+        failed = true;
+        failure = error;
+      }
+    }
+  }
+  if (failed) throw failure;
 }
 
 export const screen = {

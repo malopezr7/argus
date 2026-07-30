@@ -304,7 +304,8 @@ Query results are live views of the element, not snapshots. A held node and a
 `within(scope)` handle stay valid across an update: the node reports the current
 props and fires the current handler, so a button can be pressed twice without
 re-querying. A node whose element an update removed is detached and keeps
-reporting what it last rendered.
+reporting what it last rendered. On v0.2.0 — the current release on npm — these
+are still snapshots; live views land in the next patch release.
 
 ### Not there yet
 

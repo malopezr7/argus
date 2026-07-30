@@ -36,10 +36,21 @@ function matches(actual: unknown, expected: QueryMatcher): boolean {
   return RegExp.prototype.test.call(expected, actual);
 }
 
+/**
+ * Read `children` once per node, never per iteration.
+ *
+ * It is a live view, so every read materialises a fresh array in O(children).
+ * Reading it inside the loop — once for the bound and once for the index — made
+ * a single node cost O(children^2), which turned a wide list into a per-file
+ * timeout, and a timeout is an infrastructure failure that discards every result
+ * in the file. Hoisting keeps the traversal linear without caching anything, so
+ * a held node still reads through to the current tree.
+ */
 function textContent(node: HostNode): string {
+  const children = node.children;
   let value = '';
-  for (let i = 0; i < node.children.length; i++) {
-    const child = node.children[i];
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i];
     value += typeof child === 'string' ? child : textContent(child);
   }
   return value;
@@ -49,8 +60,9 @@ function collect(root: HostNode, predicate: Predicate): HostNode[] {
   const result: HostNode[] = [];
   function visit(node: HostNode): void {
     if (predicate(node)) result[result.length] = node;
-    for (let i = 0; i < node.children.length; i++) {
-      const child = node.children[i];
+    const children = node.children;
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i];
       if (typeof child !== 'string') visit(child);
     }
   }
