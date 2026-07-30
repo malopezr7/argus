@@ -113,6 +113,52 @@ describe('argus CLI integration (needs .hermes/hermes)', () => {
 });
 
 /**
+ * What a REJECTED forgery looks like, as opposed to a run that never happened.
+ *
+ * `expect(status).not.toBe(0)` cannot tell those apart, and that is not a
+ * theoretical gap: with ARGUS_HERMES pointing at a path that does not exist,
+ * the CLI exits 2 out of provisioning, no fixture is bundled, no VM is spawned
+ * — and every one of these assertions still passed. They attested to "something
+ * failed", which is the one thing a security fixture must never settle for.
+ *
+ * The evidence that the defence actually held is that the honest result
+ * SURVIVED the attack, and every piece of it is already on the wire:
+ *
+ *   exit 1                  a result was produced. Exit 1 means "tests failed",
+ *                           which is only reachable AFTER an envelope was
+ *                           parsed and shape-validated. Infrastructure and
+ *                           protocol failures are exit 2 and cannot satisfy it.
+ *   no INFRASTRUCTURE       rules out a missing binary, a failed provision and
+ *                           a VM that died before emitting.
+ *   no PROTOCOL FAILURE     rules out the envelope being discarded for a
+ *                           missing, duplicated or malformed frame — which is
+ *                           how a SUCCESSFUL theft of the nonce would surface
+ *                           if the attacker emitted a second valid frame.
+ *   the honest totals       the fixture's real, failing test is reported as
+ *                           failed, and the forged totals every one of these
+ *                           fixtures asks for (1 passed / 0 failed) were NOT
+ *                           adopted.
+ *
+ * Together those pin the outcome to exactly one story: the VM ran, the
+ * framework emitted, the forgery was ignored, and the truth was reported.
+ */
+function expectForgeryRejected(fixture: string, suiteName: string): void {
+  const r = runArgusCapture([`examples/${fixture}.test.ts`]);
+
+  expect(r.stderr).not.toContain('INFRASTRUCTURE FAILURE');
+  expect(r.stderr).not.toContain('PROTOCOL FAILURE');
+  expect(r.stderr).not.toContain('TIMEOUT');
+  expect(r.status).toBe(1);
+
+  // The suite ran and is named in the report — the file was not skipped.
+  expect(r.stdout).toContain(suiteName);
+  // The honest outcome, verbatim. The forged envelope in every one of these
+  // fixtures claims 1 passed / 0 failed; adopting it would change this line.
+  expect(r.stdout).toContain('0 passed, 1 failed, 0 todo, 1 total');
+  expect(r.stdout).toContain(`✗ ${fixture}.test.ts (1 of 1 failed)`);
+}
+
+/**
  * Result-channel integrity, asserted through the SHIPPED entry point.
  *
  * These lock in that user code cannot forge a false green — not by writing a
@@ -132,18 +178,51 @@ describe('argus CLI — result-channel integrity (needs .hermes/hermes)', () => 
     30_000,
   );
 
+  /**
+   * The forge fixture is the one adversarial case that must NOT produce a
+   * result, so it gets its own assertion rather than `expectForgeryRejected`.
+   *
+   * It proves two things at once, and the exit code alone proves neither:
+   *
+   *  1. User code cannot obtain the per-run nonce. The fixture actively hunts
+   *     for it — named globals, every own key of globalThis, and the source of
+   *     every reachable function via Function.prototype.toString — and prints
+   *     a loud marker if it ever finds one. That marker must be absent.
+   *  2. A frame printed BEFORE a later top-level crash is rejected. That is a
+   *     documented, separate defence in parseHermesOutput (a nonzero exit
+   *     discards the run even when a well-formed frame is present), and it is
+   *     what makes exit 2 the correct contract for this fixture.
+   *
+   * The previous version proved neither: it referenced `__ARGUS_NONCE__`, a
+   * global NOTHING defines, so Hermes threw a ReferenceError while evaluating
+   * the argument to console.log. No frame was ever printed and the trailing
+   * throw never ran — exit 2 came from a typo-shaped crash. Asserting the
+   * absence of `ReferenceError` and the presence of the deliberate throw is
+   * what keeps that from silently returning.
+   */
   gated(
-    'nonce forge attempt -> infrastructure-failure exit 2',
+    'nonce stays unreachable, and a frame before a top-level crash is rejected -> exit 2',
     () => {
-      expect(runArgus(['examples/forge.test.ts'])).toBe(2);
+      const r = runArgusCapture(['examples/forge.test.ts']);
+
+      expect(r.status).toBe(2);
+      // The VM ran and died on the fixture's OWN throw, after emitting. Stage
+      // `engine` (not `provision`/`bundle`) is what rules out a missing binary.
+      expect(r.stderr).toContain('INFRASTRUCTURE FAILURE [engine]');
+      expect(r.stderr).toContain('hermes exited exitCode=1');
+      expect(r.stderr).toContain('boom after forging');
+      // The old failure mode: dying on an undefined global before forging.
+      expect(r.stderr).not.toContain('ReferenceError');
+      // The nonce hunt came up empty. If it ever does not, this is the alarm.
+      expect(r.stdout + r.stderr).not.toContain('ARGUS_NONCE_LEAKED');
     },
     30_000,
   );
 
   gated(
-    'print() hijack cannot force a false green',
+    'print() hijack cannot steal the nonce or force a false green',
     () => {
-      expect(runArgus(['examples/print-hijack.test.ts'])).not.toBe(0);
+      expectForgeryRejected('print-hijack', 'print-hijack');
     },
     30_000,
   );
@@ -151,7 +230,7 @@ describe('argus CLI — result-channel integrity (needs .hermes/hermes)', () => 
   gated(
     'JSON.stringify hijack cannot force a false green',
     () => {
-      expect(runArgus(['examples/json-hijack.test.ts'])).not.toBe(0);
+      expectForgeryRejected('json-hijack', 'json-hijack');
     },
     30_000,
   );
@@ -159,7 +238,7 @@ describe('argus CLI — result-channel integrity (needs .hermes/hermes)', () => 
   gated(
     'Object.prototype.toJSON pollution cannot force a false green',
     () => {
-      expect(runArgus(['examples/tojson-hijack.test.ts'])).not.toBe(0);
+      expectForgeryRejected('tojson-hijack', 'tojson-hijack');
     },
     30_000,
   );
@@ -167,7 +246,7 @@ describe('argus CLI — result-channel integrity (needs .hermes/hermes)', () => 
   gated(
     'Array.prototype[Symbol.iterator] pollution cannot force a false green',
     () => {
-      expect(runArgus(['examples/iterator-hijack.test.ts'])).not.toBe(0);
+      expectForgeryRejected('iterator-hijack', 'iterator-hijack');
     },
     30_000,
   );
@@ -175,7 +254,7 @@ describe('argus CLI — result-channel integrity (needs .hermes/hermes)', () => 
   gated(
     'Array.prototype.push pollution cannot force a false green',
     () => {
-      expect(runArgus(['examples/push-hijack.test.ts'])).not.toBe(0);
+      expectForgeryRejected('push-hijack', 'push-hijack');
     },
     30_000,
   );
