@@ -6,7 +6,7 @@
   "license": "MIT",
   "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "typecheck": "pnpm -r typecheck && tsc -p tsconfig.examples.json && tsc -p tsconfig.scripts.json",
+    "typecheck": "pnpm -r typecheck && tsc -p tsconfig.examples.json && tsc -p tsconfig.scripts.json && tsc -p tsconfig.types.json",
     "check": "biome check .",
     "lint": "biome lint .",
     "format": "biome format --write .",

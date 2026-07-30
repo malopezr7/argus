@@ -16,6 +16,7 @@ Options:
       --engine <name>        Hermes engine to target: legacy or v1 (default: the engine your react-native version ships)
       --provision            Allow building Hermes from source when no binary is available (needs git, cmake, ninja)
   -h, --help                 Show this help
+      --version              Show the Argus version
 
 Environment:
   ARGUS_HERMES               Hermes binary path
@@ -77,6 +78,8 @@ export interface CliArgs {
   /** True when `--provision` was passed. Absent means the flag was not given. */
   provision?: boolean;
   help: boolean;
+  /** True when `--version` was passed. */
+  version: boolean;
   concurrency?: number;
 }
 
@@ -89,34 +92,63 @@ interface RawValues {
   engine?: string;
   provision?: boolean;
   help?: boolean;
+  version?: boolean;
 }
 
-function callParseArgs(argv: string[]): { values: RawValues; positionals: string[] } {
-  return parseArgs({
-    args: argv,
-    allowPositionals: true,
-    options: {
-      timeout: { type: 'string', short: 't' },
-      concurrency: { type: 'string', short: 'c' },
-      config: { type: 'string' },
-      hermes: { type: 'string' },
-      engine: { type: 'string' },
-      provision: { type: 'boolean' },
-      help: { type: 'boolean', short: 'h' },
-    },
-  }) as { values: RawValues; positionals: string[] };
+interface OptionSpec {
+  readonly type: 'string' | 'boolean';
+  readonly short?: string;
+  /**
+   * Present on the flags that take a positive integer. Those get a message
+   * naming the shape they wanted rather than the generic "needs a value" —
+   * `--concurrency -1` is a value mistake, not a missing value.
+   */
+  readonly numericExample?: string;
 }
 
 /**
- * The flags that take a number, as `[long, short, example]`.
+ * Every option Argus accepts, declared ONCE.
  *
- * Used both to validate a parsed value and to recognise the TypeError
- * `parseArgs` raises when the value itself looks like another option.
+ * `parseArgs` is configured from this table and the error reporter reads the
+ * same table, so a new flag cannot be understood by the parser and unknown to
+ * the diagnostics — which is the state `--version` would otherwise have been
+ * added into.
  */
-const NUMERIC_FLAGS: readonly (readonly [string, string, string])[] = [
-  ['--timeout', '-t', '5000, 30000'],
-  ['--concurrency', '-c', '1, 4, 8'],
-];
+const OPTIONS = {
+  timeout: { type: 'string', short: 't', numericExample: '5000, 30000' },
+  concurrency: { type: 'string', short: 'c', numericExample: '1, 4, 8' },
+  config: { type: 'string' },
+  hermes: { type: 'string' },
+  engine: { type: 'string' },
+  provision: { type: 'boolean' },
+  help: { type: 'boolean', short: 'h' },
+  version: { type: 'boolean' },
+} as const satisfies Record<string, OptionSpec>;
+
+const OPTION_ENTRIES: readonly (readonly [string, OptionSpec])[] = Object.entries(OPTIONS);
+
+function specFor(name: string): OptionSpec | undefined {
+  return Object.hasOwn(OPTIONS, name) ? (OPTIONS as Record<string, OptionSpec>)[name] : undefined;
+}
+
+function longNameForShort(short: string): string | undefined {
+  for (const [name, spec] of OPTION_ENTRIES) {
+    if (spec.short === short) return name;
+  }
+  return undefined;
+}
+
+function callParseArgs(argv: string[]): { values: RawValues; positionals: string[] } {
+  const options: Record<string, { type: 'string' | 'boolean'; short?: string }> = {};
+  for (const [name, spec] of OPTION_ENTRIES) {
+    options[name] =
+      spec.short === undefined ? { type: spec.type } : { type: spec.type, short: spec.short };
+  }
+  return parseArgs({ args: argv, allowPositionals: true, options }) as {
+    values: RawValues;
+    positionals: string[];
+  };
+}
 
 /**
  * Parse a flag that must be a positive integer.
@@ -164,6 +196,95 @@ function parseEngine(raw: string | undefined): HermesEngine | undefined {
 }
 
 /**
+ * The failure codes `node:util.parseArgs` documents.
+ *
+ * These are the stable part of that API. The MESSAGE is not: the previous
+ * version decided whether a failure was a usage error by searching the message
+ * for the literal string `--concurrency`, which quietly stops matching the day
+ * Node rewords it — and only ever covered two flags, so every other malformed
+ * argument escaped as a raw TypeError and was reported as an infrastructure
+ * failure.
+ */
+const PARSE_ARGS_CODES = new Set([
+  'ERR_PARSE_ARGS_UNKNOWN_OPTION',
+  'ERR_PARSE_ARGS_INVALID_OPTION_VALUE',
+  'ERR_PARSE_ARGS_UNEXPECTED_POSITIONAL',
+]);
+
+function parseArgsCode(e: unknown): string | undefined {
+  const code = (e as { code?: unknown }).code;
+  return typeof code === 'string' && PARSE_ARGS_CODES.has(code) ? code : undefined;
+}
+
+/** Why an option token is wrong, or undefined when it looks fine. */
+function faultFor(
+  flag: string,
+  name: string,
+  inlineValue: string | undefined,
+  next: string | undefined,
+): string | undefined {
+  const spec = specFor(name);
+  if (spec === undefined) {
+    return `Unknown option '${flag}'.`;
+  }
+  if (spec.type === 'boolean') {
+    return inlineValue === undefined ? undefined : `Option '${flag}' does not take a value.`;
+  }
+  if (inlineValue !== undefined) return undefined;
+
+  // A string option whose value is missing, or looks like another option —
+  // `--concurrency -1` is the case that made this specialisation necessary.
+  const hasValue = next !== undefined && !(next.startsWith('-') && next.length > 1);
+  if (hasValue) return undefined;
+  return spec.numericExample === undefined
+    ? `Option '${flag}' requires a value.`
+    : `Invalid ${flag} value: must be a positive integer (e.g. ${spec.numericExample}). ` +
+        `To pass a value that starts with a dash, write ${flag}=<value>.`;
+}
+
+/**
+ * Find, and describe, the argument that made `parseArgs` fail.
+ *
+ * Deliberately a DESCRIBER, not a second parser: it only runs once `parseArgs`
+ * has already rejected the command line, so it may treat every dash-led token
+ * before `--` as an option without worrying that one might really be a value —
+ * had it been a value, `parseArgs` would have accepted the line and this would
+ * never be called. That is what keeps it short enough to be obviously correct,
+ * and independent of Node's message wording.
+ */
+function describeArgvFault(argv: readonly string[]): string | undefined {
+  for (let at = 0; at < argv.length; at++) {
+    const token = argv[at];
+    if (token === '--') return undefined;
+    if (token.length < 2 || !token.startsWith('-')) continue;
+    const next = argv[at + 1];
+
+    if (token.startsWith('--')) {
+      const eq = token.indexOf('=');
+      const name = eq === -1 ? token.slice(2) : token.slice(2, eq);
+      const inline = eq === -1 ? undefined : token.slice(eq + 1);
+      const fault = faultFor(`--${name}`, name, inline, next);
+      if (fault !== undefined) return fault;
+      continue;
+    }
+
+    // Short form, possibly clustered (`-hc 4`) or with an attached value (`-c4`).
+    const chars = token.slice(1);
+    for (let i = 0; i < chars.length; i++) {
+      const short = chars[i];
+      const name = longNameForShort(short);
+      if (name === undefined) return `Unknown option '-${short}'.`;
+      if (specFor(name)?.type !== 'string') continue;
+      const attached = chars.slice(i + 1);
+      const fault = faultFor(`-${short}`, name, attached === '' ? undefined : attached, next);
+      if (fault !== undefined) return fault;
+      break; // whatever followed in this token was the value
+    }
+  }
+  return undefined;
+}
+
+/**
  * Parse CLI arguments using Node's built-in util.parseArgs.
  * Positional arguments become the glob patterns to discover test files.
  * Options:
@@ -173,8 +294,12 @@ function parseEngine(raw: string | undefined): HermesEngine | undefined {
  *       --engine <name>       Target engine: 'legacy' or 'v1' (default: the project's own pin)
  *       --provision           Allow building Hermes from source
  *   -h, --help                Show usage and exit 0
+ *       --version             Show the version and exit 0
  *
- * Throws UsageError for invalid --concurrency and --engine values.
+ * Every malformed argument — unknown option, missing value, a value handed to a
+ * boolean flag, a value that is not the shape the flag wants — throws
+ * UsageError. Nothing about a command line reaches the caller as a raw
+ * TypeError, because a typo is not an infrastructure failure.
  */
 export function parseCliArgs(argv: string[]): CliArgs {
   let values: RawValues;
@@ -182,21 +307,11 @@ export function parseCliArgs(argv: string[]): CliArgs {
   try {
     ({ values, positionals } = callParseArgs(argv));
   } catch (e) {
-    // node:util parseArgs throws TypeError for ambiguous/invalid flag values
-    // (e.g. --concurrency -1, where the value looks like another option).
-    // Re-surface as UsageError so cli.ts can exit 2 cleanly instead of the
-    // process dying with a stack trace.
-    if (e instanceof TypeError) {
-      const msg = (e as Error).message;
-      for (const [flag, short, example] of NUMERIC_FLAGS) {
-        if (msg.includes(flag) || msg.includes(`'${short}'`)) {
-          throw new UsageError(
-            `Invalid ${flag} value: must be a positive integer (e.g. ${example}).`,
-          );
-        }
-      }
-    }
-    throw e;
+    if (parseArgsCode(e) === undefined) throw e;
+    // Prefer our own description, which names the offending token from argv.
+    // Node's message is the fallback rather than the source, so a rewording
+    // there degrades the wording and never the classification.
+    throw new UsageError(describeArgvFault(argv) ?? (e as Error).message);
   }
 
   const timeoutMs = parsePositiveInteger(values.timeout, '--timeout', '5000, 30000');
@@ -212,6 +327,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     ...(engine === undefined ? {} : { engine }),
     ...(values.provision === undefined ? {} : { provision: values.provision }),
     help: values.help ?? false,
+    version: values.version ?? false,
   };
 }
 

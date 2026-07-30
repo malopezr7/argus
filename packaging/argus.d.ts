@@ -68,8 +68,39 @@ interface ArgusMatchers {
   toHaveReturnedWith(value: unknown): void;
   toHaveLastReturnedWith(value: unknown): void;
   toHaveNthReturnedWith(n: number, value: unknown): void;
-  [key: string]: unknown;
+  /**
+   * Where matchers registered with `expect.extend` land.
+   *
+   * This was `unknown`, which made `expect.extend` useless from TypeScript: the
+   * matcher registered fine and then `expect(5).toBeWithin(1, 10)` failed to
+   * compile, because you cannot call an `unknown`. A name is only half of a
+   * declaration.
+   *
+   * For precise types on your own matchers, reopen this interface — it is a
+   * global script, so no namespace or module augmentation is needed:
+   *
+   *   // matchers.d.ts
+   *   interface ArgusMatchers {
+   *     toBeWithin(low: number, high: number): void;
+   *   }
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: the escape hatch for expect.extend; `unknown` is not callable and would make every custom matcher a type error
+  [matcher: string]: any;
 }
+
+/**
+ * A matcher registered through `expect.extend`.
+ *
+ * `this` carries the two things a custom matcher needs from the framework:
+ * whether it was reached through `.not`, and the same structural equality
+ * `toEqual` uses — so a custom matcher compares values the way the built-in
+ * ones do rather than reimplementing it.
+ */
+type ArgusCustomMatcher = (
+  this: { isNot: boolean; equals: (a: unknown, b: unknown) => boolean },
+  actual: unknown,
+  ...args: unknown[]
+) => { pass: boolean; message: () => string };
 
 interface ArgusAsyncMatchers {
   readonly not: ArgusAsyncMatchers;
@@ -106,7 +137,9 @@ interface ArgusAsyncMatchers {
   toHaveReturnedWith(value: unknown): Promise<void>;
   toHaveLastReturnedWith(value: unknown): Promise<void>;
   toHaveNthReturnedWith(n: number, value: unknown): Promise<void>;
-  [key: string]: unknown;
+  /** Custom matchers, awaited. See the note on `ArgusMatchers`. */
+  // biome-ignore lint/suspicious/noExplicitAny: the escape hatch for expect.extend; `unknown` is not callable and would make every custom matcher a type error
+  [matcher: string]: any;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,10 +207,33 @@ interface ArgusTest {
   todo(name: string, fn?: ArgusTestFn): void;
 }
 
+/**
+ * `expect` is a callable with statics bolted onto it, so it needs an interface
+ * rather than a bare function type. Declaring only the call signature drops
+ * `extend`, `assertions` and `hasAssertions` — all three implemented and
+ * documented — and every use of them becomes a type error against a package
+ * that supports them.
+ */
+interface ArgusExpect {
+  (actual: unknown): ArgusMatchers;
+  /**
+   * Register custom matchers. They become available on `expect(...)` and on
+   * `.not`, and count towards `expect.assertions` like any built-in one.
+   */
+  extend(matchers: Record<string, ArgusCustomMatcher>): void;
+  /**
+   * Require exactly `n` assertions to run in this test. Guards a test whose
+   * assertions live in a callback that might never be reached.
+   */
+  assertions(n: number): void;
+  /** Require at least one assertion to run in this test. */
+  hasAssertions(): void;
+}
+
 declare const describe: ArgusDescribe;
 declare const test: ArgusTest;
 declare const it: ArgusTest;
-declare const expect: (actual: unknown) => ArgusMatchers;
+declare const expect: ArgusExpect;
 declare const beforeAll: (fn: ArgusHookFn) => void;
 declare const afterAll: (fn: ArgusHookFn) => void;
 declare const beforeEach: (fn: ArgusHookFn) => void;

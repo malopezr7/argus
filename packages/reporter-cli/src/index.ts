@@ -4,8 +4,16 @@ import type { Reporter, RunOutcome, RunResult, SessionResult, Suite } from '@arg
  * Render a single RunOutcome to the terminal. Extracted from CliReporter.report
  * so cli.ts can call it directly in discovery order after mapPool resolves.
  *
- * Test output goes to stdout; failures and diagnostics go to stderr.
- * Byte-identical to the original CliReporter.report switch body.
+ * STREAM ASSIGNMENT follows the outcome taxonomy the exit codes already encode:
+ *
+ *   passed / failed                → stdout. These are RESULTS (exit 0 and 1).
+ *                                    A failing test is an answer, not an error.
+ *   timeout / infrastructure /     → stderr. No result was produced at all
+ *   protocol failure                 (exit 2). These are diagnostics, and they
+ *                                    must survive `argus > report.txt`.
+ *
+ * This is the ONLY place a test result is rendered in full. The session summary
+ * aggregates; it does not re-print what was already written here.
  */
 export function renderFileOutcome(outcome: RunOutcome): void {
   switch (outcome.kind) {
@@ -34,9 +42,8 @@ export function renderFileOutcome(outcome: RunOutcome): void {
 
 /**
  * CliReporter renders a RunOutcome to the terminal. It handles ALL outcome
- * kinds — test results AND infrastructure/timeout/protocol failures. Test
- * output goes to stdout; failures and diagnostics go to stderr so severity is
- * not lost and does not compete with machine-readable stdout.
+ * kinds — test results AND infrastructure/timeout/protocol failures. See
+ * `renderFileOutcome` for how the two streams are divided.
  */
 export class CliReporter implements Reporter {
   async report(outcome: RunOutcome): Promise<void> {
@@ -73,9 +80,16 @@ export function exitCodeForSession(session: SessionResult): number {
 }
 
 /**
- * Renders a per-file and session-level summary to stdout/stderr.
- * Failures and diagnostics go to stderr; passing output and the summary
- * line go to stdout — matching machine-readable conventions.
+ * Renders a per-file recap and the session totals.
+ *
+ * A RECAP, not a second report. It names each file and how it ended; the
+ * per-test messages and stacks were already written in full, in context, by
+ * `renderFileOutcome`. Repeating them here printed every failure twice — once
+ * on stdout and once on stderr — so a terminal, a CI log, or any `2>&1` showed
+ * the whole failure doubled, with the second copy carrying nothing new.
+ *
+ * Streams follow the same taxonomy as `renderFileOutcome`: results on stdout,
+ * runs that produced no result on stderr.
  */
 export function renderSessionSummary(session: SessionResult): void {
   for (const { file, outcome } of session.files) {
@@ -85,8 +99,9 @@ export function renderSessionSummary(session: SessionResult): void {
         process.stdout.write(`  ✓ ${label}\n`);
         break;
       case 'failed':
-        process.stdout.write(`  ✗ ${label} (test failure)\n`);
-        renderFileFailures(outcome.result, file);
+        process.stdout.write(
+          `  ✗ ${label} (${outcome.result.totals.failed} of ${outcome.result.totals.total} failed)\n`,
+        );
         break;
       case 'timeout':
         process.stderr.write(`  ✗ ${label} — TIMEOUT after ${outcome.timeoutMs} ms\n`);
@@ -125,24 +140,6 @@ export function renderSessionSummary(session: SessionResult): void {
     `\n${total} files: ${fileParts.join(', ')}` +
       `\n${testsTotal} tests: ${testsPassed} passed, ${testsFailed} failed, ${testsTodo} todo\n`,
   );
-}
-
-function renderFileFailures(result: RunResult, _file: string): void {
-  const walk = (s: Suite, indent: string): void => {
-    for (const t of s.tests) {
-      if (t.status === 'failed') {
-        process.stderr.write(`    ✗ ${t.name}`);
-        if (t.failureMessage) process.stderr.write(`  — ${t.failureMessage}`);
-        process.stderr.write('\n');
-        if (t.failureStack) {
-          const pad = '      ';
-          process.stderr.write(`${pad + t.failureStack.split('\n').join(`\n${pad}`)}\n`);
-        }
-      }
-    }
-    for (const c of s.suites) walk(c, `${indent}  `);
-  };
-  for (const s of result.suites) walk(s, '');
 }
 
 function renderResult(result: RunResult): void {

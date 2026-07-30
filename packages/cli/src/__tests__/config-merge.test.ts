@@ -16,7 +16,7 @@ function merge(
 ) {
   return mergeConfig({
     loaded: { config, baseDir },
-    flags: { patterns: [], help: false, ...flags },
+    flags: { patterns: [], help: false, version: false, ...flags },
     env,
     fallbackConcurrency: FALLBACK_CONCURRENCY,
   });

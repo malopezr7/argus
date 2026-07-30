@@ -30,6 +30,7 @@ import { errMsg } from './errors.js';
 import { resolveFrameworkPaths } from './paths.js';
 import { mapPool } from './pool.js';
 import { provisionHermes } from './provision/provision.js';
+import { resolvePackageVersion } from './version.js';
 
 async function main(): Promise<void> {
   // 1. Parse CLI arguments
@@ -38,11 +39,20 @@ async function main(): Promise<void> {
     parsed = parseCliArgs(process.argv.slice(2));
   } catch (e) {
     if (e instanceof UsageError) {
-      process.stderr.write(`✗ Usage error: ${e.message}\n`);
+      // The usage text goes with the error, on stderr: a user who mistyped a
+      // flag needs to see the real ones, and stdout is where the report goes.
+      process.stderr.write(`✗ Usage error: ${e.message}\n\n${USAGE}`);
       process.exitCode = 2;
       return;
     }
     throw e;
+  }
+
+  // Both answer without touching the project, the config or a Hermes binary —
+  // `argus --version` must work in a directory where a real run cannot.
+  if (parsed.version) {
+    process.stdout.write(`${resolvePackageVersion()}\n`);
+    return;
   }
 
   if (parsed.help) {
@@ -120,10 +130,15 @@ async function main(): Promise<void> {
   // 5. Discover test files
   const files = await resolveFiles(settings.include, settings.root, settings.exclude);
   if (files.length === 0) {
+    // `process.exitCode` + return, never `process.exit()`: the line above is
+    // still in the stderr pipe buffer when the output is redirected, and
+    // `process.exit` discards it. That left `argus 'typo/**' 2> log` reporting
+    // a bare exit 2 with nothing in the log to explain it.
     process.stderr.write(
       `✗ INFRASTRUCTURE FAILURE [discover] No test files matched the given pattern(s).\n`,
     );
-    process.exit(2);
+    process.exitCode = 2;
+    return;
   }
 
   // 6. Per-file concurrent run via bounded pool

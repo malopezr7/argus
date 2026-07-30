@@ -8,7 +8,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeSync } from 'node:fs';
 
 /** `npm pack --json` and `hermes --version` both out-talk the 1 MB default. */
 const MAX_BUFFER = 64 * 1024 * 1024;
@@ -53,9 +53,20 @@ export function sha256File(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
-/** Progress line. */
+/**
+ * Progress line.
+ *
+ * Written SYNCHRONOUSLY, because `fail()` below ends the process with
+ * `process.exit`, which discards whatever is still buffered. Piped to a file or
+ * captured by CI — which is how these scripts actually run — a buffered
+ * `process.stdout.write` is exactly what gets dropped, so the log would lose
+ * the steps that led up to the failure it was there to explain.
+ *
+ * `fail()` genuinely has to abort, so it cannot use `process.exitCode` the way
+ * the CLI does; making the writes synchronous is what closes the same hole.
+ */
 export function log(message: string): void {
-  process.stdout.write(`${message}\n`);
+  writeSync(1, `${message}\n`);
 }
 
 /** A gate that passed. */
@@ -73,8 +84,8 @@ export function skip(message: string, reason: string): void {
   log(`  \u2500 SKIPPED ${message}\n      reason: ${reason}`);
 }
 
-/** Abort with a message on stderr and a non-zero exit. */
+/** Abort with a message on stderr and a non-zero exit. See `log` on why it is synchronous. */
 export function fail(message: string): never {
-  process.stderr.write(`\u2717 ${message}\n`);
+  writeSync(2, `\u2717 ${message}\n`);
   process.exit(1);
 }

@@ -201,3 +201,155 @@ describe('usage documents the provisioning surface', () => {
     expect(USAGE).toContain('~/.argus/cache');
   });
 });
+
+describe('parseCliArgs — --version', () => {
+  it('--version sets the version flag', () => {
+    expect(parseCliArgs(['--version']).version).toBe(true);
+  });
+
+  it('is false when the flag is absent', () => {
+    expect(parseCliArgs([]).version).toBe(false);
+  });
+
+  it('does not consume a value', () => {
+    expect(parseCliArgs(['--version', 'a.test.ts']).patterns).toEqual(['a.test.ts']);
+  });
+
+  it('is documented in the usage text', () => {
+    expect(USAGE).toContain('--version');
+  });
+});
+
+/**
+ * A mistyped flag is a USAGE error, not an infrastructure failure.
+ *
+ * `node:util.parseArgs` throws a bare `TypeError` for every malformed argument.
+ * Only two of those cases were ever converted, and the conversion was decided
+ * by searching Node's message text for a flag name — so every other case
+ * escaped to the process-level catch and was reported under the same banner
+ * Argus uses when the Hermes binary is missing or the VM crashes. Severity is
+ * the whole point of that banner; spending it on a typo devalues it everywhere.
+ *
+ * The class is now taken from `error.code`, which is Node's documented API,
+ * and the offending token is found by scanning argv against Argus's own option
+ * table — so neither the classification nor the message depends on Node's
+ * wording staying still.
+ */
+describe('parseCliArgs — malformed arguments are usage errors', () => {
+  it.each([
+    ['--nope'],
+    ['--Timeout'],
+    ['-x'],
+    ['--engine=v1', '--bogus'],
+    ['a.test.ts', '--unknown-flag'],
+  ])('rejects unknown option %s as a UsageError', (...argv) => {
+    expect(() => parseCliArgs(argv)).toThrow(UsageError);
+  });
+
+  it.each([
+    ['--timeout'],
+    ['-t'],
+    ['--concurrency'],
+    ['-c'],
+    ['--engine'],
+    ['--config'],
+    ['--hermes'],
+  ])('rejects %s with no value as a UsageError', (...argv) => {
+    expect(() => parseCliArgs(argv)).toThrow(UsageError);
+  });
+
+  it.each([['--provision=yes'], ['--help=1'], ['--version=2']])(
+    'rejects %s giving a value to a boolean flag as a UsageError',
+    (...argv) => {
+      expect(() => parseCliArgs(argv)).toThrow(UsageError);
+    },
+  );
+
+  it('never lets a raw TypeError escape for any malformed argument', () => {
+    const malformed = [
+      ['--nope'],
+      ['-x'],
+      ['--timeout'],
+      ['--provision=yes'],
+      ['--concurrency', '-1'],
+      ['-c'],
+      ['--engine'],
+    ];
+
+    for (const argv of malformed) {
+      expect(() => parseCliArgs(argv), argv.join(' ')).toThrow(UsageError);
+    }
+  });
+
+  it('names the option it did not recognise', () => {
+    try {
+      parseCliArgs(['--porcelain']);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(UsageError);
+      expect((e as UsageError).message).toContain('--porcelain');
+    }
+  });
+
+  it('names the option that was missing its value', () => {
+    try {
+      parseCliArgs(['--engine']);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect((e as UsageError).message).toContain('--engine');
+    }
+  });
+
+  it('names the boolean flag that was handed a value', () => {
+    try {
+      parseCliArgs(['--provision=yes']);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect((e as UsageError).message).toContain('--provision');
+    }
+  });
+
+  /**
+   * The one case that was already converted, kept as a regression: it is now
+   * reached through the error CODE and an argv scan rather than by searching
+   * Node's message for the literal string "--concurrency".
+   */
+  it('still explains that --concurrency wants a positive integer', () => {
+    try {
+      parseCliArgs(['--concurrency', '-1']);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(UsageError);
+      expect((e as UsageError).message).toContain('--concurrency');
+      expect((e as UsageError).message).toMatch(/positive integer/i);
+    }
+  });
+
+  it('applies the same treatment to --timeout', () => {
+    try {
+      parseCliArgs(['--timeout', '-5']);
+      expect.fail('should have thrown');
+    } catch (e) {
+      expect(e).toBeInstanceOf(UsageError);
+      expect((e as UsageError).message).toContain('--timeout');
+      expect((e as UsageError).message).toMatch(/positive integer/i);
+    }
+  });
+
+  /**
+   * A glob is a positional and may legitimately start with a dash after `--`.
+   * Rejecting those would break `argus -- --weird-name.test.ts`.
+   */
+  it('leaves everything after -- alone', () => {
+    expect(parseCliArgs(['--', '--not-a-flag.test.ts']).patterns).toEqual(['--not-a-flag.test.ts']);
+  });
+
+  it('accepts a well-formed command line unchanged', () => {
+    const args = parseCliArgs(['--engine=v1', '-c', '2', '--provision', 'a.test.ts']);
+
+    expect(args.engine).toBe('v1');
+    expect(args.concurrency).toBe(2);
+    expect(args.provision).toBe(true);
+    expect(args.patterns).toEqual(['a.test.ts']);
+  });
+});
