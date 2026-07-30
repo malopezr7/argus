@@ -41,7 +41,7 @@ export function renderFileOutcome(outcome: RunOutcome): void {
 }
 
 /** Process exit code for an outcome (SPEC §5.1): 0 pass, 1 fail, 2 everything else. */
-export function exitCodeFor(outcome: RunOutcome): number {
+function exitCodeFor(outcome: RunOutcome): number {
   switch (outcome.kind) {
     case 'passed':
       return 0;

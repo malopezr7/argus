@@ -83,13 +83,21 @@ Every package named below is **internal**: only `@arguslab/argus` is published, 
 host side of it is bundled into one file at build time. The seam is a source-tree boundary,
 not an installable one — see [Package map](/internals/packages/).
 
-Three ports, three adapters:
+Three ports, five adapters — `HermesProvisioner` has three implementations, which is the
+whole reason it is a port:
 
 | Port | Adapter | Responsibility |
 |---|---|---|
-| `Bundler` | `@arguslab/esbuild` | Virtual entry → sealed IIFE, syntax lowering, source map |
-| `Engine` | `@arguslab/hermes` | Spawn `hermes` on a temp file, capture stdout |
-| `HermesProvisioner` | `@arguslab/hermes` | Turn a pin into a binary — explicit path, cache, prebuilt, or source build |
+| `Bundler` | `EsbuildBundler` | Virtual entry → sealed IIFE, syntax lowering, source map |
+| `Engine` | `HermesSpawnEngine` | Spawn `hermes` on a temp file, capture stdout |
+| `HermesProvisioner` | `LocalPathAdapter` | Use a binary that is already on disk |
+| `HermesProvisioner` | `PrebuiltAdapter` | Download and verify one Argus publishes |
+| `HermesProvisioner` | `SourceBuildAdapter` | Build one from the pinned Hermes tag |
+
+Those three provisioners are tried in a fixed order, alongside sources that need no adapter
+at all: an explicit path, a binary vendored in the project, the local cache, the legacy VM
+React Native ships in `node_modules` for 0.73–0.82, a prebuilt, and finally a source build.
+Six sources, and the run summary names which one answered.
 
 Terminal rendering and exit-code policy live in `@arguslab/reporter-cli`, which the CLI calls
 directly as functions. It has no port: a port earns its place when something might be swapped
