@@ -28,7 +28,7 @@ import type { HermesEngine } from './hermes-version.js';
  * esbuild then bundles that entry into one sealed IIFE.
  *
  * (esbuild `inject` is NOT a "prepend-and-execute" mechanism — the entry must
- * be generated. See SPEC §5.1.)
+ * be generated.)
  */
 export interface BundleInput {
   /** Absolute paths to the user test files to include and execute. */
@@ -90,7 +90,7 @@ export interface SealedBundle {
  *
  * TODO: the real provisioning cache key is finer than this — it also needs the
  * exact Hermes tag/version, libc (glibc vs musl on Linux), and build config/ABI.
- * See SPEC §9 (deferred).
+ * Deferred.
  */
 export interface EngineTarget {
   /** React Native version string, e.g. '0.86.0'. */

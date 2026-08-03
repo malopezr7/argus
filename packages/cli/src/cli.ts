@@ -148,7 +148,7 @@ async function main(): Promise<void> {
   /**
    * runFile is TOTAL — every throw/timeout resolves to a RunOutcome.
    * This is the isolation boundary that keeps mapPool from rejecting.
-   * ADR-5: a throwing worker is a caller bug; runFile never throws.
+   * A throwing worker is a caller bug; runFile never throws.
    */
   async function runFile(file: string): Promise<RunOutcome> {
     try {

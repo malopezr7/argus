@@ -206,7 +206,7 @@ export function createRunner(now: () => number): Runner {
       const child = suite.children[i];
       if (child.kind === 'test') {
         // todo placeholders are reported but never executed → NOT a hook-triggering
-        // descendant (REQ-14): a todo-only suite must not run beforeAll/afterAll.
+        // descendant: a todo-only suite must not run beforeAll/afterAll.
         if (child.mode !== 'todo' && included(child, selfSkipped, ancestorsHaveOnly, hasOnly)) {
           return true;
         }
@@ -243,7 +243,7 @@ export function createRunner(now: () => number): Runner {
 
     const selfSkipped = effectivelySkipped(suite, ancestorSkipped);
     const selfHasOnly = suite.mode === 'only';
-    // D2: ancestorsHaveOnly propagates "select-all" only when the .only block
+    // ancestorsHaveOnly propagates "select-all" only when the .only block
     // has NO deeper .only that re-narrows it. If this suite is .only AND its
     // subtree has a deeper .only, children must match .only themselves.
     const selfSelectsAll = selfHasOnly && !subtreeHasOnly(suite, selfSkipped);
@@ -280,7 +280,7 @@ export function createRunner(now: () => number): Runner {
         }
 
         // Run beforeAll once before the first EXECUTABLE test. A todo placeholder
-        // is reported (via runTest) but MUST NOT trigger lifecycle hooks (REQ-14).
+        // is reported (via runTest) but MUST NOT trigger lifecycle hooks.
         if (child.mode !== 'todo' && suiteBeforeAllError === undefined) {
           const baErr = await runBeforeAll(suite, guard);
           if (baErr !== undefined) {
@@ -291,7 +291,7 @@ export function createRunner(now: () => number): Runner {
         tests[tests.length] = await runTest(child, totals, nextChain, suiteBeforeAllError);
       } else {
         // child is a suite — run this suite's beforeAll before descending, but ONLY
-        // if the child subtree has an executable (non-todo) descendant (REQ-14).
+        // if the child subtree has an executable (non-todo) descendant.
         const childHasExecutable = suiteHasIncludedDescendant(
           child,
           effectivelySkipped(child, selfSkipped),
@@ -321,7 +321,7 @@ export function createRunner(now: () => number): Runner {
     if (hasDescendants || inheritedBeforeAllError !== undefined) {
       const aaErr = await runAfterAll(suite);
       if (aaErr !== undefined) {
-        // Synthetic failed test for afterAll throw (D3)
+        // Synthetic failed test for afterAll throw
         totals.total++;
         totals.failed++;
         tests[tests.length] = {

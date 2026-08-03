@@ -6,7 +6,7 @@ import type { EngineTarget, HermesBinary } from '../domain/types.js';
  * Resolves (and if necessary downloads or builds) the Hermes VM binary for a
  * given target triple (RN version × OS × arch).
  *
- * Three adapters are planned (see SPEC §6):
+ * Three adapters are planned:
  *  - PrebuiltAdapter  — downloads a prebuilt binary from Argus CI artifacts.
  *  - SourceBuildAdapter — builds from facebook/hermes source at the pinned commit.
  *  - LocalPathAdapter — points to a user-supplied binary (BYO / CI cache).

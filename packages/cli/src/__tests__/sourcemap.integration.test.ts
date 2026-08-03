@@ -1,15 +1,15 @@
 /**
- * Task 5.3 — Integration: real CLI subprocess proves source-map wiring (AC-11, AC-21, REQ-15-A).
+ * Integration: a real CLI subprocess proves the source-map wiring.
  *
  * Runs the CLI as a real subprocess against examples/math-failing.test.ts and
  * asserts that the rendered failureStack USER-code frame references the source
  * file basename and original line — NOT run.argus-bundle.js.
  *
- * Per design D7/D8: internal frames MAY still contain run.argus-bundle.js;
- * the assertion is scoped to the USER-code frame only (AC-21, D8).
+ * Internal frames MAY still contain run.argus-bundle.js, so the assertion is
+ * scoped to the USER-code frame only.
  *
- * Task 5.4 (AC-12) — Static: packages/core/package.json has no source-map dep.
- * Task 5.5 (AC-14) — Static: source-map appears only in adapter-sourcemap/package.json.
+ * Also asserts statically that packages/core/package.json has no source-map
+ * dep, and that source-map appears only in adapter-sourcemap/package.json.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -35,10 +35,10 @@ const hasHermes =
 const gated = hasHermes ? it : it.skip;
 
 // ---------------------------------------------------------------------------
-// AC-11 / AC-21 — integration via real CLI subprocess
+// Integration via a real CLI subprocess
 // ---------------------------------------------------------------------------
 
-describe('source-map integration (AC-11, AC-21, REQ-15-A)', () => {
+describe('source-map integration', () => {
   gated(
     'failing example renders a user-code frame with the source file name and original line (not run.argus-bundle.js)',
     {
@@ -53,7 +53,7 @@ describe('source-map integration (AC-11, AC-21, REQ-15-A)', () => {
 
       const combined = (result.stdout ?? '') + (result.stderr ?? '');
 
-      // AC-21: the user-code frame must reference the source file AND its original
+      // The user-code frame must reference the source file AND its original
       // line (not just the basename, and not the bundle path).
       const lines = combined.split('\n');
       const userFrame = lines.find((l) => l.includes('math-failing.test.ts'));
@@ -66,10 +66,10 @@ describe('source-map integration (AC-11, AC-21, REQ-15-A)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.4 — AC-12: packages/core/package.json has no source-map dep
+// packages/core/package.json has no source-map dep
 // ---------------------------------------------------------------------------
 
-describe('static: @arguslab/core gains no source-map dep (AC-12, REQ-19)', () => {
+describe('static: @arguslab/core gains no source-map dep', () => {
   it('packages/core/package.json has no source-map in dependencies or devDependencies', () => {
     const pkgPath = resolve(REPO_ROOT, 'packages', 'core', 'package.json');
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as {
@@ -85,10 +85,10 @@ describe('static: @arguslab/core gains no source-map dep (AC-12, REQ-19)', () =>
 });
 
 // ---------------------------------------------------------------------------
-// Task 5.5 — AC-14: source-map dep isolated to adapter-sourcemap (REQ-19-C)
+// source-map dep isolated to adapter-sourcemap
 // ---------------------------------------------------------------------------
 
-describe('static: source-map dep confined to adapter-sourcemap (AC-14, REQ-19-C)', () => {
+describe('static: source-map dep confined to adapter-sourcemap', () => {
   it('source-map appears only in packages/adapter-sourcemap/package.json', () => {
     const noSourceMapDirs = [
       'packages/core',

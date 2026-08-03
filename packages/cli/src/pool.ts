@@ -6,7 +6,7 @@
  *
  * CONTRACT: `mapPool` does NOT swallow worker rejections. A rejecting worker
  * rejects the whole pool — that is a CALLER bug. Callers MUST make their
- * worker total (i.e. catch internally and resolve a value). See ADR-5.
+ * worker total (i.e. catch internally and resolve a value).
  */
 export async function mapPool<T, R>(
   items: readonly T[],

@@ -1,7 +1,7 @@
 /**
  * @arguslab/framework — Jest-API compatibility surface.
  *
- * Module boundary (design D6): this module OWNS the registry state and the
+ * Module boundary: this module OWNS the registry state and the
  * full registration API. index.ts imports ONE-WAY from here; no back-imports.
  *
  * Hermes 0.17 envelope rules:
@@ -160,11 +160,11 @@ test.todo = function testTodo(name: string, _fn?: TestFn): void {
   if (!currentSuite) {
     throw new Error(`test.todo("${name}") called outside of describe()`);
   }
-  // body is intentionally ignored per spec (AC-100)
+  // test.todo accepts an optional body, which is registered but never executed
   append(currentSuite.children, { kind: 'test', name, mode: 'todo' });
 };
 
-// it is referentially identical to test (AC-44)
+// it is referentially identical to test
 export const it: typeof test = test;
 
 // ---------------------------------------------------------------------------
@@ -188,13 +188,13 @@ export function afterEach(fn: HookFn): void {
 }
 
 // ---------------------------------------------------------------------------
-// Focus-resolution helpers (ADR-3 / design D2)
+// Focus-resolution helpers
 // ---------------------------------------------------------------------------
 
 /**
  * Determine whether a node is effectively skipped — either by its own mode
- * or by an ancestor having mode 'skip'. D2 says skip is resolved FIRST and
- * wins transitively.
+ * or by an ancestor having mode 'skip'. Skip is resolved FIRST and wins
+ * transitively.
  */
 export function effectivelySkipped(node: PendingNode, ancestorSkipped: boolean): boolean {
   if (ancestorSkipped) return true;
@@ -228,7 +228,7 @@ export function subtreeHasOnly(suite: PendingSuite, ancestorSkipped: boolean): b
 }
 
 /**
- * PINNED inclusion predicate (design D2 / ADR-3).
+ * PINNED inclusion predicate.
  *
  * Returns true iff the node should be executed (or, for suites, descended into).
  *
@@ -243,7 +243,7 @@ export function included(
   ancestorsHaveOnly: boolean,
   hasOnly: boolean,
 ): boolean {
-  // Skip wins transitively (D2 step 1).
+  // Step 1: skip wins transitively.
   if (effectivelySkipped(node, ancestorSkipped)) return false;
 
   if (!hasOnly) {
@@ -270,7 +270,7 @@ export function included(
 }
 
 // ---------------------------------------------------------------------------
-// Global install (D6)
+// Global install
 // ---------------------------------------------------------------------------
 
 export function installGlobals(g: Record<string, unknown>): void {

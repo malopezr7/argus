@@ -23,7 +23,7 @@
  *     null-prototype table built at module-eval; leaving any of it raw makes the
  *     envelope unparseable and discards the whole file's results.
  *  (Full isolation against an adversarial test that pollutes deep language
- *   primitives is only achievable with realm/process isolation — see SPEC §9.)
+ *   primitives is only achievable with realm/process isolation.)
  *
  * Async tests are supported (Hermes drains the microtask queue before exit);
  * timers are NOT available, and a test MUST return/await any Promise it creates.

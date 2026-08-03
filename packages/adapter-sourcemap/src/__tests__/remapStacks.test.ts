@@ -1,8 +1,6 @@
 /**
  * Unit tests for remapStacks.
  *
- * Covers: AC-03..AC-10, AC-16..AC-19, REQ-14..REQ-18 per tasks.md.
- *
  * Strategy: hand-craft minimal V3 source maps using raw VLQ mappings so we
  * can control exactly which generated (line, column) maps to which original.
  *
@@ -134,7 +132,7 @@ function getTest(result: RunResult): TestCase {
 // ---------------------------------------------------------------------------
 
 describe('remapStacks', () => {
-  // 5.1a — Mapped user frame rewritten; input not mutated (AC-03, REQ-14-A)
+  // Mapped user frame rewritten; input not mutated
   it('5.1a: mapped user frame → rewritten to source:origLine:origCol, input not mutated', async () => {
     // gen(10,4) → orig(5,2) in 0-based terms
     // stack frame col=5 (1-based) → consumer col=4 (0-based), maps to srcCol=2 (0-based) → returned col=3 (1-based)
@@ -154,7 +152,8 @@ describe('remapStacks', () => {
     expect(output).not.toBe(input);
   });
 
-  // 5.1b — Off-by-one column round-trip (ADR-3 column contract)
+  // Off-by-one column round-trip: Hermes reports 1-based columns, the
+  // SourceMapConsumer expects 0-based, and the output goes back to 1-based.
   it('5.1b: off-by-one column — stack col 5 (1-based) → lookup col 4 (0-based) → mapped col 2 (0-based) → output col 3 (1-based)', async () => {
     const map = makeMap([{ genLine: 20, genCol: 4, srcLine: 7, srcCol: 2 }]);
     const input = makeResult({
@@ -166,7 +165,7 @@ describe('remapStacks', () => {
     expect(stack).toContain('examples/math.test.ts:8:3');
   });
 
-  // 5.1c — Unmapped frame in 3-frame stack; order preserved (AC-04, REQ-16-C)
+  // Unmapped frame in a 3-frame stack; order preserved
   it('5.1c: unmapped frame passes verbatim; mapped frames around it are rewritten; order preserved', async () => {
     // frame-A: gen(10,4) → orig(5,2); frame-B: gen(11,0) → no mapping; frame-C: gen(12,4) → orig(6,0)
     const map = makeMap([
@@ -189,14 +188,14 @@ describe('remapStacks', () => {
     expect(lines).toHaveLength(3);
   });
 
-  // 5.1d — undefined map → no throw, same stacks (AC-05, REQ-16-A)
+  // undefined map → no throw, same stacks
   it('5.1d: remapStacks(result, undefined) → returns same result, no throw', async () => {
     const input = makeResult();
     const output = await remapStacks(input, undefined);
     expect(output).toBe(input); // same reference (no-op early return)
   });
 
-  // 5.1e — malformed map → no throw, stacks unchanged, nothing on stdout/stderr (AC-06, REQ-16-B)
+  // malformed map → no throw, stacks unchanged, nothing on stdout/stderr
   it('5.1e: malformed map → same stacks, no throw, no stdout/stderr', async () => {
     const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
     const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
@@ -213,7 +212,7 @@ describe('remapStacks', () => {
     }
   });
 
-  // 5.1f — Error: message line at top of stack → passes through unchanged (AC-07, REQ-14-C)
+  // Error: message line at top of stack → passes through unchanged
   it('5.1f: error-message line (no path:line:col) is unchanged at same index', async () => {
     const map = makeMap([{ genLine: 2, genCol: 0, srcLine: 1, srcCol: 0 }]);
     const input = makeResult({
@@ -227,7 +226,7 @@ describe('remapStacks', () => {
     expect(lines[0]).toBe('Error: expect(1).toBe(2)');
   });
 
-  // 5.1g — Frame maps to packages/framework/src → kept as bundle offset (AC-08, REQ-17-A)
+  // Frame maps to packages/framework/src → kept as bundle offset
   it('5.1g: framework-internal frame → kept as run.argus-bundle.js:LINE:COL', async () => {
     const frameworkMap = makeMap(
       [{ genLine: 5, genCol: 0, srcLine: 1, srcCol: 0 }],
@@ -242,7 +241,7 @@ describe('remapStacks', () => {
     expect(stack).not.toContain('packages/framework/src');
   });
 
-  // 5.1h — Frame maps to examples/math.test.ts → rewritten (REQ-17-B)
+  // Frame maps to examples/math.test.ts → rewritten
   it('5.1h: user-source frame → rewritten to examples/math.test.ts:LINE:COL', async () => {
     const map = makeMap([{ genLine: 3, genCol: 0, srcLine: 3, srcCol: 0 }]);
     const input = makeResult({
@@ -254,7 +253,7 @@ describe('remapStacks', () => {
     expect(stack).not.toContain('run.argus-bundle.js');
   });
 
-  // 5.1i — failureMessage without location → byte-identical (AC-09, REQ-18-A)
+  // failureMessage without location → byte-identical
   it('5.1i: failureMessage without path:line:col → unchanged', async () => {
     const map = makeMap([{ genLine: 1, genCol: 0, srcLine: 1, srcCol: 0 }]);
     const input = makeResult({
@@ -265,7 +264,7 @@ describe('remapStacks', () => {
     expect(getTest(output).failureMessage).toBe('expect(1).toBe(2)');
   });
 
-  // 5.1j — failureMessage ending with <bundlepath>:5:10 → suffix replaced (AC-10, REQ-18-B)
+  // failureMessage ending with <bundlepath>:5:10 → suffix replaced
   it('5.1j: failureMessage ending with bundle location → suffix remapped', async () => {
     const map = makeMap([{ genLine: 5, genCol: 9, srcLine: 3, srcCol: 4 }]);
     const input = makeResult({
@@ -278,7 +277,7 @@ describe('remapStacks', () => {
     expect(msg).not.toContain('run.argus-bundle.js');
   });
 
-  // 5.1k — valid JSON that SourceMapConsumer rejects → input unchanged (REQ-16, AC-06)
+  // valid JSON that SourceMapConsumer rejects → input unchanged
   it('5.1k: valid JSON that SourceMapConsumer rejects (not a real V3 map) → result unchanged', async () => {
     const badMap = JSON.stringify({ not: 'a real source map' });
     const input = makeResult();
@@ -287,8 +286,8 @@ describe('remapStacks', () => {
     expect(getTest(output).failureStack).toBe(originalStack);
   });
 
-  // 5.x — AC-17: non-bundle frame with mappable coords stays verbatim (D3)
-  it('5.x AC-17: non-bundle frame basename stays verbatim even if coords would map', async () => {
+  // Bundle detection is by basename, so a non-bundle frame stays verbatim
+  it('non-bundle frame basename stays verbatim even if coords would map', async () => {
     const map = makeMap([{ genLine: 10, genCol: 4, srcLine: 5, srcCol: 2 }]);
     const input = makeResult({
       failureStack: '    at foo (/some/other/file.js:10:5)',
@@ -299,8 +298,8 @@ describe('remapStacks', () => {
     expect(stack).toBe('    at foo (/some/other/file.js:10:5)');
   });
 
-  // 5.x — AC-18: failed test with message-location and NO stack → message remapped (D4)
-  it('5.x AC-18: message-location remapped even when failureStack is absent', async () => {
+  // failureStack and failureMessage are remapped independently
+  it('message-location remapped even when failureStack is absent', async () => {
     const map = makeMap([{ genLine: 71, genCol: 25, srcLine: 10, srcCol: 5 }]);
     const input = makeResult({
       failureStack: undefined,
@@ -312,8 +311,8 @@ describe('remapStacks', () => {
     expect(msg).not.toContain('run.argus-bundle.js');
   });
 
-  // 5.x — AC-19: packages/core/ frame stays verbatim (D5)
-  it('5.x AC-19: packages/core/ frame stays verbatim', async () => {
+  // Internal sources are kept verbatim rather than remapped
+  it('packages/core/ frame stays verbatim', async () => {
     const coreMap = makeMap(
       [{ genLine: 5, genCol: 0, srcLine: 1, srcCol: 0 }],
       'packages/core/src/domain/types.ts',
@@ -327,9 +326,9 @@ describe('remapStacks', () => {
     expect(stack).not.toContain('packages/core/src');
   });
 
-  // 5.x — AC-19 regression (D5): a USER path that merely CONTAINS an internal
-  // segment is classified by PREFIX, so it IS remapped (not kept verbatim).
-  it('5.x: user path containing "packages/core/" as a non-prefix segment is remapped', async () => {
+  // Regression: a USER path that merely CONTAINS an internal segment is
+  // classified by PREFIX, so it IS remapped (not kept verbatim).
+  it('user path containing "packages/core/" as a non-prefix segment is remapped', async () => {
     const userMap = makeMap(
       [{ genLine: 5, genCol: 0, srcLine: 7, srcCol: 3 }],
       'examples/packages/core/foo.test.ts', // user file, NOT an internal prefix

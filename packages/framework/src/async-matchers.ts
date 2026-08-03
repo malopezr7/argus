@@ -30,7 +30,7 @@ export type { AsyncMatchers };
 export { matchesThrow, thrownMessage };
 
 // ---------------------------------------------------------------------------
-// toThrow helpers (ADR-6, R8)
+// toThrow helpers
 // ---------------------------------------------------------------------------
 
 function thrownMessage(thrown: unknown): string {
@@ -56,7 +56,7 @@ function matchesThrow(thrown: unknown, expected: unknown): boolean {
     return thrown instanceof (expected as new (...args: unknown[]) => unknown);
   }
   if (expected instanceof Error) {
-    // R8 / AC-39: Error instance — match on message substring
+    // Error instance — match on message substring
     return thrownMessage(thrown).indexOf(expected.message) !== -1;
   }
   throw new Error(
@@ -65,9 +65,9 @@ function matchesThrow(thrown: unknown, expected: unknown): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Async matchers factory (ADR-5 / REQ-15)
+// Async matchers factory
 //
-// All methods are async function declarations — NEVER async arrows (AC-74).
+// All methods are async function declarations — NEVER async arrows.
 // makeMatchersFn is injected to avoid a cycle with matchers.ts.
 // ---------------------------------------------------------------------------
 
@@ -90,7 +90,7 @@ export function makeAsyncMatchers(
         settled = e;
       }
       if (wantReject !== didReject) {
-        // D5/AC-98: count this assertion even on the wrong-settlement failure
+        // Count this assertion even on the wrong-settlement failure
         // path (it never reaches applySync, which would otherwise count it).
         incAssertionCount();
         throw new Error(
@@ -233,7 +233,7 @@ export function makeAsyncMatchers(
           settled = e;
         }
         if (wantReject !== didReject) {
-          // D5/AC-98: count the assertion on the wrong-settlement path too.
+          // Count the assertion on the wrong-settlement path too.
           incAssertionCount();
           throw new Error(
             wantReject
@@ -248,7 +248,7 @@ export function makeAsyncMatchers(
           return;
         }
         // For .rejects.toThrow — match the rejection value as the thrown error.
-        // Count the assertion BEFORE any pass/fail throw (D5/AC-98: count EVERY
+        // Count the assertion BEFORE any pass/fail throw (count EVERY
         // assertion call, not just the passing path). The .resolves.toThrow path
         // above delegates to the sync matcher which counts there, so this manual
         // increment is the only count for the .rejects path (no double-count).

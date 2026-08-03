@@ -12,7 +12,7 @@ import type {
 
 /**
  * HermesSpawnEngine writes the sealed bundle to a temp FILE and spawns `hermes`
- * on it (NEVER stdin — that triggers REPL pollution, verified in Phase 0).
+ * on it (NEVER stdin — that triggers REPL pollution, observed against the real binary).
  * Enforces a timeout (SIGKILL), captures stdout/stderr, and always cleans up.
  */
 export class HermesSpawnEngine implements Engine {

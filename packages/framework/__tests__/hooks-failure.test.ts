@@ -1,5 +1,6 @@
 /**
- * hooks-failure.test.ts — AC-55, AC-56, AC-57, AC-95, AC-96
+ * Hook failure policy: a throwing hook fails the affected tests without
+ * aborting the run, and the remaining hooks in the chain still execute.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -14,7 +15,7 @@ import {
 } from './run-harness.js';
 
 describe('hook failure behavior', () => {
-  it('throwing beforeEach: test failed, body not run, afterEach still runs (AC-55)', async () => {
+  it('throwing beforeEach: test failed, body not run, afterEach still runs', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
       argusDescribe('suite', () => {
@@ -37,7 +38,7 @@ describe('hook failure behavior', () => {
     expect(log).toContain('cleanup-ran');
   });
 
-  it('throwing beforeAll: all block tests failed, afterAll still runs (AC-56, AC-96)', async () => {
+  it('throwing beforeAll: all block tests failed, afterAll still runs', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
       argusDescribe('suite', () => {
@@ -64,7 +65,7 @@ describe('hook failure behavior', () => {
     expect(log).not.toContain('body2');
   });
 
-  it('throwing afterEach: test marked failed, remaining afterEach hooks still run (AC-57)', async () => {
+  it('throwing afterEach: test marked failed, remaining afterEach hooks still run', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
       argusDescribe('suite', () => {
@@ -83,7 +84,7 @@ describe('hook failure behavior', () => {
     expect(log).toContain('afterEach-2-ran');
   });
 
-  it('throwing afterAll: synthetic "afterAll hook" failed test; other tests unaffected (AC-95)', async () => {
+  it('throwing afterAll: synthetic "afterAll hook" failed test; other tests unaffected', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusAfterAll(() => {
@@ -106,7 +107,7 @@ describe('hook failure behavior', () => {
     expect(result.totals.passed).toBe(2);
   });
 
-  it('throwing afterAll: remaining afterAll hooks still run (AC-95)', async () => {
+  it('throwing afterAll: remaining afterAll hooks still run', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
       argusDescribe('suite', () => {

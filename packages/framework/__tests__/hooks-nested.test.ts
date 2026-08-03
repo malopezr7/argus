@@ -1,5 +1,7 @@
 /**
- * hooks-nested.test.ts — AC-48, AC-49, AC-50, AC-51, AC-52
+ * Nested hook ordering: outer beforeEach runs before inner, inner afterEach
+ * before outer, beforeAll/afterAll nest the same way, and multiple hooks of the
+ * same type on one block run in registration order.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -14,7 +16,7 @@ import {
 } from './run-harness.js';
 
 describe('hooks nested ordering', () => {
-  it('outer-BE before inner-BE, inner-AE before outer-AE (AC-48, AC-49)', async () => {
+  it('outer-BE before inner-BE, inner-AE before outer-AE', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
       argusDescribe('outer', () => {
@@ -42,7 +44,7 @@ describe('hooks nested ordering', () => {
     expect(flattenTests(result.suites)[0].status).toBe('passed');
   });
 
-  it('nested beforeAll / afterAll ordering (AC-50, AC-51)', async () => {
+  it('nested beforeAll / afterAll ordering', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
       argusDescribe('outer', () => {
@@ -76,7 +78,7 @@ describe('hooks nested ordering', () => {
     expect(result.totals.passed).toBe(2);
   });
 
-  it('multiple hooks same type on same block run in registration order (AC-52)', async () => {
+  it('multiple hooks same type on same block run in registration order', async () => {
     const log: string[] = [];
     await runWith(() => {
       argusDescribe('suite', () => {

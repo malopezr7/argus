@@ -327,7 +327,7 @@ describe('argus CLI — control characters in the result channel (needs .hermes/
 });
 
 // ---------------------------------------------------------------------------
-// Phase 3 (item 3): Matcher integration tests (task 5.10)
+// Matcher integration tests
 // ---------------------------------------------------------------------------
 
 describe('argus matchers integration (needs .hermes/hermes)', () => {
@@ -341,11 +341,11 @@ describe('argus matchers integration (needs .hermes/hermes)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Phase 3: Concurrency tests (tasks 5.1b, 5.5, 2.2b integration)
+// Concurrency tests
 // ---------------------------------------------------------------------------
 
 describe('argus CLI — concurrency (needs .hermes/hermes)', () => {
-  // Task 2.2b integration — exit 2 on invalid --concurrency
+  // exit 2 on invalid --concurrency
   it('-c 0 → exit 2 (usage error, no hermes binary needed)', () => {
     // This exits before even looking for hermes, so no gating needed
     const result = runArgusCapture(['-c', '0', 'examples/math.test.ts']);
@@ -359,9 +359,9 @@ describe('argus CLI — concurrency (needs .hermes/hermes)', () => {
     expect(result.stderr).toMatch(/concurrency/i);
   }, 10_000);
 
-  // Task 5.1b — -c 1 vs -c N byte-identity for stdout AND stderr (normalized for timing)
+  // -c 1 vs -c N byte-identity for stdout AND stderr (normalized for timing)
   gated(
-    '5.1b: -c 1 and -c 4 produce identical stdout+stderr (after timing normalization)',
+    '-c 1 and -c 4 produce identical stdout+stderr (after timing normalization)',
     () => {
       const c1 = runArgusCapture(['-c', '1', 'examples/math.test.ts']);
       const cN = runArgusCapture(['-c', '4', 'examples/math.test.ts']);
@@ -374,7 +374,7 @@ describe('argus CLI — concurrency (needs .hermes/hermes)', () => {
   );
 
   gated(
-    '5.1b: -c 1 and -c 2 on multiple files produce identical stdout+stderr',
+    '-c 1 and -c 2 on multiple files produce identical stdout+stderr',
     () => {
       const files = ['examples/math.test.ts', 'examples/robustness.test.ts'];
       const c1 = runArgusCapture(['-c', '1', ...files]);
@@ -387,9 +387,9 @@ describe('argus CLI — concurrency (needs .hermes/hermes)', () => {
     60_000,
   );
 
-  // Task 5.5 — -c 2 with mixed pass/fail/infra → discovery-ordered output + worst-case exit
+  // -c 2 with mixed pass/fail/infra → discovery-ordered output + worst-case exit
   gated(
-    '5.5: -c 2 mixed pass/fail/infra → exit 2 (infra worst-case)',
+    '-c 2 mixed pass/fail/infra → exit 2 (infra worst-case)',
     () => {
       // examples/**/*.test.ts includes forge.test.ts (infra-failure) → worst-case = 2
       const result = runArgusCapture(['-c', '2', 'examples/**/*.test.ts']);
@@ -399,7 +399,7 @@ describe('argus CLI — concurrency (needs .hermes/hermes)', () => {
   );
 
   gated(
-    '5.5: -c 2 output is in discovery order (math before robustness)',
+    '-c 2 output is in discovery order (math before robustness)',
     () => {
       const result = runArgusCapture([
         '-c',

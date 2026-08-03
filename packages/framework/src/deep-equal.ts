@@ -1,7 +1,7 @@
 /**
  * @arguslab/framework — deep equality helpers
  *
- * Moved from matchers.ts (ADR-1). Runs IN-REALM alongside user test code.
+ * Moved from matchers.ts. Runs IN-REALM alongside user test code.
  * Follows Hermes 0.17 envelope rules: index loops, no for..of/spread,
  * no Array.prototype methods, no WeakRef/WeakMap/WeakSet.
  *
@@ -20,7 +20,7 @@
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** SameValueZero: +0 ≡ -0, NaN ≡ NaN (R7). */
+/** SameValueZero: +0 ≡ -0, NaN ≡ NaN. */
 export function sameValueZero(a: unknown, b: unknown): boolean {
   return a === b || Object.is(a, b);
 }
@@ -46,7 +46,7 @@ export function sameType(a: object, b: object): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// deepEqual — single recursive engine (ADR-3, R2, R4)
+// deepEqual — single recursive engine
 // ---------------------------------------------------------------------------
 
 export function deepEqual(
@@ -64,14 +64,15 @@ export function deepEqual(
   const bObj = b !== null && typeof b === 'object';
   if (!aObj || !bObj) return false;
 
-  // 3. Two-sided cycle check (R2 — bisimulation guard, AC-42)
+  // 3. Two-sided cycle check — a bisimulation guard: revisiting a node on one
+  //    side only means the two graphs differ in shape, so they are NOT equal.
   for (let i = 0; i < seenA.length; i++) {
     if (seenA[i] === a || seenB[i] === b) {
       return seenA[i] === a && seenB[i] === b;
     }
   }
 
-  // 4. Date — use === so two invalid Dates (NaN) are NOT equal (R4, AC-40)
+  // 4. Date — use === so two invalid Dates (NaN) are NOT equal
   if (a instanceof Date || b instanceof Date) {
     if (!(a instanceof Date) || !(b instanceof Date)) return false;
     return a.getTime() === b.getTime();
@@ -83,7 +84,7 @@ export function deepEqual(
     return a.source === b.source && a.flags === b.flags;
   }
 
-  // 6. Map/Set loud guard (ADR-4, REQ-01b, AC-36)
+  // 6. Map/Set loud guard
   if (a instanceof Map || b instanceof Map || a instanceof Set || b instanceof Set) {
     throw new Error(
       'deepEqual: Map/Set structural equality is not supported in this build. ' +
@@ -119,7 +120,7 @@ export function deepEqual(
     return ok;
   }
 
-  // 8. Strict type-tag gate (ADR-4)
+  // 8. Strict type-tag gate
   if (strict && !sameType(a as object, b as object)) return false;
 
   // 9. Plain object key comparison
@@ -149,7 +150,7 @@ export function deepEqual(
 }
 
 // ---------------------------------------------------------------------------
-// matchObject — cycle-safe subset matching for toMatchObject (R3)
+// matchObject — cycle-safe subset matching for toMatchObject
 // ---------------------------------------------------------------------------
 
 export function matchObject(
@@ -161,7 +162,7 @@ export function matchObject(
   if (actual === null || typeof actual !== 'object') return false;
   if (subset === null || typeof subset !== 'object') return false;
 
-  // Map/Set loud guard (REQ-01b, AC-36) — applied at EVERY recursion level so a
+  // Map/Set loud guard — applied at EVERY recursion level so a
   // nested Map/Set value cannot slip past as a key-less plain object (which would
   // silently match). Mirrors deepEqual's guard; covers either side.
   if (
@@ -221,7 +222,7 @@ export function matchObject(
 }
 
 // ---------------------------------------------------------------------------
-// getByPath — path resolution for toHaveProperty (R6)
+// getByPath — path resolution for toHaveProperty
 // ---------------------------------------------------------------------------
 
 export function getByPath(

@@ -1,24 +1,24 @@
 /**
- * String/collection matcher tests — task 5.6 + 5.6b
- * AC-12..15, AC-37, REQ-04
+ * String and collection matchers: toMatch, toContain (SameValueZero membership),
+ * toContainEqual (structural membership), and toHaveLength.
  */
 import { describe, expect, it } from 'vitest';
 import { expect as argusExpect } from '../src/matchers.js';
 
 describe('toMatch', () => {
-  it('passes for string substring (AC-12)', () => {
+  it('passes for string substring', () => {
     argusExpect('hello world').toMatch('world');
   });
 
-  it('throws when substring not found (AC-12)', () => {
+  it('throws when substring not found', () => {
     expect(() => argusExpect('hello world').toMatch('xyz')).toThrow();
   });
 
-  it('passes for matching RegExp (AC-12)', () => {
+  it('passes for matching RegExp', () => {
     argusExpect('hello world').toMatch(/wor.d/);
   });
 
-  it('throws when RegExp does not match (AC-12)', () => {
+  it('throws when RegExp does not match', () => {
     expect(() => argusExpect('hello world').toMatch(/^world/)).toThrow();
   });
 
@@ -32,7 +32,7 @@ describe('toMatch', () => {
 });
 
 describe('toContain', () => {
-  it('passes when NaN is in array (SameValueZero, AC-13)', () => {
+  it('passes when NaN is in array (SameValueZero)', () => {
     argusExpect([1, NaN, 3]).toContain(NaN);
   });
 
@@ -44,7 +44,7 @@ describe('toContain', () => {
     argusExpect('hello world').toContain('world');
   });
 
-  it('passes when +0 contains -0 (SameValueZero, AC-37)', () => {
+  it('passes when +0 contains -0 (SameValueZero)', () => {
     // SameValueZero: +0 === -0, so -0 is "in" an array containing +0
     argusExpect([+0]).toContain(-0);
   });
@@ -63,11 +63,11 @@ describe('toContain', () => {
 });
 
 describe('toContainEqual', () => {
-  it('passes when array contains structurally equal element (AC-14)', () => {
+  it('passes when array contains structurally equal element', () => {
     argusExpect([{ a: 1 }, { b: 2 }]).toContainEqual({ a: 1 });
   });
 
-  it('throws when no matching element (AC-14)', () => {
+  it('throws when no matching element', () => {
     expect(() => argusExpect([{ a: 1 }]).toContainEqual({ a: 2 })).toThrow();
   });
 
@@ -81,11 +81,11 @@ describe('toContainEqual', () => {
 });
 
 describe('toHaveLength', () => {
-  it('passes for array with correct length (AC-15)', () => {
+  it('passes for array with correct length', () => {
     argusExpect([1, 2, 3]).toHaveLength(3);
   });
 
-  it('throws for array with wrong length (AC-15)', () => {
+  it('throws for array with wrong length', () => {
     expect(() => argusExpect([1, 2, 3]).toHaveLength(2)).toThrow();
   });
 

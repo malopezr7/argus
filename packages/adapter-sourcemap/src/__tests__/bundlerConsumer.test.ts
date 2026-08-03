@@ -1,7 +1,8 @@
 /**
- * Task 5.2 — Bundler emits a map that SourceMapConsumer can load and resolve (REQ-13-C, AC-01).
+ * The bundler emits a map that SourceMapConsumer can load and resolve.
  *
- * This test lives in @arguslab/sourcemap (where source-map is confined per AC-14/REQ-19-C).
+ * This test lives in @arguslab/sourcemap because that is the only package
+ * allowed to depend on source-map.
  * It imports EsbuildBundler from @arguslab/esbuild (workspace devDep) and verifies that
  * the emitted bundle.map resolves a known user-source position via SourceMapConsumer.
  */
@@ -24,8 +25,8 @@ const FIXTURE_PATH = resolve(REPO_ROOT, 'examples', 'math.test.ts');
 // `expect(1 + 1).toBe(2);` is on line 10 in math.test.ts
 const KNOWN_LINE = 10;
 
-describe('EsbuildBundler map → SourceMapConsumer position resolution (REQ-13-C)', () => {
-  it('SourceMapConsumer resolves a known user-source position from bundle.map (AC-01)', async () => {
+describe('EsbuildBundler map → SourceMapConsumer position resolution', () => {
+  it('SourceMapConsumer resolves a known user-source position from bundle.map', async () => {
     const bundler = new EsbuildBundler();
     const bundle = await bundler.bundle({
       testPaths: [FIXTURE_PATH],

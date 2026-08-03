@@ -1,5 +1,7 @@
 /**
- * focus.test.ts — AC-61, AC-62, AC-63, AC-64, AC-93, AC-94
+ * Focus resolution for .only: focused tests run and siblings are silenced,
+ * describe.only selects its whole subtree unless a deeper .only re-narrows it,
+ * and .only nested inside a skipped block never activates focus.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -10,7 +12,7 @@ import {
 } from './run-harness.js';
 
 describe('focus (.only) modifier', () => {
-  it('test.only among siblings: focused passes, others skipped (AC-61)', async () => {
+  it('test.only among siblings: focused passes, others skipped', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('T1', () => {});
@@ -31,7 +33,7 @@ describe('focus (.only) modifier', () => {
     expect(result.totals.total).toBe(3);
   });
 
-  it('describe.only runs all descendants, sibling describes silenced (AC-62)', async () => {
+  it('describe.only runs all descendants, sibling describes silenced', async () => {
     const result = await runWith(() => {
       argusDescribe.only('A', () => {
         argusTest('A1', () => {});
@@ -56,7 +58,7 @@ describe('focus (.only) modifier', () => {
     expect(result.totals.skipped).toBe(2);
   });
 
-  it('no .only in file: all tests run normally (AC-63)', async () => {
+  it('no .only in file: all tests run normally', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('T1', () => {});
@@ -69,7 +71,7 @@ describe('focus (.only) modifier', () => {
     expect(result.totals.skipped).toBe(0);
   });
 
-  it('test.only inside describe.only: only focused test runs — siblings skipped (AC-93/AC-64)', async () => {
+  it('test.only inside describe.only: only focused test runs — siblings skipped', async () => {
     const result = await runWith(() => {
       argusDescribe.only('D', () => {
         argusTest.only('a', () => {});
@@ -91,7 +93,7 @@ describe('focus (.only) modifier', () => {
     expect(result.totals.skipped).toBe(2);
   });
 
-  it('.only inside describe.skip: no focus activation, rest of file runs (AC-94)', async () => {
+  it('.only inside describe.skip: no focus activation, rest of file runs', async () => {
     const result = await runWith(() => {
       argusDescribe.skip('D', () => {
         argusTest.only('a', () => {

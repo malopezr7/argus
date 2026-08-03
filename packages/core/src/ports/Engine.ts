@@ -10,14 +10,14 @@ import type {
  *
  * Executes ONE sealed bundle on a Hermes binary subprocess.
  *
- * The channel is strictly unidirectional (SPEC §4.2):
+ * The channel is strictly unidirectional:
  *   bundle → temp file → Hermes → stdout (framed JSON) → host
  *
  * The adapter is responsible for:
  *  - Spawning the `hermes` subprocess (not `hermesc` or `hvm`).
  *  - Writing the bundle to a TEMP FILE and passing it as the path argument.
  *    NOT stdin: piping puts Hermes in REPL mode, which pollutes stdout with
- *    `>> ` prompts and `undefined` lines (verified in the Phase 0 spike).
+ *    `>> ` prompts and `undefined` lines (observed against the real binary).
  *  - Capturing stdout and stderr completely.
  *  - Enforcing opts.timeoutMs: kill the subprocess (SIGKILL) if exceeded and
  *    set EngineOutput.timedOut. A hanging test must never hang the runner.

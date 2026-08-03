@@ -1,12 +1,12 @@
 /**
- * Truthiness matcher tests — task 5.4
- * AC-08, AC-23, REQ-02
+ * Truthiness matchers: toBeTruthy, toBeFalsy, toBeNull, toBeUndefined,
+ * toBeDefined, and toBeNaN — with their .not forms.
  */
 import { describe, expect, it } from 'vitest';
 import { expect as argusExpect } from '../src/matchers.js';
 
 describe('toBeTruthy', () => {
-  it('passes for truthy value (AC-08)', () => {
+  it('passes for truthy value', () => {
     argusExpect(1).toBeTruthy();
     argusExpect('hello').toBeTruthy();
     argusExpect({}).toBeTruthy();
@@ -28,7 +28,7 @@ describe('toBeTruthy', () => {
 });
 
 describe('toBeFalsy', () => {
-  it('passes for falsy value (AC-08)', () => {
+  it('passes for falsy value', () => {
     argusExpect(0).toBeFalsy();
     argusExpect('').toBeFalsy();
     argusExpect(null).toBeFalsy();

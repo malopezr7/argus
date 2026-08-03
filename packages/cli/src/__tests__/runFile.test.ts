@@ -1,14 +1,15 @@
 /**
- * Task 4.2 — runFile totality tests.
+ * runFile totality tests.
  *
  * runFile (defined inside cli.ts main()) is a TOTAL function: every throw,
  * every timeout, every engine error resolves to a RunOutcome and never rejects.
- * This anchors ADR-5 and R3 from the judge report.
+ * That is what keeps mapPool from rejecting, since the pool treats a throwing
+ * worker as a caller bug.
  *
  * Because runFile is a closure inside main(), we test the same logic pattern
  * directly here using a thin re-implementation that mirrors the try/catch
- * exactly. The integration tests (integration.test.ts task 5.1b, 5.5) confirm
- * the full CLI stack behaves consistently.
+ * exactly. The integration tests in integration.test.ts confirm the full CLI
+ * stack behaves consistently.
  */
 import type { RunOutcome } from '@arguslab/core';
 import { describe, expect, it } from 'vitest';
@@ -73,7 +74,7 @@ async function makeToatalWorker(
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('runFile totality (ADR-5, R3)', () => {
+describe('runFile totality', () => {
   it('bundle throw → resolved infrastructure-failure (stage: bundle)', async () => {
     const outcome = await makeToatalWorker(
       () => Promise.reject(new Error('esbuild failed')),

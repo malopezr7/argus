@@ -10,7 +10,7 @@ import type { BundleInput, SealedBundle } from '../domain/types.js';
  * The bundler GENERATES a synthetic virtual entry (see BundleInput) that wires
  * polyfills → framework globals → user tests → run() → framed result line.
  *
- * Key constraints (from SPEC §3.4, §5.1):
+ * Key constraints:
  *  - Output format MUST be IIFE with bundle:true.
  *  - Engine target MUST be set (e.g. 'es2020'). NOTE: esbuild's `hermes*` target
  *    is unusable (it errors lowering const/let/class) — use a standard ES level.

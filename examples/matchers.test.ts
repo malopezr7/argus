@@ -2,8 +2,6 @@
  * Matchers integration fixture — exercises expect() matchers on real Hermes.
  * Run with: pnpm argus examples/matchers.test.ts
  * Expected: exit 0 (all tests pass).
- *
- * task 5.10 / AC-29, AC-30
  */
 declare const describe: (name: string, fn: () => void) => void;
 declare const test: (name: string, fn: () => void | Promise<unknown>) => void;

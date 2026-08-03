@@ -81,7 +81,7 @@ export class EsbuildBundler implements Bundler {
         : [],
       legalComments: 'none',
     });
-    // D1: select by explicit suffix (esbuild output ordering is not contractual).
+    // Select by explicit suffix (esbuild output ordering is not contractual).
     const jsFile = result.outputFiles.find((f) => f.path.endsWith('.js'));
     const mapFile = result.outputFiles.find((f) => f.path.endsWith('.js.map'));
     if (!jsFile) throw new Error('EsbuildBundler: esbuild produced no JS output file');
@@ -99,7 +99,7 @@ export class EsbuildBundler implements Bundler {
 }
 
 /**
- * Generate the synthetic virtual entry (SPEC §5.1):
+ * Generate the synthetic virtual entry:
  *   polyfills -> framework (installs globals) -> user tests (register)
  *   -> run(<nonce>).
  *

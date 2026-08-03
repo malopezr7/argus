@@ -1,5 +1,6 @@
 /**
- * hooks-async.test.ts — AC-53, AC-54: async hooks awaited
+ * Async hooks are awaited: a returned promise must settle before the test body
+ * runs, and before the next test's beforeEach starts.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -12,7 +13,7 @@ import {
 } from './run-harness.js';
 
 describe('async hooks', () => {
-  it('async beforeEach is awaited before test body runs (AC-53)', async () => {
+  it('async beforeEach is awaited before test body runs', async () => {
     let asyncSetupDone = false;
     const result = await runWith(() => {
       argusDescribe('suite', () => {
@@ -32,7 +33,7 @@ describe('async hooks', () => {
     expect(flattenTests(result.suites)[0].status).toBe('passed');
   });
 
-  it('async afterEach is awaited before next beforeEach runs (AC-54)', async () => {
+  it('async afterEach is awaited before next beforeEach runs', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
       argusDescribe('suite', () => {

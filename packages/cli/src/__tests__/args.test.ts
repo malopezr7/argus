@@ -45,7 +45,7 @@ describe('parseCliArgs — --concurrency / -c', () => {
     expect(defaultConcurrency()).toBeGreaterThanOrEqual(1);
   });
 
-  // Strict validation — UsageError cases (task 2.1b / 2.2b)
+  // Strict validation — UsageError cases
 
   it('-c 1.5 throws UsageError', () => {
     expect(() => parseCliArgs(['-c', '1.5'])).toThrow(UsageError);

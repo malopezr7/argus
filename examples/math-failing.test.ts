@@ -1,5 +1,5 @@
 /**
- * Deliberately failing test fixture for source-map integration testing (task 5.3).
+ * Deliberately failing test fixture for source-map integration testing.
  * This file is intentionally NOT included in the Vitest suite (examples/ is excluded).
  * It is run via `pnpm argus` directly (on Hermes) in the integration test.
  */

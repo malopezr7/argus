@@ -1,5 +1,6 @@
 /**
- * hooks-flat.test.ts — AC-47: flat hook ordering
+ * Flat hook ordering within a single describe block, including multiple hooks
+ * of the same type running in registration order.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -13,7 +14,7 @@ import {
   runWith,
 } from './run-harness.js';
 
-describe('hooks flat ordering (AC-47)', () => {
+describe('hooks flat ordering', () => {
   it('log is [BA,BE,T1,AE,BE,T2,AE,AA] and both tests pass', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
@@ -46,7 +47,7 @@ describe('hooks flat ordering (AC-47)', () => {
     expect(result.totals.passed).toBe(2);
   });
 
-  it('multiple hooks same type run in registration order (AC-52)', async () => {
+  it('multiple hooks same type run in registration order', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
       argusDescribe('suite', () => {

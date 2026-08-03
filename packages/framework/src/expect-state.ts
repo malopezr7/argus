@@ -10,7 +10,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// Assertion counter (ADR-6 / design D5 — increments on every assert call)
+// Assertion counter — increments on every assert call
 // ---------------------------------------------------------------------------
 
 let assertionCount = 0;
@@ -50,7 +50,7 @@ export function setExpectedAssertions(mode: 'exact' | 'min', n: number): void {
 
 /**
  * Wrap every data-property method of a matchers object so the assertion counter
- * increments ONCE on entry (D5/AC-98) — before any matcher body can throw a
+ * increments ONCE on entry — before any matcher body can throw a
  * usage/guard error. The `.not`/`.resolves`/`.rejects` accessors are sub-matcher
  * selectors (their descriptor has `get`, not `value`), so they are skipped.
  *
@@ -76,7 +76,7 @@ export function installAssertionCounting(m: Record<string, unknown>): void {
 }
 
 // ---------------------------------------------------------------------------
-// Custom matchers registry (ADR-6 / design D4)
+// Custom matchers registry
 // ---------------------------------------------------------------------------
 
 export type CustomMatcherFn = (

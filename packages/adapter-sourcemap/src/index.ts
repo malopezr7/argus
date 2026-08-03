@@ -29,7 +29,7 @@ function displaySource(source: string): string {
 }
 
 function isInternalSource(source: string): boolean {
-  // D5: cwd-relative PREFIX match (not substring) so a user path that merely
+  // Use a cwd-relative PREFIX match (not substring) so a user path that merely
   // CONTAINS an internal segment — e.g. `examples/packages/core/foo.test.ts` —
   // is NOT misclassified as internal and IS remapped.
   const s = source.replace(/^\.\//, '');
@@ -51,7 +51,7 @@ function remapFrame(line: string, c: SourceMapConsumer): string {
   const m = PAREN_FRAME.exec(line) ?? BARE_FRAME.exec(line);
   if (!m) return line;
   const [, pre, filePath, lineStr, colStr, post] = m;
-  if (!isBundlePath(filePath)) return line; // D3: basename-only detection
+  if (!isBundlePath(filePath)) return line; // basename-only detection
   let orig: ReturnType<SourceMapConsumer['originalPositionFor']>;
   try {
     orig = c.originalPositionFor({
@@ -62,7 +62,7 @@ function remapFrame(line: string, c: SourceMapConsumer): string {
     return line; // per-frame guard — never propagate
   }
   if (orig.source == null || orig.line == null) return line;
-  if (isInternalSource(orig.source)) return line; // D5: keep framework/core/node_modules verbatim
+  if (isInternalSource(orig.source)) return line; // keep framework/core/node_modules verbatim
   const outCol = (orig.column ?? 0) + 1; // 0-based → 1-based
   return `${pre}${displaySource(orig.source)}:${orig.line}:${outCol}${post}`;
 }
@@ -75,7 +75,7 @@ function remapStack(stack: string, c: SourceMapConsumer): string {
 }
 
 // ---------------------------------------------------------------------------
-// failureMessage location remap (ADR-6)
+// failureMessage location remap
 // ---------------------------------------------------------------------------
 
 function remapMessageLocation(message: string, c: SourceMapConsumer): string {
@@ -107,9 +107,9 @@ function hasBundleLocation(s: string | undefined): boolean {
 }
 
 function remapTest(t: TestCase, c: SourceMapConsumer): TestCase {
-  // D4: failureStack and failureMessage are remapped INDEPENDENTLY
+  // failureStack and failureMessage are remapped INDEPENDENTLY
   const hasStack = t.status === 'failed' && t.failureStack != null;
-  // D9: only treat a message as remappable when it actually carries a bundle location.
+  // Only treat a message as remappable when it actually carries a bundle location.
   const hasMessageLoc = t.status === 'failed' && hasBundleLocation(t.failureMessage);
   if (!hasStack && !hasMessageLoc) return t;
   const next: TestCase = { ...t };
@@ -131,13 +131,13 @@ function remapSuite(suite: Suite, c: SourceMapConsumer): Suite {
 }
 
 // ---------------------------------------------------------------------------
-// hasRemappable: skip consumer construction if nothing to remap (D9)
+// hasRemappable: skip consumer construction if nothing to remap
 // ---------------------------------------------------------------------------
 
 function hasRemappable(suites: Suite[]): boolean {
   for (const suite of suites) {
     for (const t of suite.tests) {
-      // D9: a stack (always bundle-relative from Hermes) OR a message that carries
+      // A stack (always bundle-relative from Hermes) OR a message that carries
       // a bundle location. A plain assertion message (no location) is NOT remappable.
       if (
         t.status === 'failed' &&
@@ -160,14 +160,14 @@ function hasRemappable(suites: Suite[]): boolean {
  * source positions using a V3 source map. Pure and TOTAL: never mutates the
  * input, never throws; on any failure mode returns the input unchanged or the
  * offending frame verbatim. Async because source-map's SourceMapConsumer API
- * is promise-based (ADR-5).
+ * is promise-based.
  *
  * @param result the RunResult from a passed/failed RunOutcome
  * @param map    the V3 source-map JSON string (SealedBundle.map), or undefined
  */
 export async function remapStacks(result: RunResult, map: string | undefined): Promise<RunResult> {
-  if (!map) return result; // absent map → no-op (ADR-5)
-  if (!hasRemappable(result.suites)) return result; // D9: skip if nothing to remap
+  if (!map) return result; // absent map → no-op
+  if (!hasRemappable(result.suites)) return result; // skip if nothing to remap
   let consumer: SourceMapConsumer;
   try {
     consumer = await new SourceMapConsumer(map); // throws on malformed JSON/map
@@ -177,7 +177,7 @@ export async function remapStacks(result: RunResult, map: string | undefined): P
   try {
     return { ...result, suites: result.suites.map((s) => remapSuite(s, consumer)) };
   } catch {
-    return result; // defensive: the tree-walk is total, but NEVER let a throw escape (ADR-5)
+    return result; // defensive: the tree-walk is total, but NEVER let a throw escape
   } finally {
     consumer.destroy();
   }

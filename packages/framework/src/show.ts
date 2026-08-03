@@ -1,16 +1,16 @@
 /**
  * @arguslab/framework — bounded, cycle-safe value renderer
  *
- * Moved from matchers.ts (ADR-1, ADR-5, R5). Runs IN-REALM alongside user
+ * Moved from matchers.ts. Runs IN-REALM alongside user
  * test code. Uses Object.getOwnPropertyDescriptor to read object keys so
- * accessor side-effects are never triggered (R5, AC-41).
+ * accessor side-effects are never triggered.
  *
  * Follows Hermes 0.17 envelope rules: index loops, no for..of/spread,
  * no Array.prototype methods.
  */
 
 // ---------------------------------------------------------------------------
-// show() — bounded, cycle-safe renderer (ADR-5, R5)
+// show() — bounded, cycle-safe renderer
 // ---------------------------------------------------------------------------
 
 const MAX_DEPTH = 4;
@@ -51,7 +51,7 @@ function render(v: unknown, depth: number, seen: unknown[]): string {
     const n = arr.length < MAX_ENTRIES ? arr.length : MAX_ENTRIES;
     for (let i = 0; i < n; i++) {
       if (i > 0) out += ', ';
-      // R5/AC-41: read indices via descriptor so accessor indices are never
+      // Read indices via descriptor so accessor indices are never
       // invoked. Holes (no descriptor) render as `undefined`; accessors as
       // `[Getter]`; data indices render their value.
       const desc = Object.getOwnPropertyDescriptor(arr, String(i));
@@ -78,7 +78,7 @@ function render(v: unknown, depth: number, seen: unknown[]): string {
   for (let i = 0; i < n; i++) {
     if (i > 0) out += ', ';
     const key = keys[i];
-    // R5: use getOwnPropertyDescriptor — never invoke accessors (AC-41)
+    // Use getOwnPropertyDescriptor — never invoke accessors
     const desc = Object.getOwnPropertyDescriptor(obj, key);
     const valStr =
       desc !== undefined && 'value' in desc

@@ -38,7 +38,7 @@ describe('mapPool', () => {
     expect(order).toEqual([0, 1, 2]);
   });
 
-  // Edge cases (task 1.2b)
+  // Edge cases
 
   it('empty input returns []', async () => {
     const results = await mapPool([], 4, async (item: number) => item * 2);

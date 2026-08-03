@@ -1,15 +1,15 @@
 /**
- * Task 5.2 — Bundler emits a usable V3 source map (AC-01, REQ-13-A, REQ-13-B/AC-20).
+ * The bundler emits a usable V3 source map.
  *
  * Verifies:
  * - bundle.map is a string
  * - JSON.parse(bundle.map).version === 3
  * - mappings is non-empty
- * - sources contains the user test file (REQ-13-A)
- * - bundle.code does NOT contain a sourceMappingURL comment (REQ-13-B, AC-20)
+ * - sources contains the user test file
+ * - bundle.code does NOT contain a sourceMappingURL comment
  *
- * NOTE: The SourceMapConsumer position-resolution test (REQ-13-C) lives in
- * packages/adapter-sourcemap where source-map is confined (AC-14/REQ-19-C).
+ * NOTE: the SourceMapConsumer position-resolution test lives in
+ * packages/adapter-sourcemap, the only package allowed to depend on source-map.
  */
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,8 +24,8 @@ const COMPONENT_PATH = resolve(REPO_ROOT, 'packages', 'rntl', 'src', 'index');
 const POLYFILL_PATH = resolve(REPO_ROOT, 'packages', 'framework', 'src', 'polyfill');
 const FIXTURE_PATH = resolve(REPO_ROOT, 'examples', 'math.test.ts');
 
-describe('EsbuildBundler source-map generation (ADR-1)', () => {
-  it('bundle.map is a valid V3 source-map JSON string containing the user test file (REQ-13-A, AC-01)', async () => {
+describe('EsbuildBundler source-map generation', () => {
+  it('bundle.map is a valid V3 source-map JSON string containing the user test file', async () => {
     const bundler = new EsbuildBundler();
     const bundle = await bundler.bundle({
       testPaths: [FIXTURE_PATH],
@@ -49,7 +49,7 @@ describe('EsbuildBundler source-map generation (ADR-1)', () => {
     expect(parsed.sources.some((s: string) => s.includes('math.test.ts'))).toBe(true);
   });
 
-  it('bundle.code does NOT contain a sourceMappingURL comment (REQ-13-B, AC-20)', async () => {
+  it('bundle.code does NOT contain a sourceMappingURL comment', async () => {
     const bundler = new EsbuildBundler();
     const bundle = await bundler.bundle({
       testPaths: [FIXTURE_PATH],

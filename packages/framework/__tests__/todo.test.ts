@@ -1,5 +1,7 @@
 /**
- * todo.test.ts — AC-65, AC-66, AC-67, AC-100
+ * test.todo / it.todo placeholders: reported with status todo, any body passed
+ * is never executed, the totals invariant still holds, and a todo-only suite
+ * does not trigger beforeAll/afterAll.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -13,7 +15,7 @@ import {
 } from './run-harness.js';
 
 describe('test.todo modifier', () => {
-  it('test.todo registers placeholder, status todo, totals.todo++ (AC-65)', async () => {
+  it('test.todo registers placeholder, status todo, totals.todo++', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest.todo('not yet implemented');
@@ -31,7 +33,7 @@ describe('test.todo modifier', () => {
     expect(result.totals.total).toBe(2);
   });
 
-  it('it.todo behaves identically to test.todo (AC-66)', async () => {
+  it('it.todo behaves identically to test.todo', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusIt.todo('pending');
@@ -43,7 +45,7 @@ describe('test.todo modifier', () => {
     expect(result.totals.todo).toBe(1);
   });
 
-  it('totals invariant holds when all four statuses coexist (AC-67)', async () => {
+  it('totals invariant holds when all four statuses coexist', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('passing', () => {});
@@ -65,7 +67,7 @@ describe('test.todo modifier', () => {
     ).toBe(result.totals.total);
   });
 
-  it('test.todo(name, fn) ignores the body — never executed (AC-100)', async () => {
+  it('test.todo(name, fn) ignores the body — never executed', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
       argusDescribe('suite', () => {
@@ -79,7 +81,7 @@ describe('test.todo modifier', () => {
     expect(flattenTests(result.suites)[0].status).toBe('todo');
   });
 
-  it('a todo-only suite does NOT run beforeAll/afterAll (REQ-14)', async () => {
+  it('a todo-only suite does NOT run beforeAll/afterAll', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
       argusDescribe('todo-only', () => {
@@ -100,7 +102,7 @@ describe('test.todo modifier', () => {
     expect(result.totals.todo).toBe(2);
   });
 
-  it('an outer beforeAll does NOT run when the only nested suite is todo-only (REQ-14)', async () => {
+  it('an outer beforeAll does NOT run when the only nested suite is todo-only', async () => {
     const log: string[] = [];
     await runWith(() => {
       argusDescribe('outer', () => {
@@ -116,7 +118,7 @@ describe('test.todo modifier', () => {
     expect(log).toEqual([]); // outer beforeAll must not fire for a todo-only subtree
   });
 
-  it('beforeAll DOES run when an executable test sits beside a todo (REQ-14 sanity)', async () => {
+  it('beforeAll DOES run when an executable test sits beside a todo', async () => {
     const log: string[] = [];
     await runWith(() => {
       argusDescribe('mixed', () => {

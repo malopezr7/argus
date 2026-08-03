@@ -98,8 +98,8 @@ describe('parseHermesOutput', () => {
     expect(o.kind === 'protocol-failure' && o.reason).toBe('missing-frame');
   });
 
-  // AC-82: isTotals validates updated invariant with todo field
-  it('isTotals accepts {passed:1,failed:0,skipped:1,todo:1,total:3} (AC-82)', () => {
+  // isTotals validates the counts invariant when a todo field is present
+  it('isTotals accepts {passed:1,failed:0,skipped:1,todo:1,total:3}', () => {
     const payload = {
       v: 1,
       ok: true,
@@ -115,8 +115,7 @@ describe('parseHermesOutput', () => {
     expect(o.kind).not.toBe('protocol-failure');
   });
 
-  // AC-82: isTestCaseShape accepts status:'todo'
-  it('isTestCaseShape accepts status:"todo" (AC-82)', () => {
+  it('isTestCaseShape accepts status:"todo"', () => {
     const payload = {
       v: 1,
       ok: true,
@@ -136,8 +135,7 @@ describe('parseHermesOutput', () => {
     expect(o.kind).toBe('passed'); // totals.failed=0, all valid
   });
 
-  // AC-84: isTotals rejects totals missing todo field
-  it('isTotals rejects totals object missing todo field (AC-84)', () => {
+  it('isTotals rejects totals object missing todo field', () => {
     const payload = {
       v: 1,
       ok: true,

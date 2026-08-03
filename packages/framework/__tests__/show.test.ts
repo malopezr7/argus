@@ -1,14 +1,14 @@
 /**
- * show() bounding tests — task 5.2 + 5.2b
- * AC-25..28, AC-41, ADR-5, R5
+ * show() bounding: depth cap, array-element cap, string truncation, circular
+ * references, and rendering accessors as [Getter] without ever invoking them.
  */
 import { describe, expect, it } from 'vitest';
 import { show } from '../src/matchers.js';
 
 describe('show() renderer', () => {
-  // --- Depth cap (AC-25) ---
+  // --- Depth cap ---
 
-  it('depth-5 object hits [Object] placeholder at cap (AC-25)', () => {
+  it('depth-5 object hits [Object] placeholder at cap', () => {
     const value = { a: { b: { c: { d: { e: 1 } } } } };
     const out = show(value);
     expect(out).toContain('[Object]');
@@ -16,7 +16,7 @@ describe('show() renderer', () => {
     expect(out).not.toContain('e: 1');
   });
 
-  it('depth exactly 4 (MAX_DEPTH) nested objects: leaf at depth 4 renders as [Object] (AC-25)', () => {
+  it('depth exactly 4 (MAX_DEPTH) nested objects: leaf at depth 4 renders as [Object]', () => {
     // MAX_DEPTH=4, depth>=4 → [Object]. Object at depth 4 triggers the cap.
     const value = { a: { b: { c: { d: { e: 1 } } } } };
     const out = show(value);
@@ -30,9 +30,9 @@ describe('show() renderer', () => {
     expect(out).toContain('42');
   });
 
-  // --- Array element cap (AC-26) ---
+  // --- Array element cap ---
 
-  it('10-element array truncates at 8 and appends … (AC-26)', () => {
+  it('10-element array truncates at 8 and appends …', () => {
     const value = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     const out = show(value);
     expect(out).toContain('…');
@@ -47,9 +47,9 @@ describe('show() renderer', () => {
     expect(out).toContain('8');
   });
 
-  // --- String truncation (AC-27) ---
+  // --- String truncation ---
 
-  it('200-char string is truncated at ≤80 chars and has … indicator (AC-27)', () => {
+  it('200-char string is truncated at ≤80 chars and has … indicator', () => {
     const value = 'a'.repeat(200);
     const out = show(value);
     expect(out.startsWith('"')).toBe(true);
@@ -63,9 +63,9 @@ describe('show() renderer', () => {
     expect(out).toBe('"hello"');
   });
 
-  // --- Circular reference (AC-28) ---
+  // --- Circular reference ---
 
-  it('circular value returns [Circular] without infinite loop (AC-28)', () => {
+  it('circular value returns [Circular] without infinite loop', () => {
     const obj: Record<string, unknown> = {};
     obj.self = obj;
     const out = show(obj);
@@ -116,9 +116,9 @@ describe('show() renderer', () => {
     expect(show(d)).toBe('[Date 1000]');
   });
 
-  // --- R5: throwing getter renders as [Getter] without invoking (AC-41, 5.2b) ---
+  // --- Throwing getter renders as [Getter] without being invoked ---
 
-  it('throwing getter renders as [Getter] and does not throw (AC-41)', () => {
+  it('throwing getter renders as [Getter] and does not throw', () => {
     const obj = Object.defineProperty({}, 'danger', {
       get() {
         throw new Error('getter should not be called');
@@ -138,8 +138,8 @@ describe('show() renderer', () => {
     expect(out).toContain('x: 42');
   });
 
-  // R5/AC-41: array index accessors must NOT be invoked either
-  it('throwing array-index getter renders [Getter] and does not throw (AC-41)', () => {
+  // Array index accessors must NOT be invoked either
+  it('throwing array-index getter renders [Getter] and does not throw', () => {
     const arr: unknown[] = [1];
     Object.defineProperty(arr, '1', {
       get() {

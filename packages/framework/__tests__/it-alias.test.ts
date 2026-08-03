@@ -1,5 +1,6 @@
 /**
- * it-alias.test.ts — AC-44, AC-45, AC-46
+ * `it` is the very same function object as `test` — not a wrapper — so it
+ * reports identically and carries the same .skip/.only/.todo modifiers.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -10,12 +11,12 @@ import {
   runWith,
 } from './run-harness.js';
 
-describe('it alias (AC-44, AC-45, AC-46)', () => {
-  it('it === test is true (AC-44)', () => {
+describe('it alias', () => {
+  it('it === test is true', () => {
     expect(argusIt).toBe(argusTest);
   });
 
-  it('it(name, fn) runs and reports passed identically to test(name, fn) (AC-45)', async () => {
+  it('it(name, fn) runs and reports passed identically to test(name, fn)', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusIt('works', () => {});
@@ -28,7 +29,7 @@ describe('it alias (AC-44, AC-45, AC-46)', () => {
     expect(result.totals.passed).toBe(1);
   });
 
-  it('it.skip/only/todo accessible and correct (AC-46)', async () => {
+  it('it.skip/only/todo accessible and correct', async () => {
     expect(argusIt.skip).toBe(argusTest.skip);
     expect(argusIt.only).toBe(argusTest.only);
     expect(argusIt.todo).toBe(argusTest.todo);

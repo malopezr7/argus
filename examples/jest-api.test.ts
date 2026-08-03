@@ -2,8 +2,6 @@
  * jest-api integration fixture — exercises the full Jest-API surface on real Hermes.
  * Run with: pnpm argus examples/jest-api.test.ts
  * Expected: exit 0 (all tests pass).
- *
- * Phase 3 / AC-44..AC-81
  */
 declare const describe: (
   name: string,
@@ -186,7 +184,7 @@ describe('nested hooks', () => {
 });
 
 // ---------------------------------------------------------------------------
-// A todo-only suite MUST NOT trigger lifecycle hooks (REQ-14).
+// A todo-only suite MUST NOT trigger lifecycle hooks.
 // This exercises the REAL index.ts runner (not just the in-process harness).
 // ---------------------------------------------------------------------------
 

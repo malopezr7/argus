@@ -2,7 +2,7 @@ import type { EngineOutput, RunOutcome, RunResult } from './domain/types.js';
 import { ARGUS_RESULT_PREFIX } from './domain/types.js';
 
 /**
- * Parse a Hermes subprocess's stdout into a RunOutcome, per SPEC §5.1.
+ * Parse a Hermes subprocess's stdout into a RunOutcome.
  *
  * The framework emits ONE framed line: `__ARGUS_RESULT__:<nonce>:<json>`. The
  * <nonce> is a per-run secret passed privately to run(nonce) — user code never

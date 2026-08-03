@@ -4,7 +4,7 @@ import { detectArch, readHermesVersionInfo } from './utils.js';
 
 /**
  * LocalPathAdapter (BYO) — resolves a user-supplied `hermes` binary.
- * Use cases: CI cache, monorepo-vendored binary, the Phase 0/1 spike binary.
+ * Use cases: CI cache, monorepo-vendored binary, a locally built binary.
  */
 export class LocalPathAdapter implements HermesProvisioner {
   constructor(private readonly binaryPath: string) {}

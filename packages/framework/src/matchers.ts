@@ -65,7 +65,7 @@ export function expect(actual: unknown): Matchers {
   return makeMatchers(actual, false);
 }
 
-// Assertion count expectation setters (ADR-6 / REQ-17)
+// Assertion count expectation setters
 (expect as unknown as Record<string, unknown>).assertions = function assertions(n: number): void {
   setExpectedAssertions('exact', n);
 };
@@ -73,7 +73,7 @@ export function expect(actual: unknown): Matchers {
   setExpectedAssertions('min', 1);
 };
 
-// expect.extend — merges custom matchers (ADR-6 / REQ-16 / design D4)
+// expect.extend — merges custom matchers
 (expect as unknown as Record<string, unknown>).extend = function extend(
   table: Record<string, CustomMatcherFn>,
 ): void {
@@ -88,10 +88,10 @@ export function expect(actual: unknown): Matchers {
 // ---------------------------------------------------------------------------
 
 /**
- * R9: makeAssert takes only negated (no actual param).
+ * makeAssert takes only `negated` — it deliberately has no `actual` param.
  *
  * NOTE: assertion counting is NOT done here. It is done once per matcher
- * INVOCATION by the entry wrapper installed in makeMatchers (D5/AC-98), so that
+ * INVOCATION by the entry wrapper installed in makeMatchers, so that
  * matchers which throw a usage/guard error BEFORE reaching assert (e.g. toThrow
  * on a non-function, toEqual on a Map) still count exactly once.
  */
@@ -123,7 +123,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     // --- Equality ---
 
     toBe(expected: unknown): void {
-      // AC-07
       const pass = Object.is(actual, expected);
       assert(
         pass,
@@ -133,7 +132,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     },
 
     toEqual(expected: unknown): void {
-      // AC-01, AC-02, AC-06
       const pass = deepEqual(actual, expected, false);
       assert(
         pass,
@@ -143,7 +141,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     },
 
     toStrictEqual(expected: unknown): void {
-      // AC-03, AC-04, AC-05
       const pass = deepEqual(actual, expected, true);
       assert(
         pass,
@@ -155,7 +152,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     // --- Truthiness ---
 
     toBeTruthy(): void {
-      // AC-08
       const pass = Boolean(actual);
       assert(
         pass,
@@ -165,7 +161,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     },
 
     toBeFalsy(): void {
-      // AC-08
       const pass = !actual;
       assert(
         pass,
@@ -213,7 +208,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     // --- Numeric ---
 
     toBeGreaterThan(n: number): void {
-      // AC-09
       const pass = typeof actual === 'number' && actual > n;
       assert(
         pass,
@@ -250,7 +244,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     },
 
     toBeCloseTo(expected: number, numDigits?: number): void {
-      // AC-10, AC-11
       const digits = numDigits === undefined ? 2 : numDigits;
       const tolerance = 10 ** -digits / 2;
       const pass = typeof actual === 'number' && Math.abs(actual - expected) < tolerance;
@@ -265,7 +258,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     // --- String / Collection ---
 
     toMatch(pattern: string | RegExp): void {
-      // AC-12
       let pass: boolean;
       if (typeof pattern === 'string') {
         pass = typeof actual === 'string' && actual.indexOf(pattern) !== -1;
@@ -280,7 +272,7 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     },
 
     toContain(item: unknown): void {
-      // AC-13, AC-37 (R7 — SameValueZero, +0 ≡ -0, NaN ≡ NaN)
+      // Array membership compares with SameValueZero: +0 ≡ -0 and NaN ≡ NaN.
       let pass: boolean;
       if (typeof actual === 'string') {
         pass = typeof item === 'string' && actual.indexOf(item) !== -1;
@@ -304,7 +296,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     },
 
     toContainEqual(item: unknown): void {
-      // AC-14
       let pass = false;
       if (Array.isArray(actual)) {
         const arr = actual as unknown[];
@@ -323,7 +314,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     },
 
     toHaveLength(n: number): void {
-      // AC-15
       const len = (actual as { length?: unknown }).length;
       const pass = len === n;
       assert(
@@ -333,11 +323,10 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
       );
     },
 
-    // --- Object (R6: arguments.length distinguishes omitted vs explicit undefined) ---
+    // --- Object (arguments.length distinguishes omitted vs explicit undefined) ---
 
     toHaveProperty(keyPath: string | Array<string | number>, value?: unknown): void {
-      // AC-16, AC-17, AC-38
-      // biome-ignore lint: arguments.length needed for R6 (detect omitted vs explicit undefined)
+      // biome-ignore lint: arguments.length needed to detect omitted vs explicit undefined
       const checkValue = arguments.length >= 2;
       const resolved = getByPath(actual, keyPath);
       let pass: boolean;
@@ -358,7 +347,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     },
 
     toMatchObject(subset: object): void {
-      // AC-18
       const pass = matchObject(actual, subset);
       assert(
         pass,
@@ -370,7 +358,6 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     // --- Error ---
 
     toThrow(expected?: unknown): void {
-      // AC-19..22, AC-39 (ADR-6, R8)
       if (typeof actual !== 'function') {
         throw new Error(`expect(received).toThrow() requires a function; received ${show(actual)}`);
       }
@@ -399,7 +386,7 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
     },
   } as Matchers;
 
-  // Install custom matchers (ADR-6 / design D4)
+  // Install custom matchers
   const ck = Object.keys(customMatchers);
   for (let i = 0; i < ck.length; i++) {
     const name = ck[i];
@@ -430,7 +417,7 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
 
   mixinCallMatchers(m as unknown as Record<string, unknown>, actual, negated, assert);
 
-  // D5/AC-98: count every matcher INVOCATION exactly once, at ENTRY — before any
+  // Count every matcher INVOCATION exactly once, at ENTRY — before any
   // matcher body can throw a usage/guard error. (See installAssertionCounting.)
   installAssertionCounting(m as unknown as Record<string, unknown>);
 

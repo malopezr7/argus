@@ -1,5 +1,7 @@
 /**
- * assertions.test.ts — AC-78, AC-79, AC-80, AC-81, AC-98
+ * expect.assertions(n) and expect.hasAssertions(): the counter increments on
+ * every assertion call — passing or failing, sync or async — and resets
+ * between tests.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -11,7 +13,7 @@ import {
 } from './run-harness.js';
 
 describe('expect.assertions / expect.hasAssertions', () => {
-  it('expect.assertions(n) fails when count is low (AC-78)', async () => {
+  it('expect.assertions(n) fails when count is low', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('low count', () => {
@@ -25,7 +27,7 @@ describe('expect.assertions / expect.hasAssertions', () => {
     expect(t.failureMessage).toMatch(/assertions\(2\)/);
   });
 
-  it('expect.assertions(n) passes when exact count matched (AC-79)', async () => {
+  it('expect.assertions(n) passes when exact count matched', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('exact count', () => {
@@ -38,7 +40,7 @@ describe('expect.assertions / expect.hasAssertions', () => {
     expect(flattenTests(result.suites)[0].status).toBe('passed');
   });
 
-  it('expect.hasAssertions() fails when zero assertions ran (AC-80)', async () => {
+  it('expect.hasAssertions() fails when zero assertions ran', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('zero assertions', () => {
@@ -52,7 +54,7 @@ describe('expect.assertions / expect.hasAssertions', () => {
     expect(t.failureMessage).toMatch(/hasAssertions/);
   });
 
-  it('assertion counter resets between tests (AC-81)', async () => {
+  it('assertion counter resets between tests', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('T1', () => {
@@ -72,10 +74,10 @@ describe('expect.assertions / expect.hasAssertions', () => {
     expect(tests[1].status).toBe('passed');
   });
 
-  it('counter increments on pass AND fail (AC-98)', async () => {
+  it('counter increments on pass AND fail', async () => {
     // We expect assertions(2); one passes, one fails -> count = 2 before throw
     // but the failed assertion throws, so the second one never runs...
-    // Actually per D5: counter increments on EVERY assert call (pass or fail).
+    // The counter increments on EVERY assert call (pass or fail).
     // The throw happens AFTER the increment, so the counter still goes up on fail.
     // Test: assertions(1); one failing assertion → still fail on the assertion
     // but counter = 1 by then. The test fails because the assertion threw, not
@@ -100,8 +102,8 @@ describe('expect.assertions / expect.hasAssertions', () => {
     expect(flattenTests(result.suites)[0].status).toBe('passed');
   });
 
-  it('counter increments on a caught-failing .rejects.toThrow (AC-98, async path)', async () => {
-    // D5: a .rejects.toThrow that fails (rejection does not match) MUST still
+  it('counter increments on a caught-failing .rejects.toThrow (async path)', async () => {
+    // A .rejects.toThrow that fails (rejection does not match) MUST still
     // increment the counter, so hasAssertions is satisfied even though the
     // assertion failed and was caught.
     const result = await runWith(() => {
@@ -124,8 +126,8 @@ describe('expect.assertions / expect.hasAssertions', () => {
     expect(flattenTests(result.suites)[0].status).toBe('passed');
   });
 
-  it('counter increments on a caught WRONG-SETTLEMENT async assertion (AC-98)', async () => {
-    // D5: a .rejects.toBe on a RESOLVING promise (and a .resolves.toBe on a
+  it('counter increments on a caught WRONG-SETTLEMENT async assertion', async () => {
+    // A .rejects.toBe on a RESOLVING promise (and a .resolves.toBe on a
     // REJECTING promise) fails on the wrong-settlement path — which never reaches
     // the sync matcher — and MUST still increment the counter.
     const result = await runWith(() => {

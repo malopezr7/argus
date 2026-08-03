@@ -3,9 +3,9 @@
  *
  * All helpers are async function declarations (no async arrows).
  * No for..of, no spread. Index loops only.
- * No imports from @arguslab/core or Node built-ins (AC-91).
+ * No imports from @arguslab/core or Node built-ins.
  *
- * Error policy (design D3):
+ * Error policy:
  *  - beforeAll throws → store error; all block+nested tests fail; afterAll still runs.
  *  - beforeEach throws → test fails, body skipped; afterEach chain still runs.
  *  - afterEach throws → test fails/annotated; remaining afterEach hooks still run.

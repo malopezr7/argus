@@ -1,31 +1,30 @@
 /**
- * toThrow matcher tests — task 5.8 + 5.8b
- * AC-19..22, AC-39, REQ-06, ADR-6, R8
+ * toThrow matcher tests — every accepted argument form (none, string, RegExp,
+ * Error class, Error instance), the non-function usage error, and .not.
  */
 import { describe, expect, it } from 'vitest';
 import { expect as argusExpect } from '../src/matchers.js';
 
 describe('toThrow', () => {
-  // AC-19: no arg — any throw passes
-  it('passes when fn throws (no arg, AC-19)', () => {
+  // No arg — any throw passes
+  it('passes when fn throws (no arg)', () => {
     argusExpect(() => {
       throw new Error('boom');
     }).toThrow();
   });
 
-  // AC-19: fails when fn does not throw
-  it('throws when fn does not throw (AC-19)', () => {
+  it('throws when fn does not throw', () => {
     expect(() => argusExpect(() => 42).toThrow()).toThrow();
   });
 
-  // AC-20: string substring match
-  it('passes for string substring match (AC-20)', () => {
+  // String substring match
+  it('passes for string substring match', () => {
     argusExpect(() => {
       throw new Error('connection refused');
     }).toThrow('refused');
   });
 
-  it('throws for string substring mismatch (AC-20)', () => {
+  it('throws for string substring mismatch', () => {
     expect(() =>
       argusExpect(() => {
         throw new Error('connection refused');
@@ -33,8 +32,8 @@ describe('toThrow', () => {
     ).toThrow();
   });
 
-  // AC-21: RegExp match
-  it('passes for RegExp match (AC-21)', () => {
+  // RegExp match
+  it('passes for RegExp match', () => {
     argusExpect(() => {
       throw new Error('invalid token: abc123');
     }).toThrow(/invalid token: \w+/);
@@ -48,14 +47,14 @@ describe('toThrow', () => {
     ).toThrow();
   });
 
-  // AC-22: Error subclass instanceof
-  it('passes for TypeError subclass instanceof (AC-22)', () => {
+  // Error subclass instanceof
+  it('passes for TypeError subclass instanceof', () => {
     argusExpect(() => {
       throw new TypeError('bad type');
     }).toThrow(TypeError);
   });
 
-  it('throws for wrong class instanceof (AC-22)', () => {
+  it('throws for wrong class instanceof', () => {
     expect(() =>
       argusExpect(() => {
         throw new TypeError('bad type');
@@ -63,8 +62,8 @@ describe('toThrow', () => {
     ).toThrow();
   });
 
-  // AC-39 / R8: Error instance — match on message substring
-  it('passes when thrown message contains Error instance message (AC-39)', () => {
+  // Error instance — match on message substring
+  it('passes when thrown message contains Error instance message', () => {
     argusExpect(() => {
       throw new Error('disk full: /tmp');
     }).toThrow(new Error('disk full'));
@@ -78,7 +77,7 @@ describe('toThrow', () => {
     ).toThrow();
   });
 
-  // Non-function usage error (ADR-6)
+  // Non-function usage error
   it('throws usage error for non-function actual', () => {
     expect(() => argusExpect(42).toThrow()).toThrow('requires a function');
   });
@@ -101,7 +100,7 @@ describe('toThrow', () => {
   });
 
   // Custom Error subclass
-  it('passes for custom Error subclass (AC-22)', () => {
+  it('passes for custom Error subclass', () => {
     class MyError extends Error {}
     argusExpect(() => {
       throw new MyError('custom');

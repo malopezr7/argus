@@ -1,5 +1,6 @@
 /**
- * async-matchers.test.ts — AC-68..AC-74, AC-101
+ * The .resolves / .rejects async matcher surface, including composition with
+ * .not and the wrong-settlement failure messages.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -11,7 +12,7 @@ import {
 } from './run-harness.js';
 
 describe('.resolves / .rejects async matchers', () => {
-  it('.resolves.toBe pass — resolved to expected value (AC-68)', async () => {
+  it('.resolves.toBe pass — resolved to expected value', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('resolves pass', async function t() {
@@ -22,7 +23,7 @@ describe('.resolves / .rejects async matchers', () => {
     expect(flattenTests(result.suites)[0].status).toBe('passed');
   });
 
-  it('.resolves.toBe fail — value mismatch (AC-69)', async () => {
+  it('.resolves.toBe fail — value mismatch', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('resolves fail', async function t() {
@@ -33,7 +34,7 @@ describe('.resolves / .rejects async matchers', () => {
     expect(flattenTests(result.suites)[0].status).toBe('failed');
   });
 
-  it('.rejects.toThrow pass (AC-70)', async () => {
+  it('.rejects.toThrow pass', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('rejects pass', async function t() {
@@ -44,7 +45,7 @@ describe('.resolves / .rejects async matchers', () => {
     expect(flattenTests(result.suites)[0].status).toBe('passed');
   });
 
-  it('.resolves on rejecting promise → failed with wrong-settlement message (AC-71)', async () => {
+  it('.resolves on rejecting promise → failed with wrong-settlement message', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('wrong settlement resolves', async function t() {
@@ -57,7 +58,7 @@ describe('.resolves / .rejects async matchers', () => {
     expect(t.failureMessage).toMatch(/resolves.*rejected/i);
   });
 
-  it('.rejects on resolving promise → failed with wrong-settlement message (AC-72)', async () => {
+  it('.rejects on resolving promise → failed with wrong-settlement message', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('wrong settlement rejects', async function t() {
@@ -70,7 +71,7 @@ describe('.resolves / .rejects async matchers', () => {
     expect(t.failureMessage).toMatch(/rejects.*resolved/i);
   });
 
-  it('.resolves.not.toBe composes (AC-73)', async () => {
+  it('.resolves.not.toBe composes', async () => {
     const resultPass = await runWith(() => {
       argusDescribe('suite', () => {
         argusTest('not.toBe pass', async function t() {
@@ -90,7 +91,7 @@ describe('.resolves / .rejects async matchers', () => {
     expect(flattenTests(resultFail.suites)[0].status).toBe('failed');
   });
 
-  it('.rejects.not composes (AC-101)', async () => {
+  it('.rejects.not composes', async () => {
     // .rejects.not.toThrow('other') should pass when error message doesn't match
     const result = await runWith(() => {
       argusDescribe('suite', () => {
@@ -103,9 +104,11 @@ describe('.resolves / .rejects async matchers', () => {
   });
 });
 
-describe('structural check: no async arrows in matchers.ts new sections (AC-74)', () => {
-  it('placeholder — structural check done via grep in Phase 8 gate', () => {
-    // Verified externally; this test marks the AC as covered.
+describe('structural check: no async arrows in matchers.ts new sections', () => {
+  it('placeholder — the no-async-arrows rule is syntactic, not observable at runtime', () => {
+    // Nothing to assert here: whether the source uses async arrows cannot be
+    // detected from the compiled behaviour. The rule is enforced by inspecting
+    // the source; this placeholder keeps it visible in the suite.
     expect(true).toBe(true);
   });
 });

@@ -1,12 +1,12 @@
 /**
- * Numeric matcher tests — task 5.5
- * AC-09, AC-10, AC-11, REQ-03
+ * Numeric comparison matchers: toBeGreaterThan(OrEqual), toBeLessThan(OrEqual),
+ * and toBeCloseTo — including how numDigits sets the tolerance.
  */
 import { describe, expect, it } from 'vitest';
 import { expect as argusExpect } from '../src/matchers.js';
 
 describe('toBeGreaterThan', () => {
-  it('passes when actual > n (AC-09)', () => {
+  it('passes when actual > n', () => {
     argusExpect(5).toBeGreaterThan(4);
   });
 
@@ -62,11 +62,11 @@ describe('toBeLessThanOrEqual', () => {
 });
 
 describe('toBeCloseTo', () => {
-  it('0.1+0.2 passes with default numDigits=2 (AC-10)', () => {
+  it('0.1+0.2 passes with default numDigits=2', () => {
     argusExpect(0.1 + 0.2).toBeCloseTo(0.3);
   });
 
-  it('0.1+0.2 fails with numDigits=20 (AC-11 — small enough tolerance that diff exceeds it)', () => {
+  it('0.1+0.2 fails with numDigits=20 (small enough tolerance that diff exceeds it)', () => {
     // tolerance = 10^-20 / 2 = 5e-21; diff ≈ 4.44e-17 > 5e-21 → fails
     expect(() => argusExpect(0.1 + 0.2).toBeCloseTo(0.3, 20)).toThrow();
   });

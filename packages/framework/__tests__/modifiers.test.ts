@@ -1,5 +1,6 @@
 /**
- * modifiers.test.ts — AC-58, AC-59, AC-60
+ * The .skip modifier on test, it, and describe: the body is never called, the
+ * status is reported as skipped, and tests outside the block are unaffected.
  */
 import { describe, expect, it } from 'vitest';
 import {
@@ -11,7 +12,7 @@ import {
 } from './run-harness.js';
 
 describe('skip modifier', () => {
-  it('test.skip body not called, status skipped, totals.skipped (AC-58)', async () => {
+  it('test.skip body not called, status skipped, totals.skipped', async () => {
     const log: string[] = [];
     const result = await runWith(() => {
       argusDescribe('suite', () => {
@@ -31,7 +32,7 @@ describe('skip modifier', () => {
     expect(result.totals.total).toBe(2);
   });
 
-  it('it.skip behaves identically to test.skip (AC-59)', async () => {
+  it('it.skip behaves identically to test.skip', async () => {
     const result = await runWith(() => {
       argusDescribe('suite', () => {
         argusIt.skip('skipped', () => {
@@ -46,7 +47,7 @@ describe('skip modifier', () => {
     expect(tests[1].status).toBe('passed');
   });
 
-  it('describe.skip skips all contained tests, outer tests unaffected (AC-60)', async () => {
+  it('describe.skip skips all contained tests, outer tests unaffected', async () => {
     const result = await runWith(() => {
       argusDescribe('outer', () => {
         argusDescribe.skip('skipped block', () => {

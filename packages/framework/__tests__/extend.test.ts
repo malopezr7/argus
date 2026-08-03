@@ -1,5 +1,6 @@
 /**
- * extend.test.ts — AC-75, AC-76, AC-77, AC-97
+ * expect.extend: custom matchers pass/fail correctly, compose with .not, are
+ * merged additively across calls, and receive this.isNot / this.equals.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { expect as argusExpect, resetAssertions } from '../src/matchers.js';
@@ -9,8 +10,8 @@ beforeEach(() => {
   resetAssertions();
 });
 
-describe('expect.extend (AC-75, AC-76, AC-77, AC-97)', () => {
-  it('custom matcher passes and fails correctly (AC-75)', () => {
+describe('expect.extend', () => {
+  it('custom matcher passes and fails correctly', () => {
     (argusExpect as unknown as { extend(t: Record<string, unknown>): void }).extend({
       toBeEven(this: { isNot: boolean }, actual: unknown) {
         const pass = typeof actual === 'number' && (actual as number) % 2 === 0;
@@ -27,7 +28,7 @@ describe('expect.extend (AC-75, AC-76, AC-77, AC-97)', () => {
     }).toThrow();
   });
 
-  it('custom matcher composes with .not (AC-76)', () => {
+  it('custom matcher composes with .not', () => {
     // passes (3 is odd → not.toBeEven passes)
     (argusExpect(3).not as unknown as { toBeEven(): void }).toBeEven();
 
@@ -37,7 +38,7 @@ describe('expect.extend (AC-75, AC-76, AC-77, AC-97)', () => {
     }).toThrow();
   });
 
-  it('expect.extend is additive: second call does not remove first (AC-77)', () => {
+  it('expect.extend is additive: second call does not remove first', () => {
     (argusExpect as unknown as { extend(t: Record<string, unknown>): void }).extend({
       matcherA(_actual: unknown) {
         return { pass: true, message: () => 'A' };
@@ -54,7 +55,7 @@ describe('expect.extend (AC-75, AC-76, AC-77, AC-97)', () => {
     (argusExpect(1) as unknown as { matcherB(): void }).matcherB();
   });
 
-  it('custom matcher reads this.isNot and this.equals (AC-97)', () => {
+  it('custom matcher reads this.isNot and this.equals', () => {
     (argusExpect as unknown as { extend(t: Record<string, unknown>): void }).extend({
       toBeWithin(
         this: { isNot: boolean; equals(a: unknown, b: unknown): boolean },
