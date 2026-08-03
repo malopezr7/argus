@@ -60,15 +60,26 @@ whatever the next provisioning source can supply.
 
 ## When both engines are pinned
 
-Argus prefers **V1** when your project pins both, regardless of which one React Native
-treats as its default. On RN 0.83 that means Argus targets V1 while an RN build defaults to
-legacy.
+Argus runs **the engine your React Native release ships by default** — the `RN default
+engine` column above — not simply whichever is newest. Pinning an engine and shipping it
+are different things: RN 0.82 and 0.83 pin V1 as well as legacy, but ship legacy, and V1 is
+reachable there only by building React Native from source. Testing on a VM those apps never
+execute would be the exact fidelity gap this tool exists to close.
 
-If you ship legacy on 0.83, say so:
+So on RN 0.83 Argus targets **legacy**, and says so on the summary line:
+
+```text
+✓ hermes legacy hermes-v0.14.1 · … 
+```
+
+If you opted into V1 there, ask for it:
 
 ```bash
-argus --engine legacy "src/**/*.test.ts"
+argus --engine v1 "src/**/*.test.ts"
 ```
+
+An explicit `--engine` always wins. When a release's default is unknown — an out-of-table
+React Native pinning both — Argus assumes V1 and flags the guess rather than hiding it.
 
 Or check what your build actually uses — RN reads the same pins, and
 [the mismatch warning](/hermes/engines/#the-mismatch-warning) tells you when a binary

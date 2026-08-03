@@ -32,7 +32,12 @@ The runner works and ships. What is missing is test-authoring surface.
   V1, all four platforms, covering React Native 0.86 and 0.87.
 - A [configuration file](/cli/configuration/) — `argus.config.ts` loaded through Node's own
   type stripping, so it needs no transpiler and adds no dependency.
-- 875 host-side unit tests across 70 files (2 skipped), plus 15 Hermes fixtures — 6 passing,
+- The [syntax envelope](/hermes/syntax-envelope/), documented for both engines and derived
+  from real binaries instead of prose. `test/hermes-syntax-probe.test.ts` checks the policy
+  against whichever VMs are present, which is what caught two long-standing errors: legacy
+  **runs** `async function` and rejects only the arrow form, and V1 rejects
+  `async function*` exactly as legacy does, so it is not a superset.
+- 1140 host-side unit tests across 83 files (2 skipped), plus 19 Hermes fixtures — 10 passing,
   2 intentionally failing, 7 adversarial.
 
 ## Shipped in v0.1.0 — distribution
@@ -43,8 +48,8 @@ Argus is installable. This was the milestone everything else waited behind.
   workspace packages are private and never reach the registry — see
   [Package map](/internals/packages/).
 - A build pipeline staging the tarball: host code bundled to a single ESM binary, the
-  Hermes-side sources copied verbatim as TypeScript runtime assets. 30 files, 59 kB packed,
-  219 kB unpacked, 276 kB installed.
+  Hermes-side sources copied verbatim as TypeScript runtime assets. 30 files, 68 kB packed,
+  246 kB unpacked, 300 kB installed.
 - Path resolution anchored to the CLI module's own location instead of the monorepo layout,
   so the framework and polyfills are found in both the development and installed shapes.
 - React resolved from the **user's project** rather than relative to the component-testing
@@ -65,13 +70,20 @@ so consumers add `"types": ["@arguslab/argus"]` or one triple-slash reference. S
   *dependencies* — `node_modules` JavaScript containing class syntax — and runs regardless
   of engine. Correct and cheap, but broader than it needs to be on V1, whose parser handles
   classes natively.
-- Revisit the documented [syntax envelope](/hermes/syntax-envelope/) — it describes V0, not
-  V1.
 - Refresh the RN-to-Hermes lookup table in CI from the published branches table. The table
   exists and is correct; refreshing it is manual.
 - Cut the remaining `hermes-bin-v*` releases. Only `hermes-bin-v250829098.0.16` is
-  published, so the prebuilt step 404s on React Native 0.83–0.85 and on every legacy pin,
-  falling through to `--provision`.
+  published — it covers React Native 0.86 and 0.87 and nothing else. The prebuilt step 404s
+  on RN 0.83–0.85, and on the date-based legacy pins of RN 0.78–0.82 it cannot apply at all,
+  because a date ref cannot name a release version. Those fall through to the bundled macOS
+  VM where it exists and to `--provision` everywhere else — which is the whole of Linux
+  below RN 0.86.
+- **Re-cut the published Linux archives.** The ones on the release page require glibc 2.38,
+  so they refuse to start on Ubuntu 22.04 LTS, Debian 12, Amazon Linux 2023 and RHEL 9. The
+  build now targets the oldest supported runner and a gate reads the requirement out of the
+  ELF and fails above 2.35, but that landed after the release was cut, so the fix is not in
+  users' hands until the binaries are rebuilt. musl distributions such as Alpine stay out of
+  reach regardless. See [Prebuilt binaries](/hermes/prebuilts/#what-the-linux-archives-require).
 
 ## Shipped in v0.2.0 — configuration
 
@@ -102,10 +114,11 @@ Still open here:
 - `passWithNoTests` — a zero-match run currently exits 2.
 - esbuild target, module aliases and the JSX runtime are still fixed.
 
-## v0.2.0 — Test-authoring features
+## Next — test-authoring features
 
-The next milestone. None of these blocked installability; all of them are the reason
-someone would ask for a v0.2.
+The next milestone. It is deliberately unnumbered: which release these land in is not
+decided, and naming one here would be a promise this page cannot keep. None of them blocked
+installability; all of them are the reason someone would ask for the release after this one.
 
 ### Snapshots, coverage, watch
 
@@ -140,7 +153,7 @@ signed provenance, authenticated by npm trusted publishing over OIDC so no token
 in the repository. `v0.1.0` predates it and was published by hand, so it carries no
 attestation; `v0.1.1` and everything after does.
 
-## v0.3.0 and beyond
+## Later
 
 - **Reporters** — pluggable output, JSON and JUnit for CI.
 - **CLI framework migration** — worth doing once a second subcommand exists (`init`,

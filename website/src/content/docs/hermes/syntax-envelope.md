@@ -8,21 +8,42 @@ sidebar:
 Your test file is TypeScript. The thing that runs is a bundle, lowered for the engine you
 target. The gap between the two is the syntax envelope.
 
+Everything below is derived from the binaries themselves by
+`test/hermes-syntax-probe.test.ts`, not written by hand. Prose about this drifts — two
+claims this project shipped were contradicted by the engines when they were finally probed.
+
 ## On Hermes V1
 
-Effectively nothing to worry about. V1 parses `class` in every form, private fields, static
+Almost nothing to worry about. V1 parses `class` in every form, private fields, static
 blocks, `async` arrow functions, `for await…of` and `WeakRef`. Write modern TypeScript.
 
-The only real constraint is **host APIs, not syntax** — the standalone VM has no timers, no
+**One exception: V1 rejects `async function*`.** It is not a superset of legacy — async
+generators fail there exactly as they do on legacy, with the same
+`async generators are unsupported`. esbuild lowers them for you on both engines.
+
+The other real constraint is **host APIs, not syntax** — the standalone VM has no timers, no
 `fetch`, no `require`. See [Async tests](/tests/async/#there-are-no-timers).
 
 ## On the legacy engine
 
 The legacy engine parses **no `class` syntax at all**. Not "supports it partially" — the
-parser rejects it.
+parser rejects it with `invalid statement encountered`.
 
-That means no classes, no private fields (`#x`), no static blocks, no `async` arrow
-functions, no async generators, no `WeakRef` or `FinalizationRegistry`.
+That means no classes, no private fields (`#x`), no static blocks, no `WeakRef` or
+`FinalizationRegistry`.
+
+`async` is the subtle one, and it is easy to state backwards:
+
+| Form | Legacy |
+|---|---|
+| `async function f() {}`, methods, expressions | **Runs** |
+| `async () => {}` | Rejected |
+| `async function* g() {}` | Rejected (V1 too) |
+
+The rejection message for the arrow reads `async functions are unsupported`, which is what
+makes this so easy to get wrong — the engine names the wrong thing. esbuild has a single
+`async-await` lever and cannot lower only the arrow, so Argus lowers `async` wholesale on
+legacy rather than rewriting every arrow in your code.
 
 esbuild handles most of this for you when targeting legacy:
 

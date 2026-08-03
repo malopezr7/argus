@@ -14,9 +14,33 @@ import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 | Node 24+ | The host process. Argus uses `node:util.parseArgs`, `fs.promises.glob` and `util.styleText`. Declared as `"engines": { "node": ">=24" }`. |
 | A `react-native` install | Argus reads the Hermes engine your project pins from it. Without one, you must name a binary yourself. |
 | macOS or Linux | Prebuilt Hermes binaries are published for `darwin-arm64`, `darwin-x64`, `linux-x64` and `linux-arm64`. **Windows is not supported.** |
+| Sometimes `git`, `cmake`, `ninja` | Only when no prebuilt applies to your React Native version — see below. |
 
-You do **not** need Xcode, Android Studio, a simulator, cmake, or Metro. The Hermes VM is
-downloaded on first use.
+You never need Xcode, Android Studio, a simulator, or Metro.
+
+Whether you need a compiler toolchain depends on **which React Native you are on**, because
+a prebuilt has to exist for the exact Hermes version your project pins:
+
+| Your React Native | First run |
+|---|---|
+| **0.86, 0.87** | Downloads a prebuilt. Nothing else to install |
+| 0.83, 0.84, 0.85 | No release cut yet → `--provision`, which needs `git`, `cmake`, `ninja` |
+| 0.78 – 0.82 | **macOS:** uses the VM inside `react-native`, free. **Linux:** `--provision` |
+
+<Aside type="caution" title="Linux needs glibc 2.38 today">
+The published Linux archives are glibc builds that currently require **glibc 2.38**, so they
+do not start on Ubuntu 22.04 LTS (2.35), Debian 12 (2.36), Amazon Linux 2023 or RHEL 9
+(2.34) — the loader rejects them before any Argus code runs. Ubuntu 24.04+, Debian 13 and
+Fedora 39+ are fine.
+
+The build has since moved to the oldest supported runner, with a CI gate that reads the
+requirement out of the ELF and fails above glibc 2.35. **That has not shipped yet** — it
+landed after the current release was cut. Until the archives are rebuilt, use `--provision`
+or `--hermes` on those distributions.
+
+**Alpine and other musl distributions cannot run these binaries at all**, now or after the
+rebuild. A glibc build does not run on musl; that is not a packaging choice.
+</Aside>
 
 ## Install
 
@@ -38,7 +62,7 @@ downloaded on first use.
   </TabItem>
 </Tabs>
 
-One package, one binary — 30 files, 59 kB packed, 276 kB installed. Everything the runner
+One package, one binary — 30 files, 68 kB packed, 300 kB installed. Everything the runner
 needs on the host comes with it: the bundler, the Hermes adapter, the source-map remapper,
 the reporter.
 
@@ -149,6 +173,14 @@ No transpiler and no extra dependency — Node strips the types itself. Because 
 defaults to the config file's own directory, `argus` then behaves identically whether you
 run it from the repo root or from a subdirectory.
 
+<Aside type="caution">
+Name the file `argus.config.mts` unless your `package.json` has `"type": "module"`. Node —
+not Argus — decides whether a `.ts` file is ESM, and it decides from the nearest
+`package.json`; in a CommonJS package the `import` above fails with `Cannot use import
+statement outside a module`. The `.mts` extension settles it regardless. See
+[Configuration](/cli/configuration/#pick-ts-or-mts-by-your-packagejson).
+</Aside>
+
 Every option, the search order, and precedence against flags:
 [Configuration](/cli/configuration/).
 
@@ -158,9 +190,11 @@ Every option, the search order, and precedence against flags:
 pnpm test:hermes
 ```
 
-On the first run Argus resolves which Hermes your project pins, downloads the matching
-prebuilt, verifies its SHA-256, and caches it under `~/.argus/cache/`. Later runs reuse the
-cache and start immediately.
+On the first run Argus resolves which Hermes your project pins and finds a binary for it. On
+React Native 0.86 and 0.87 that means downloading the matching prebuilt, verifying its
+SHA-256, and caching it under `~/.argus/cache/`; later runs reuse the cache and start
+immediately. On other versions it uses the VM bundled inside `react-native`, or tells you to
+pass `--provision` — see [How the binary is provisioned](/hermes/provisioning/).
 
 The run opens with one line naming exactly what it ran on:
 

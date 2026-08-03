@@ -5,7 +5,27 @@ sidebar:
   order: 1
 ---
 
-The test API is installed as globals inside the Hermes realm. There is nothing to import.
+The test API is installed as globals inside the Hermes realm. There is nothing to import —
+but the module *under* test is bundled with your test, so it does have to exist:
+
+```ts title="src/cart.ts"
+export interface Item {
+  sku: string;
+  price: number;
+}
+
+export class Cart {
+  readonly items: Item[] = [];
+
+  add(item: Item): void {
+    this.items.push(item);
+  }
+
+  get total(): number {
+    return this.items.reduce((sum, item) => sum + item.price, 0);
+  }
+}
+```
 
 ```ts title="src/cart.test.ts"
 import { Cart } from './cart';

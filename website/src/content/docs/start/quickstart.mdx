@@ -22,7 +22,17 @@ import { Steps, Aside } from '@astrojs/starlight/components';
    { "compilerOptions": { "types": ["@arguslab/argus"] } }
    ```
 
-2. **Write a test.** No import of the test API is needed — `describe`, `test`, `it`,
+2. **Write something to test.** Argus bundles your test *and its imports*, so the module
+   under test has to exist — an unresolved import is a bundle failure, not a red test.
+
+   ```ts title="src/money.ts"
+   export function formatCents(cents: number): string {
+     if (cents < 0) throw new RangeError('amount must not be negative');
+     return (Math.round(cents) / 100).toFixed(2);
+   }
+   ```
+
+3. **Write a test.** No import of the test API is needed — `describe`, `test`, `it`,
    `expect` and the hooks are installed as globals inside the Hermes realm.
 
    ```ts title="src/money.test.ts"
@@ -43,7 +53,7 @@ import { Steps, Aside } from '@astrojs/starlight/components';
    });
    ```
 
-3. **Run it.**
+4. **Run it.**
 
    ```bash
    pnpm exec argus "src/**/*.test.ts"
@@ -51,19 +61,23 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 
    ```text
    ✓ hermes v1 hermes-v250829098.0.16 · prebuilt darwin-arm64 · ~/.argus/cache/…/bin/hermes
-
    formatCents
      ✓ formats whole euros
      ✓ rounds half up
      ✓ rejects a negative amount
 
-   3 passed, 0 failed, 0 todo, 3 total (41 ms in Hermes)
+   3 passed, 0 failed, 0 todo, 3 total (0 ms in Hermes)
+     ✓ money.test.ts
 
    1 files: 1 passed, 0 failed
    3 tests: 3 passed, 0 failed, 0 todo
    ```
 
-4. **Break it on purpose**, so you can see what a failure looks like.
+   That first line is the prebuilt path, which applies on React Native 0.86 and 0.87. On
+   other versions Argus names a different source — see
+   [How the binary is provisioned](/hermes/provisioning/).
+
+5. **Break it on purpose**, so you can see what a failure looks like.
 
    ```ts
    test('rounds half up', () => {
@@ -74,18 +88,28 @@ import { Steps, Aside } from '@astrojs/starlight/components';
    ```text
    formatCents
      ✓ formats whole euros
-     ✗ rounds half up  — expected "12.06" but received "12.05"
-       at src/money.test.ts:8:34
+     ✗ rounds half up  — expect("12.05").toBe("12.06")
+       Error: expect("12.05").toBe("12.06")
+           at toBe (…/argus-MCNniB/run.argus-bundle.js:1105:24)
+           at apply (native)
+           at counted (…/argus-MCNniB/run.argus-bundle.js:437:26)
+           at anonymous (src/money.test.ts:9:31)
+           …
      ✓ rejects a negative amount
 
-   2 passed, 1 failed, 0 todo, 3 total (39 ms in Hermes)
+   2 passed, 1 failed, 0 todo, 3 total (0 ms in Hermes)
+     ✗ money.test.ts (1 of 3 failed)
+
+   1 files: 0 passed, 1 failed
+   3 tests: 2 passed, 1 failed, 0 todo
    ```
 
-   The frame says `src/money.test.ts:8`, not `run.argus-bundle.js:2418`. Stacks are
-   remapped through the bundle's source map before anything is printed — see
-   [Source maps](/internals/source-maps/).
+   One frame in that stack is yours — `src/money.test.ts:9:31`, the line you just broke,
+   not `run.argus-bundle.js:1105`. Frames inside the bundle stay as bundle frames on
+   purpose: they are Argus' own, and pretending they map to your source would be a lie.
+   See [Source maps](/internals/source-maps/).
 
-5. **Add it to `package.json`** so it runs like any other check.
+6. **Add it to `package.json`** so it runs like any other check.
 
    ```json title="package.json"
    {

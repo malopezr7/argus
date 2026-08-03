@@ -98,20 +98,22 @@ in dependencies with no path to exploitation through Argus.
 
 ### Which versions can be verified
 
+Three versions are on the registry. Two of them can be verified:
+
 | Version | Provenance |
 | --- | --- |
 | `0.1.0` | **No** — published by hand from a laptop, before the release workflow existed |
-| Every release after it | Yes — published by `.github/workflows/npm-publish.yml` |
+| `0.1.1` | Yes — the first release published by `.github/workflows/npm-publish.yml` |
+| `0.2.0` | Yes — current `latest` |
 
-**`0.1.0` is currently the only version on the registry, and it cannot be
-verified.** It carries the registry's own signature, which says npm served those
-bytes; it carries no attestation, so there is nothing that proves *where they
-came from*. The commands below return `{"error":"Not found"}` against it. That
-is the honest answer rather than a bug — do not read it as evidence of
-tampering, and do not read it as verification either.
+**`0.1.0` cannot be verified.** It carries the registry's own signature, which
+says npm served those bytes; it carries no attestation, so there is nothing that
+proves *where they came from*. The commands below return `{"error":"Not found"}`
+against it. That is the honest answer rather than a bug — do not read it as
+evidence of tampering, and do not read it as verification either. If you are
+verifying anything, verify `latest`; there is no reason to install `0.1.0`.
 
-The next release is the first one these commands will work against. They are
-written below against `0.2.0` so they can be copied and edited; substitute
+The commands are written against `0.2.0` and work against it today. Substitute
 whichever version you are actually checking.
 
 ### Origin — who built it?
@@ -155,11 +157,11 @@ different answer from "verification failed".
 ### Why not `npm audit signatures`
 
 `npm audit signatures` checks the whole dependency tree and reports totals. It
-does not single out a package that simply has no attestation: with `0.1.0`
-installed it reports verified signatures and verified attestations, zero
-invalid, zero missing — and never mentions that Argus itself is in none of those
-groups. It is a useful tree-wide check and a misleading per-package one, so it
-is not the command to reach for here.
+does not single out a package that simply has no attestation: run against a tree
+holding an unattested Argus — `0.1.0` — it reports verified signatures and
+verified attestations, zero invalid, zero missing, and never mentions that Argus
+itself is in none of those groups. It is a useful tree-wide check and a
+misleading per-package one, so it is not the command to reach for here.
 
 ## Verifying a Hermes binary you downloaded
 

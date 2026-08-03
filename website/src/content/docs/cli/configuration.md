@@ -53,6 +53,28 @@ in your home directory or a sibling checkout would quietly govern this project's
 There is no `.cjs`, `.json`, `.yaml` or `.toml`. Argus is ESM-only, and each extra format
 is a parser to carry and another way for two configs to disagree.
 
+### Pick `.ts` or `.mts` by your `package.json`
+
+Argus loads the config with Node's own `import()`, so **Node** decides whether a `.ts` or
+`.js` file is a module — and it decides from the nearest `package.json`. In a package
+without `"type": "module"`, `argus.config.ts` is treated as CommonJS and the `import` line
+in it fails:
+
+```text
+✗ Config error: Failed to load the Argus config at /app/argus.config.ts:
+  Cannot use import statement outside a module
+```
+
+That is Node's rule, not an Argus check, so the fix is one of Node's:
+
+| Your `package.json` | Use |
+|---|---|
+| `"type": "module"` | `argus.config.ts` or `argus.config.mts` — either works |
+| no `type`, or `"type": "commonjs"` | **`argus.config.mts`** (or `.mjs`) — the extension forces ESM on its own |
+
+`npm init -y` produces a package with no `type` field, so a brand-new project wants `.mts`.
+If you would rather keep `argus.config.ts`, add `"type": "module"` to `package.json`.
+
 ### Naming one explicitly
 
 ```bash

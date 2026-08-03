@@ -22,6 +22,9 @@ On the [roadmap](/reference/roadmap/), in priority order.
 | `bail`, `retry`, test-name filtering | Not implemented. |
 | Setup files | No user-supplied global setup or teardown. |
 | Windows | **Unsupported.** No prebuilt VM is published for `win32-x64`, and no source-build path is verified. Prebuilts cover `darwin-arm64`, `darwin-x64`, `linux-x64` and `linux-arm64`. |
+| Alpine / musl Linux | **Unsupported.** The Linux prebuilts are glibc builds and cannot run on musl. `--provision` is the only path, and it is not verified there. |
+| Older glibc Linux | The published Linux archives currently need **glibc 2.38**, so Ubuntu 22.04 LTS, Debian 12, Amazon Linux 2023 and RHEL 9 cannot start them. A fix is merged but unreleased; until the archives are rebuilt, use `--provision` or `--hermes`. |
+| A prebuilt for every React Native | Only `hermes-bin-v250829098.0.16` is published, covering **RN 0.86 and 0.87**. RN 0.83–0.85 need `--provision`; RN 0.78–0.82 use the macOS bundled VM, or `--provision` off macOS. See the [version table](/hermes/versions/). |
 
 ## Out of scope on purpose
 
@@ -95,7 +98,9 @@ platform fidelity beyond the four shim components.
 
 Held node references stay live across an update, so a node queried once can be asserted on
 and dispatched into after the tree changes. A node whose element an update removed detaches
-and keeps reporting what it last rendered.
+and keeps reporting what it last rendered. **That is unreleased.** On `v0.2.0` — the current
+release on npm — query results are still snapshots, and a node held across an update
+dispatches into the previous render's closure. Live views land in the next patch release.
 
 ## The honest summary
 

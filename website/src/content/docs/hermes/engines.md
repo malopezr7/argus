@@ -15,11 +15,22 @@ From React Native 0.83 onward there is not one Hermes, there are two.
 | Still available | removed in **RN 0.87** | yes |
 | `class` syntax | not parsed at all | full support |
 | Private fields, static blocks | no | yes |
+| `async function` declarations | **yes** | yes |
 | `async` arrow functions | no | yes |
+| `async function*` generators | no | **no** |
 | `for await…of`, `WeakRef` | no | yes |
 
-Argus targets **V1 by default** and treats legacy as the compatibility mode, mirroring
-where React Native itself is.
+Two rows there are routinely got wrong, including by this project's own notes until they
+were checked against the binaries. Legacy **runs** `async function` — it rejects only the
+*arrow* form, and its error message says "async functions are unsupported" while doing it.
+And V1 is **not** a superset: it rejects `async function*` exactly as legacy does. Both are
+derived from real binaries by `test/hermes-syntax-probe.test.ts`, which is what the syntax
+policy is checked against.
+
+Argus runs **the engine your React Native release ships by default** — legacy up to RN 0.83,
+V1 from 0.84 — rather than always preferring the newer one. RN 0.82 and 0.83 pin V1 as an
+opt-in they do not ship, and testing a VM those apps never execute is the fidelity gap this
+tool exists to close. `--engine` overrides it.
 
 ## Static Hermes did not replace the interpreter
 

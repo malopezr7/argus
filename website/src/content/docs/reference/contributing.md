@@ -27,8 +27,16 @@ Run the gates — and the fourth one is not optional:
 pnpm typecheck
 pnpm exec biome check .
 pnpm test
-pnpm argus "examples/**/*.test.ts"
+ARGUS_HERMES=/path/to/hermes pnpm argus "examples/**/*.test.ts"
 ```
+
+The first three should be silent; `pnpm test` currently runs 1140 tests across 83 files with
+2 skipped.
+
+The fourth needs `ARGUS_HERMES`, or a binary vendored at `./.hermes/hermes`. This repository
+has no `react-native` install, so Argus has no engine pin to read and cannot provision
+anything for itself — a fresh clone running `pnpm argus` exits 2 with `no engine resolved`.
+That is expected, not a broken checkout.
 
 `pnpm test` runs on **Node**. Argus ships code that runs on **Hermes**, after being lowered
 by esbuild. A green Node suite is not evidence about the artifact that actually ships.

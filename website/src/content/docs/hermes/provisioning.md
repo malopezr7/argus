@@ -72,7 +72,14 @@ tar per platform. Downloaded, checksum-verified, extracted into the cache.
 
 Applies only when a matching asset *could* exist: there is a ref, the ref can name a
 release version, and your host is a published platform. Each miss reports its own reason
-rather than a blanket "unavailable". See [Prebuilt binaries](/hermes/prebuilts/).
+rather than a blanket "unavailable".
+
+**Only one release is published so far**, `hermes-bin-v250829098.0.16`, which is what React
+Native 0.86 and 0.87 pin. On RN 0.83–0.85 this step gets a 404 and the chain moves on; on
+RN 0.78–0.82 it cannot apply at all, because a date-based ref cannot name a release version.
+The Linux archives also carry a glibc floor worth knowing about. Both in
+[Prebuilt binaries](/hermes/prebuilts/), with the per-version breakdown in the
+[version table](/hermes/versions/).
 
 ### 6. Source build
 

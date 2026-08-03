@@ -19,9 +19,25 @@ are not installed for you:
 pnpm add -D react test-renderer
 ```
 
-```tsx title="src/Counter.test.tsx"
-import { fireEvent, render, screen, within } from 'argus';
+```tsx title="src/Counter.tsx"
+import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+
+export function Counter() {
+  const [count, setCount] = useState(0);
+  return (
+    <View>
+      <Text testID="value">{String(count)}</Text>
+      <Pressable onPress={() => setCount(count + 1)}>
+        <Text>+</Text>
+      </Pressable>
+    </View>
+  );
+}
+```
+
+```tsx title="src/Counter.test.tsx"
+import { fireEvent, render, screen } from 'argus';
 import { Counter } from './Counter';
 
 describe('Counter', () => {
@@ -34,6 +50,10 @@ describe('Counter', () => {
   });
 });
 ```
+
+`react-native` itself is not needed to run this. The bundler aliases it to a small internal
+shim, so the component under test imports `View` and `Text` exactly as it does in your app
+while the suite runs with only `react` and `test-renderer` installed.
 
 Test files import from `'argus'` — a virtual specifier the bundler maps onto the
 component-testing layer that ships inside the Argus package. Plain TypeScript tests never

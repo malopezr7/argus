@@ -24,6 +24,31 @@ Windows is absent deliberately — it needs a different toolchain and a differen
 layout (`.exe`, bundled ICU DLLs), and no part of Argus is verified on it yet. On Windows,
 use `--provision` or name a binary with `--hermes`.
 
+### What the Linux archives require
+
+They are glibc builds, and a glibc binary refuses to start on any system whose glibc is
+older than the one it was linked against. That makes the build host, not the code, the thing
+that sets the floor for every user.
+
+The archives on the release page today were built on Ubuntu 24.04 and require **glibc 2.38**:
+
+| Distribution | glibc | Published archive |
+|---|---|---|
+| Ubuntu 24.04+, Debian 13, Fedora 39+ | 2.38+ | Runs |
+| **Ubuntu 22.04 LTS** | 2.35 | **Refuses to start** |
+| **Debian 12** | 2.36 | **Refuses to start** |
+| **Amazon Linux 2023, RHEL 9** | 2.34 | **Refuses to start** |
+| **Alpine, other musl** | — | **Never runs** |
+
+The build now targets the oldest supported runner, and a gate reads the glibc requirement
+out of the ELF and fails the build above 2.35 — which covers Ubuntu 22.04 and everything
+newer. **That change is merged but not yet released**, so the archives you can download are
+still the 2.38 ones. Until they are re-cut, use `--provision` or `--hermes` on those
+distributions.
+
+musl is a separate problem and not one a runner choice fixes: these are glibc builds, so
+Alpine is out of reach permanently.
+
 Each archive holds three executables:
 
 | File | What it is |
@@ -48,7 +73,7 @@ release — esbuild only ever needs one.
 A release on a public repository also needs no authentication to download, has no practical
 size limit, and is CDN-served. npm stays reserved for the Argus package itself, which is a
 separate concern — `@arguslab/argus` carries no VM at all, which is why it installs in
-276 kB.
+300 kB.
 
 The `hermes-bin-v` prefix keeps the two tag namespaces separable: Argus tags its own
 releases `v0.1.0`, and both live on the same repository. A hyphen rather than a slash keeps

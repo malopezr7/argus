@@ -25,9 +25,8 @@ tree that behaves differently from everyone else's.
 
 ## The Hermes binary
 
-Argus needs a real Hermes VM to run tests on. **You do not have to build or
-download one by hand** — it is provisioned automatically on first run, from the
-first source that has one:
+Argus needs a real Hermes VM to run tests on. In a *user's* project it finds one
+by itself, walking this chain and taking the first source that has a binary:
 
 1. `--hermes <path>` or `ARGUS_HERMES=<path>`
 2. `./.hermes/hermes` in the project
@@ -35,6 +34,20 @@ first source that has one:
 4. The legacy VM bundled with react-native 0.73–0.82
 5. A prebuilt archive downloaded from this repository's releases
 6. A source build, only if you passed `--provision`
+
+**In this repository none of steps 2–6 can fire.** Argus reads the engine pin
+out of a `react-native` install, and this repo deliberately has none — so there
+is no pin, no cache key, and nothing to download. A fresh clone running
+`pnpm argus` gets exit 2 and a message ending `no engine resolved`.
+
+So step 1 is the contributor's path. Get a binary once and point at it:
+
+```bash
+ARGUS_HERMES=/path/to/hermes pnpm argus examples/math.test.ts
+```
+
+Or drop it at `./.hermes/hermes`, which is gitignored and then picked up with no
+flag at all. That is what the commands further down assume.
 
 Every run prints which one it used:
 
@@ -45,15 +58,15 @@ Every run prints which one it used:
 Include that line in bug reports. It identifies the engine, the version, and
 how it got there, which is usually most of the diagnosis.
 
-Building from source is the last resort and is opt-in:
+Building from source is the last resort and is opt-in, with `--provision`. It
+needs `git`, `cmake` and `ninja` on your PATH and takes minutes rather than
+seconds. There is no reason to reach for it unless you are working on the build
+path itself, or you are on a React Native version or platform with no published
+prebuilt.
 
-```bash
-pnpm argus --provision "examples/**/*.test.ts"
-```
-
-That needs `git`, `cmake` and `ninja` on your PATH, and it takes minutes rather
-than seconds. There is no reason to reach for it unless you are working on the
-build path itself or you are on a platform with no published prebuilt.
+Note that `--provision` cannot help *here* either: with no engine resolved there
+is no ref to build. To exercise that path, run Argus against a real React Native
+project rather than against this repository.
 
 ## The gates
 
@@ -65,8 +78,10 @@ pnpm exec biome check .   # lint + format
 pnpm test                 # Vitest, on Node
 ```
 
-`pnpm exec biome check .` currently emits one `info` about a `biome.json`
-migration. That one is known. Anything else is yours.
+All three are expected to be silent. `biome check` reports zero errors and zero
+warnings on a clean tree — anything it prints is yours. `pnpm test` currently
+runs 1140 tests across 83 files, with 2 skipped: those two are the host
+integration tests, gated on a Hermes binary being present.
 
 ### Vitest is not enough on its own
 
@@ -181,8 +196,9 @@ the commit it came from. A hand-rolled `npm publish` produces bytes nobody can
 trace, which is exactly what the workflow exists to stop.
 
 `0.1.0` was published by hand before the workflow existed and carries no
-provenance. Everything from `0.2.0` on does. SECURITY.md documents how a user
-verifies it.
+provenance. `0.1.1` was the first release published by the workflow, and
+everything since — including `0.2.0` — carries an attestation. SECURITY.md
+documents how a user verifies it.
 
 ### Cutting a release
 

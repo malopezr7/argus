@@ -43,7 +43,7 @@ You need **Node 24 or newer**.
 npm install --save-dev @arguslab/argus
 ```
 
-One package, one binary — 30 files, 59 kB packed, 276 kB installed. `core`, the
+One package, one binary — 30 files, 68 kB packed, 300 kB installed. `core`, the
 adapters, and the Hermes-side framework are internal seams rather than an API,
 so they are not published separately.
 
@@ -98,7 +98,8 @@ cd ~/my-rn-app
 npx argus "src/**/*.test.ts"
 ```
 
-On a clean machine — no binary, no cache — that prints:
+On a clean machine — no binary, no cache — on React Native 0.86 or 0.87, that
+prints:
 
 ```
 ✓ hermes v1 hermes-v250829098.0.16 · prebuilt darwin-arm64 · /Users/you/.argus/cache/hermes-hermes-v250829098.0.16/build/bin/hermes
@@ -111,6 +112,10 @@ sum
 1 files: 1 passed, 0 failed
 1 tests: 1 passed, 0 failed, 0 todo
 ```
+
+On other React Native versions the first line names a different source — the VM
+bundled inside `react-native`, or a build you authorised with `--provision`. See
+[Getting a Hermes binary](#getting-a-hermes-binary) for which one applies to you.
 
 ### Working on Argus itself
 
@@ -171,14 +176,18 @@ From React Native 0.83 on, RN pins **two** Hermes engines: a legacy one and
 **Hermes V1** (Static Hermes). RN 0.84 made V1 the default. **RN 0.87 dropped
 legacy entirely.**
 
-Argus targets V1 by default and treats legacy as compatibility mode.
+Argus runs **the engine your React Native release ships by default**, which is not
+always the newest one it pins. RN 0.82 and 0.83 pin V1 *and* legacy but ship
+legacy — V1 is an opt-in you reach by building RN from source — so on those
+versions Argus targets legacy. Testing a VM those apps never execute would be
+the exact gap this tool exists to close. `--engine` overrides it either way.
 
 | | Legacy | Hermes V1 |
 | --- | --- | --- |
 | HBC bytecode version | 96 | 98 |
 | React Native | 0.69 – 0.86 | 0.83 – (default from 0.84) |
 | `class`, private fields, `static {}` | Cannot parse | Native |
-| Argus `--engine` | `legacy` | `v1` (default) |
+| Argus runs it by default on | RN ≤ 0.83 | RN 0.84+ |
 
 The bytecode version is the reliable discriminator, and it is why a mismatch is
 not a silent quality problem: a VM refuses foreign bytecode outright
@@ -206,8 +215,8 @@ a logged reason — React Native ships no arm64 compiler to compare against.
 
 ## Getting a Hermes binary
 
-Argus provisions one. You do not build or download anything by hand. It walks
-this chain and takes the first source that has a binary:
+Argus walks this chain and takes the first source that has a binary. Steps 1–5
+need nothing from you; step 6 does, and says so before it runs.
 
 | # | Source | Notes |
 | --- | --- | --- |
@@ -215,8 +224,12 @@ this chain and takes the first source that has a binary:
 | 2 | `./.hermes/hermes` in the project | Vendored by you |
 | 3 | `~/.argus/cache` | Anything provisioned earlier |
 | 4 | The VM inside the `react-native` tarball | Legacy only, macOS, RN 0.73 – 0.82 |
-| 5 | **A prebuilt from this repository's GitHub Releases** | Downloaded, checksum-verified |
-| 6 | A source build | **Opt-in behind `--provision`** |
+| 5 | **A prebuilt from this repository's GitHub Releases** | Downloaded, checksum-verified — **only where one is published**, see below |
+| 6 | A source build | **Opt-in behind `--provision`**, needs `git`, `cmake`, `ninja` |
+
+Which step you land on depends on the Hermes version your project pins and on
+your OS. On React Native 0.86 or 0.87 it is step 5 and there is nothing to
+install; on 0.83–0.85 no release has been cut yet and you need step 6.
 
 Every run prints one line naming what it used, so a CI log always says which
 engine produced the result:
@@ -225,13 +238,65 @@ engine produced the result:
 ✓ hermes v1 hermes-v250829098.0.16 · prebuilt darwin-arm64 · /Users/you/.argus/cache/…/hermes
 ```
 
-Prebuilts are published for `darwin-arm64`, `darwin-x64`, `linux-x64` and
-`linux-arm64`. Windows is not supported yet.
+### What is actually downloadable today
 
-Measured on a clean project with no binary and no cache: **3.6 s** for the first
-run including the download, **1.3 s** for the second, settling at **0.62 s** once
-the cache is warm. The download leg is network-bound, so the first number is the
-one that moves. With the network cut, the cached run still passes.
+Step 5 is the only step that needs no tools and no waiting, and it does **not**
+cover every project. A prebuilt has to be published for the exact Hermes version
+your React Native pins, and so far exactly one release exists:
+[`hermes-bin-v250829098.0.16`](https://github.com/malopezr7/argus/releases/tag/hermes-bin-v250829098.0.16).
+
+| Your React Native | Pins | On a clean machine you get |
+| --- | --- | --- |
+| **0.87** | Hermes V1 `250829098.0.16` | **Prebuilt download.** Nothing to install |
+| **0.86** | Hermes V1 `250829098.0.16` | **Prebuilt download.** Nothing to install |
+| 0.85 | Hermes V1 `250829098.0.10` | No release cut yet → `--provision` |
+| 0.84 | Hermes V1 `250829098.0.9` | No release cut yet → `--provision` |
+| 0.83 | legacy `v0.14.1` | No release cut yet → `--provision` |
+| 0.78 – 0.82 | legacy, date-based ref | **macOS:** the VM inside `react-native`, free. **Linux:** `--provision` |
+
+Below 0.78 there is no fallback table, but your install is what Argus actually
+reads and `sdks/.hermesversion` has existed since RN 0.69 — so 0.73 – 0.77 on
+macOS generally works off the bundled VM too.
+
+A date-based pin (`2025-07-07-RNv0.81.0`) and a bare commit SHA can never have a
+prebuilt: a release has to be *named* by a version, and those are git refs. That
+is a permanent property of those React Native releases, not a backlog item.
+
+When no source applies, Argus does not guess. It fails with exit 2 and prints
+every step it tried and why — including the exact 404 — plus the four commands
+that would fix it.
+
+### Linux needs a recent glibc
+
+The published Linux archives are glibc builds that currently require
+**glibc 2.38**. They do not start below that — the loader rejects them before
+any Argus code runs.
+
+| Distribution | glibc | Published binary |
+| --- | --- | --- |
+| Ubuntu 24.04 LTS and newer | 2.39+ | Runs |
+| Fedora 39+, Debian 13 | 2.38+ | Runs |
+| **Ubuntu 22.04 LTS** | 2.35 | **Does not start** |
+| **Debian 12** | 2.36 | **Does not start** |
+| **Amazon Linux 2023, RHEL 9** | 2.34 | **Does not start** |
+| **Alpine and other musl distros** | none | **Never** — these are glibc builds |
+
+The build now happens on the oldest supported runner and a CI gate reads the
+glibc requirement straight out of the ELF and fails the build above 2.35, which
+brings Ubuntu 22.04, Debian 12 and Amazon Linux 2023 back. **That fix has not
+shipped yet** — it landed after the current release was cut, so the archives on
+the release page are still the 2.38 ones. Until they are re-cut, use
+`--provision` or `--hermes` on those distributions.
+
+musl is not affected by any of that. A glibc build cannot run on Alpine, and
+choosing a different builder does not change it.
+
+### Speed, once a prebuilt applies
+
+Measured on this machine, RN 0.86, empty cache: **2.3 s** for the first run
+including a ~7 MB download, **0.62 s** once the cache is warm. The first number
+is network-bound and will move; the warm one is the one you live with. With the
+network cut, the cached run still passes.
 
 The source build is last and opt-in for a reason. It clones and compiles Hermes,
 takes minutes rather than seconds, and needs `git`, `cmake` and `ninja`. That
@@ -337,6 +402,12 @@ TypeScript, with no build step and no added dependency — Node strips the types
 itself. `defineConfig` is an identity function; it exists so your editor checks
 the object.
 
+Name it `argus.config.mts` unless your `package.json` says `"type": "module"`.
+Argus loads the file with Node's `import()`, and Node decides whether a `.ts` is
+ESM from the nearest `package.json` — in a CommonJS package the `import` above
+fails with `Cannot use import statement outside a module`. The `.mts` extension
+settles it on its own.
+
 Argus searches upward from the working directory for `argus.config.ts`, `.mts`,
 `.js`, `.mjs`, `.config/argus.config.ts`, then an `argus` field in
 `package.json`. First hit wins, configs are never merged, and the walk stops at
@@ -393,7 +464,7 @@ Globs default to `**/*.test.ts` and `**/*.test.tsx`.
 | `-c, --concurrency <n>` | CPU-based, capped at 8 | Files in parallel; `1` is sequential |
 | `--config <path>` | searched for | Config file to use, instead of searching |
 | `--hermes <path>` | — | Hermes binary; overrides `ARGUS_HERMES` |
-| `--engine <legacy\|v1>` | The engine the project pins, preferring `v1` | Target engine |
+| `--engine <legacy\|v1>` | The engine the project's RN release ships by default | Target engine |
 | `--provision` | off | Allow building Hermes from source |
 | `-h, --help` | — | Show help |
 
