@@ -53,27 +53,47 @@ in your home directory or a sibling checkout would quietly govern this project's
 There is no `.cjs`, `.json`, `.yaml` or `.toml`. Argus is ESM-only, and each extra format
 is a parser to carry and another way for two configs to disagree.
 
-### Pick `.ts` or `.mts` by your `package.json`
+### CommonJS projects
 
-Argus loads the config with Node's own `import()`, so **Node** decides whether a `.ts` or
-`.js` file is a module — and it decides from the nearest `package.json`. In a package
-without `"type": "module"`, `argus.config.ts` is treated as CommonJS and the `import` line
-in it fails:
+`argus.config.ts` works whatever your `package.json` says. Any of the four extensions does;
+none of them depends on a `"type"` field. It is worth knowing why, because the mechanism is
+visible in one place.
 
-```text
-✗ Config error: Failed to load the Argus config at /app/argus.config.ts:
-  Cannot use import statement outside a module
+Argus loads the config with Node's own `import()`, and **Node** decides whether a `.ts` or
+`.js` file is a module from the nearest `package.json`. In a package declaring
+`"type": "commonjs"` — exactly what `npm init -y` writes — it reads `argus.config.ts` as a
+CommonJS script, where the `import` line above is a syntax error.
+
+Node already solves this for itself: when a package declares no `type` at all, it detects the
+syntax and loads the file as whichever it turns out to be. The only reason that does not
+happen here is the explicit `"commonjs"` a scaffolder wrote on your behalf, so Argus applies
+the same detection to its own config file, and to nothing else.
+
+The second reading is attempted only after the CommonJS one has already failed to parse. Two
+consequences follow, and both are deliberate:
+
+- **A CommonJS config still loads as CommonJS.** `module.exports = { … }` parses on the first
+  attempt, so it is never reinterpreted.
+- **Your config is executed exactly once.** A parse failure happens *before* evaluation, so no
+  line of the file has run when the retry begins. (Trying the module reading first would not
+  have this property: `module.exports` parses cleanly as a module and fails only at
+  evaluation, by which point the body has already run.)
+
+Nothing is transpiled, no temporary file is written into your project, and the retry does not
+reach inside `node_modules` — a dependency that ships CommonJS said so deliberately.
+
+One detail is observable. The retry has to ask the module loader for a URL it has not already
+failed, so on that path `import.meta.url` carries an `?argus-esm-retry=1` query:
+
+```ts
+import.meta.url                          // file:///app/argus.config.ts?argus-esm-retry=1
+fileURLToPath(import.meta.url)           // /app/argus.config.ts          — query dropped
+new URL('./data.json', import.meta.url)  // file:///app/data.json         — resolves normally
 ```
 
-That is Node's rule, not an Argus check, so the fix is one of Node's:
-
-| Your `package.json` | Use |
-|---|---|
-| `"type": "module"` | `argus.config.ts` or `argus.config.mts` — either works |
-| no `type`, or `"type": "commonjs"` | **`argus.config.mts`** (or `.mjs`) — the extension forces ESM on its own |
-
-`npm init -y` produces a package with no `type` field, so a brand-new project wants `.mts`.
-If you would rather keep `argus.config.ts`, add `"type": "module"` to `package.json`.
+Both idiomatic uses are unaffected; only the raw string differs. If you parse `import.meta.url`
+by hand in a config, strip the query — or name the file `argus.config.mts`, which Node reads as
+a module with no detection and no retry involved.
 
 ### Naming one explicitly
 

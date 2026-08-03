@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import type { ArgusConfig } from '@arguslab/core';
 import { errMsg } from '../errors.js';
+import { importConfigSource, isEsmSyntaxError } from './esm-fallback.js';
 import { configBaseDir, locateConfig } from './locate.js';
 import { ConfigError, validateConfig } from './validate.js';
 
@@ -19,6 +19,12 @@ import { ConfigError, validateConfig } from './validate.js';
  * Stripping is not compiling, and it buys that simplicity at one cost: `enum`
  * and `namespace` cannot be erased without emitting code, so Node refuses them.
  * `describeLoadFailure` turns that refusal into an explanation.
+ *
+ * The other thing a bare `import()` gets wrong is a project whose package.json
+ * says `"type": "commonjs"` — what `npm init -y` writes — where Node reads the
+ * config as a script and rejects the first `import` in it. `esm-fallback.ts`
+ * reloads it as the ES module it is; this layer only names the file when even
+ * that could not be done.
  */
 
 /** Where the configuration came from, and what it said. */
@@ -69,6 +75,23 @@ export function describeLoadFailure(path: string, error: unknown): string {
     ].join('\n');
   }
 
+  if (isEsmSyntaxError(error)) {
+    return [
+      `Failed to load the Argus config at ${path}:`,
+      `  ${errMsg(error)}`,
+      '',
+      '  The nearest package.json says "type": "commonjs" \u2014 what `npm init -y`',
+      '  writes \u2014 so Node reads this file as a CommonJS script, where `import`',
+      '  and `export` are syntax errors. Argus normally reloads such a config as',
+      '  an ES module by itself, and could not this time. Any one of these makes',
+      '  the file unambiguous:',
+      '',
+      '    \u2022 rename it to argus.config.mts   (TypeScript, always an ES module)',
+      '    \u2022 add "type": "module" to package.json',
+      '    \u2022 rename it to argus.config.mjs   (JavaScript, always an ES module)',
+    ].join('\n');
+  }
+
   return `Failed to load the Argus config at ${path}:\n  ${errMsg(error)}`;
 }
 
@@ -76,7 +99,7 @@ export function describeLoadFailure(path: string, error: unknown): string {
 async function importConfigModule(path: string): Promise<unknown> {
   let module: { default?: unknown };
   try {
-    module = (await import(pathToFileURL(path).href)) as { default?: unknown };
+    module = await importConfigSource(path);
   } catch (error) {
     throw new ConfigError(describeLoadFailure(path, error));
   }

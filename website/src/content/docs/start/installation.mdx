@@ -173,12 +173,13 @@ No transpiler and no extra dependency — Node strips the types itself. Because 
 defaults to the config file's own directory, `argus` then behaves identically whether you
 run it from the repo root or from a subdirectory.
 
-<Aside type="caution">
-Name the file `argus.config.mts` unless your `package.json` has `"type": "module"`. Node —
-not Argus — decides whether a `.ts` file is ESM, and it decides from the nearest
-`package.json`; in a CommonJS package the `import` above fails with `Cannot use import
-statement outside a module`. The `.mts` extension settles it regardless. See
-[Configuration](/cli/configuration/#pick-ts-or-mts-by-your-packagejson).
+<Aside type="note">
+This works whatever your `package.json` says, including the `"type": "commonjs"` that
+`npm init -y` writes. Node reads a `.ts` file in such a package as a CommonJS script, where
+the `import` above would be a syntax error; Argus reloads it as the module it is, after the
+CommonJS reading has already failed to parse — so a config written as `module.exports` still
+loads as CommonJS, and either way the file runs exactly once. See
+[Configuration](/cli/configuration/#commonjs-projects).
 </Aside>
 
 Every option, the search order, and precedence against flags:

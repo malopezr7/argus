@@ -402,11 +402,12 @@ TypeScript, with no build step and no added dependency — Node strips the types
 itself. `defineConfig` is an identity function; it exists so your editor checks
 the object.
 
-Name it `argus.config.mts` unless your `package.json` says `"type": "module"`.
-Argus loads the file with Node's `import()`, and Node decides whether a `.ts` is
-ESM from the nearest `package.json` — in a CommonJS package the `import` above
-fails with `Cannot use import statement outside a module`. The `.mts` extension
-settles it on its own.
+This works whatever your `package.json` says. Node reads a `.ts` file in a
+package declaring `"type": "commonjs"` — what `npm init -y` writes — as a
+CommonJS script, where the `import` above would be a syntax error; Argus reloads
+it as the module it is. That happens only after the CommonJS reading has failed
+to parse, so a config written as `module.exports` still loads as CommonJS, and
+either way the file is executed exactly once.
 
 Argus searches upward from the working directory for `argus.config.ts`, `.mts`,
 `.js`, `.mjs`, `.config/argus.config.ts`, then an `argus` field in

@@ -277,3 +277,71 @@ describe('describeLoadFailure', () => {
     expect(message).not.toContain('type stripping');
   });
 });
+
+/**
+ * The floor under the CommonJS fallback.
+ *
+ * The fallback in `esm-fallback.ts` loads these configs rather than explaining
+ * them, so this message is only reached when the hook could not be installed
+ * at all. It still has to be complete, because it is the last thing standing
+ * between the user and Node's bare "Cannot use import statement outside a
+ * module" — which names no fix, and which Node's own follow-up advice answers
+ * with two options while omitting the one that suits a TypeScript config.
+ */
+describe('describeLoadFailure — an ES module config in a CommonJS project', () => {
+  const path = '/repo/argus.config.ts';
+
+  /** Exactly what Node throws: a bare SyntaxError, carrying no code. */
+  function esmInCommonJs(message: string): Error {
+    return new SyntaxError(message);
+  }
+
+  it('names all three ways out', () => {
+    const message = describeLoadFailure(
+      path,
+      esmInCommonJs('Cannot use import statement outside a module'),
+    );
+
+    expect(message).toContain('argus.config.mts');
+    expect(message).toContain('"type": "module"');
+    expect(message).toContain('argus.config.mjs');
+  });
+
+  it('says why the file could not be loaded', () => {
+    const message = describeLoadFailure(
+      path,
+      esmInCommonJs('Cannot use import statement outside a module'),
+    );
+
+    expect(message).toContain('CommonJS');
+    expect(message).toContain(path);
+  });
+
+  it('keeps the original message rather than replacing it', () => {
+    const message = describeLoadFailure(path, esmInCommonJs("Unexpected token 'export'"));
+
+    expect(message).toContain("Unexpected token 'export'");
+  });
+
+  it('recognises the failure however the file happened to trip it', () => {
+    for (const raw of [
+      'Cannot use import statement outside a module',
+      "Unexpected token 'export'",
+      'await is only valid in async functions and the top level bodies of modules',
+      "Cannot use 'import.meta' outside a module",
+    ]) {
+      expect(describeLoadFailure(path, esmInCommonJs(raw))).toContain('argus.config.mts');
+    }
+  });
+
+  /**
+   * A config with an ordinary typo is not a module-format problem, and telling
+   * its author to rename the file would send them somewhere useless.
+   */
+  it('stays quiet about module formats for an unrelated syntax error', () => {
+    const message = describeLoadFailure(path, esmInCommonJs('Unexpected end of input'));
+
+    expect(message).toContain('Unexpected end of input');
+    expect(message).not.toContain('argus.config.mts');
+  });
+});
