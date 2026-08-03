@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-Status: **`v0.2.0`** — installable from npm as `@arguslab/argus`. Pre-1.0: the surface is
+Status: **`v0.2.1`** — installable from npm as `@arguslab/argus`. Pre-1.0: the surface is
 still free to change between minor versions.
 
 The runner works and ships. What is missing is test-authoring surface.

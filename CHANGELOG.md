@@ -10,6 +10,10 @@ below say plainly which ones do.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.1] — 2026-08-03
+
 The engine-selection and syntax fixes below change which Hermes build your tests
 run on and how your source reaches it. If you are on React Native 0.82 or 0.83,
 expect your tests to move from Hermes V1 to legacy — that is the correction, not
