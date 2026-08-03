@@ -67,7 +67,7 @@ CommonJS script, where the `import` line above is a syntax error.
 Node already solves this for itself: when a package declares no `type` at all, it detects the
 syntax and loads the file as whichever it turns out to be. The only reason that does not
 happen here is the explicit `"commonjs"` a scaffolder wrote on your behalf, so Argus applies
-the same detection to its own config file, and to nothing else.
+the same detection only while loading the config's module graph, then removes the loader hook.
 
 The second reading is attempted only after the CommonJS one has already failed to parse. Two
 consequences follow, and both are deliberate:
@@ -80,7 +80,8 @@ consequences follow, and both are deliberate:
   evaluation, by which point the body has already run.)
 
 Nothing is transpiled, no temporary file is written into your project, and the retry does not
-reach inside `node_modules` — a dependency that ships CommonJS said so deliberately.
+reinterpret `node_modules` or explicit `.cjs`/`.cts` files — dependencies that declare
+CommonJS keep Node's normal ESM-to-CommonJS interop.
 
 One detail is observable. The retry has to ask the module loader for a URL it has not already
 failed, so on that path `import.meta.url` carries an `?argus-esm-retry=1` query:

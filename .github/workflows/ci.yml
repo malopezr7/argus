@@ -133,6 +133,17 @@ jobs:
             echo "$missing"
             exit 1
           fi
+
+          deleted=$(
+            comm -13 \
+              <(find examples -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) | sort) \
+              <(printf '%s' "$asserted" | sort)
+          )
+          if [ -n "$deleted" ]; then
+            echo "::error::expect_exit asserts fixtures that do not exist:"
+            echo "$deleted"
+            exit 1
+          fi
           echo "✓ every fixture in examples/ has an asserted exit code"
 
       # Everything above runs from inside the workspace, where every dependency

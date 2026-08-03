@@ -1,4 +1,9 @@
-import { registerHooks } from 'node:module';
+import {
+  type ModuleHooks,
+  type ResolveFnOutput,
+  type ResolveHookContext,
+  registerHooks,
+} from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 /**
@@ -16,7 +21,7 @@ import { pathToFileURL } from 'node:url';
  * it detects the syntax and loads the file as whichever it turns out to be.
  * The only reason that does not happen here is the explicit `"commonjs"` a
  * scaffolder wrote on the user's behalf. So Argus applies the same detection
- * to its own config file, and to nothing else.
+ * to its config's module graph, and to nothing outside it.
  *
  * The mechanism is a resolve hook that rewrites Node's chosen FORMAT — from
  * `commonjs-typescript` to `module-typescript` — and stops there. Node still
@@ -34,8 +39,9 @@ import { pathToFileURL } from 'node:url';
  *   parses cleanly as ESM and only fails at evaluation, by which point the
  *   config body has already run and would run again on the fallback.
  *
- *   IT STOPS AT node_modules. A dependency that ships CommonJS means it, and
- *   said so deliberately rather than because a scaffolder guessed.
+ *   IT IS SCOPED TO ONE IMPORT. The hook follows only the config's descendants,
+ *   leaves explicit `.cjs` and `.cts` files and node_modules alone, then removes
+ *   itself as soon as the retry settles.
  */
 
 /** Node's format for a file it read as CommonJS, and the ES module counterpart. */
@@ -61,9 +67,9 @@ const RETRY_MARKER = 'argus-esm-retry';
  *
  * None of these errors carries a `code`, so unlike the strip-only case in
  * `load.ts` there is nothing stable to match on but the wording. That is why
- * this decides MESSAGE TEXT ONLY and never whether to retry — the retry is
- * gated on `SyntaxError`, which cannot drift. If a future Node rewords these,
- * the user loses a sentence of guidance; the config still loads.
+ * these exact messages gate the retry. A runtime `SyntaxError` is not evidence
+ * of a format mismatch: evaluation has already started, so retrying it would
+ * execute the config twice.
  */
 const ESM_SYNTAX_MARKERS: readonly string[] = [
   'import statement outside a module',
@@ -85,8 +91,8 @@ export interface ConfigNamespace {
  * whose format Argus is willing to reconsider at all.
  *
  * Returns `undefined` for everything else, which the hook passes through
- * untouched: files already read as ES modules, anything under node_modules,
- * and non-file URLs.
+ * untouched: files already read as ES modules, explicit `.cjs`/`.cts`, anything
+ * under node_modules, and non-file URLs.
  */
 export function esmEquivalentFormat(
   url: string,
@@ -94,6 +100,8 @@ export function esmEquivalentFormat(
 ): string | undefined {
   if (!url.startsWith('file:')) return undefined;
   if (url.includes('/node_modules/')) return undefined;
+  const pathname = new URL(url).pathname;
+  if (pathname.endsWith('.cjs') || pathname.endsWith('.cts')) return undefined;
   if (typeof format !== 'string') return undefined;
   return ESM_EQUIVALENT[format];
 }
@@ -101,6 +109,11 @@ export function esmEquivalentFormat(
 /** True when a failure is CommonJS refusing syntax that is really an ES module. */
 export function isEsmSyntaxError(error: unknown): boolean {
   if (!(error instanceof SyntaxError)) return false;
+  // A parser failure's stack starts with the source location and offending
+  // line, then the error header. Runtime SyntaxErrors start with that header.
+  // The distinction matters: runtime means module evaluation already began.
+  if (typeof error.stack !== 'string') return false;
+  if (!error.stack.includes(`\n${error.name}: ${error.message}\n`)) return false;
   return ESM_SYNTAX_MARKERS.some((marker) => error.message.includes(marker));
 }
 
@@ -123,32 +136,58 @@ export function esmFallbackEnabled(): boolean {
   return hookInstalled;
 }
 
-/** Rewrites the format of a file Argus is willing to read as an ES module. */
+/** True for the marked config retry rather than an ordinary file URL. */
+function isRetryUrl(url: string): boolean {
+  return url.startsWith('file:') && new URL(url).searchParams.has(RETRY_MARKER);
+}
+
+/** Rewrites formats only inside the marked config's module graph. */
 function flipToEsm(
+  scopedUrls: Set<string>,
   specifier: string,
-  context: unknown,
-  nextResolve: (specifier: string, context: unknown) => { url: string; format?: string | null },
-): { url: string; format?: string | null } {
+  context: ResolveHookContext,
+  nextResolve: (specifier: string, context?: Partial<ResolveHookContext>) => ResolveFnOutput,
+): ResolveFnOutput {
   const resolved = nextResolve(specifier, context);
+  const parentIsScoped = context.parentURL !== undefined && scopedUrls.has(context.parentURL);
+  if (!isRetryUrl(resolved.url) && !parentIsScoped) return resolved;
+
   const format = esmEquivalentFormat(resolved.url, resolved.format);
-  return format === undefined ? resolved : { ...resolved, format };
+  if (format !== undefined) {
+    scopedUrls.add(resolved.url);
+    return { ...resolved, format };
+  }
+
+  // Keep following an already-ESM descendant, but do not cross a boundary that
+  // explicitly opted into CommonJS or belongs to an installed dependency.
+  if (
+    resolved.url.startsWith('file:') &&
+    !resolved.url.includes('/node_modules/') &&
+    !new URL(resolved.url).pathname.match(/\.(?:cjs|cts)$/)
+  ) {
+    scopedUrls.add(resolved.url);
+  }
+  return resolved;
 }
 
 /**
- * Install the hook, once.
+ * Install a hook for one retry.
  *
- * Returns `false` when the runtime has no synchronous hook API, which is the
+ * Returns `undefined` when the runtime has no synchronous hook API, which is the
  * one case where the fallback cannot happen. `load.ts` answers that with an
  * explanation naming every way out by hand, so the user is never left holding
  * Node's message alone.
  */
-function enableEsmFallback(): boolean {
-  if (hookInstalled) return true;
-  if (typeof registerHooks !== 'function') return false;
+function enableEsmFallback(): ModuleHooks | undefined {
+  if (typeof registerHooks !== 'function') return undefined;
 
-  registerHooks({ resolve: flipToEsm as never });
+  const scopedUrls = new Set<string>();
+  const hooks = registerHooks({
+    resolve: (specifier, context, nextResolve) =>
+      flipToEsm(scopedUrls, specifier, context, nextResolve),
+  });
   hookInstalled = true;
-  return true;
+  return hooks;
 }
 
 interface HeldImport {
@@ -171,21 +210,24 @@ interface HeldImport {
  * restoring the listeners immediately after it settles is enough to catch it.
  */
 async function importHoldingWarnings(url: string): Promise<HeldImport> {
-  const saved = process.listeners('warning');
+  const saved = process.rawListeners('warning');
   const warnings: Error[] = [];
-
-  process.removeAllListeners('warning');
-  process.on('warning', (warning: Error) => {
+  const hold = (warning: Error): void => {
     warnings.push(warning);
-  });
+  };
+
+  for (const listener of saved) process.removeListener('warning', listener);
+  process.on('warning', hold);
 
   try {
     return { module: (await import(url)) as ConfigNamespace, warnings };
   } catch (error) {
     return { error, warnings };
   } finally {
-    process.removeAllListeners('warning');
-    for (const listener of saved) process.on('warning', listener as (warning: Error) => void);
+    process.removeListener('warning', hold);
+    for (let i = saved.length - 1; i >= 0; i--) {
+      process.prependListener('warning', saved[i] as (warning: Error) => void);
+    }
   }
 }
 
@@ -209,10 +251,15 @@ export async function importConfigSource(path: string): Promise<ConfigNamespace>
     return first.module;
   }
 
-  // Gated on the error TYPE, never its wording. A file that fails to parse as
-  // CommonJS but parses as an ES module is an ES module; there is no other
-  // reading of it to get wrong.
-  if (!(first.error instanceof SyntaxError) || !enableEsmFallback()) {
+  // Only a CommonJS parser rejecting ES module syntax proves evaluation never
+  // began. An arbitrary runtime SyntaxError may have followed side effects.
+  if (!isEsmSyntaxError(first.error)) {
+    release(first.warnings);
+    throw first.error;
+  }
+
+  const hooks = enableEsmFallback();
+  if (hooks === undefined) {
     release(first.warnings);
     throw first.error;
   }
@@ -221,12 +268,8 @@ export async function importConfigSource(path: string): Promise<ConfigNamespace>
 
   try {
     return (await import(retryUrl(path))) as ConfigNamespace;
-  } catch (retryError) {
-    // A parse error under the ES module reading is the more useful of the two:
-    // it comes from the reading that got furthest, and points at the real
-    // mistake rather than at the module system. Anything else means the file
-    // was CommonJS after all and the retry learned nothing, so the original
-    // failure is the honest one to report.
-    throw retryError instanceof SyntaxError ? retryError : first.error;
+  } finally {
+    hooks.deregister();
+    hookInstalled = false;
   }
 }

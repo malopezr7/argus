@@ -293,7 +293,11 @@ describe('describeLoadFailure — an ES module config in a CommonJS project', ()
 
   /** Exactly what Node throws: a bare SyntaxError, carrying no code. */
   function esmInCommonJs(message: string): Error {
-    return new SyntaxError(message);
+    const error = new SyntaxError(message);
+    error.stack =
+      `${path}:1\nimport './helper.js';\n^^^^^^\n\n` +
+      `SyntaxError: ${message}\n    at wrapSafe (node:internal/modules/cjs/loader:1:1)`;
+    return error;
   }
 
   it('names all three ways out', () => {

@@ -31,6 +31,13 @@ describe('esmEquivalentFormat', () => {
     expect(esmEquivalentFormat('file:///project/argus.config.js', 'commonjs')).toBe('module');
   });
 
+  it('leaves an explicitly CommonJS file alone', () => {
+    expect(esmEquivalentFormat('file:///project/helper.cjs', 'commonjs')).toBeUndefined();
+    expect(
+      esmEquivalentFormat('file:///project/helper.cts', 'commonjs-typescript'),
+    ).toBeUndefined();
+  });
+
   it('leaves a file Node already reads as an ES module alone', () => {
     expect(esmEquivalentFormat(file, 'module-typescript')).toBeUndefined();
     expect(esmEquivalentFormat(file, 'module')).toBeUndefined();
@@ -61,12 +68,18 @@ describe('esmEquivalentFormat', () => {
 /**
  * The four ways V8 refuses ES module syntax inside a CommonJS script, measured
  * on Node 26. None of them carries an error `code`, so the family can only be
- * recognised by wording — which is why this is used for MESSAGE TEXT ONLY and
- * never to decide whether to retry. Getting it wrong costs a sentence of
- * guidance, never a config that fails to load.
+ * recognised by wording. The source prefix in a parser-generated stack is the
+ * second half of the gate: a runtime SyntaxError starts with its error header,
+ * even when its message copies one of these strings.
  */
 describe('isEsmSyntaxError', () => {
-  const syntaxError = (message: string): Error => new SyntaxError(message);
+  const syntaxError = (message: string): Error => {
+    const error = new SyntaxError(message);
+    error.stack =
+      `/project/argus.config.ts:1\nimport './helper.js';\n^^^^^^\n\n` +
+      `SyntaxError: ${message}\n    at wrapSafe (node:internal/modules/cjs/loader:1:1)`;
+    return error;
+  };
 
   it.each([
     'Cannot use import statement outside a module',
@@ -79,6 +92,12 @@ describe('isEsmSyntaxError', () => {
 
   it('does not claim an ordinary syntax error is a module-format problem', () => {
     expect(isEsmSyntaxError(syntaxError('Unexpected end of input'))).toBe(false);
+  });
+
+  it('does not trust module-format wording from a runtime SyntaxError', () => {
+    expect(isEsmSyntaxError(new SyntaxError('Cannot use import statement outside a module'))).toBe(
+      false,
+    );
   });
 
   it('does not claim a thrown config is a module-format problem', () => {
@@ -152,11 +171,15 @@ describe('the fallback on real Node', () => {
     files?: Record<string, string>;
     /** package.json "type". `npm init -y` writes "commonjs". */
     type?: string;
+    /** Config extension. `.mts` reaches the native ESM loader on the first attempt. */
+    extension?: 'ts' | 'mts';
+    /** Statements the plain-Node driver runs after the config import settles. */
+    afterLoad?: string;
   }
 
   /**
    * Load a config in a fresh Node process the way `load.ts` does: import it,
-   * and on a SyntaxError enable the fallback and import it again.
+   * and on a CommonJS module-format SyntaxError import it as ESM.
    */
   function loadInRealNode(fixture: Fixture): { status: number; stdout: string; stderr: string } {
     const dir = mkdtempSync(join(tmpdir(), 'argus-esm-fallback-'));
@@ -165,7 +188,8 @@ describe('the fallback on real Node', () => {
         join(dir, 'package.json'),
         JSON.stringify({ name: 'fixture', type: fixture.type ?? 'commonjs' }),
       );
-      writeFileSync(join(dir, 'argus.config.ts'), fixture.config);
+      const configPath = join(dir, `argus.config.${fixture.extension ?? 'ts'}`);
+      writeFileSync(configPath, fixture.config);
 
       for (const [relative, contents] of Object.entries(fixture.files ?? {})) {
         const target = join(dir, relative);
@@ -178,9 +202,10 @@ describe('the fallback on real Node', () => {
         driver,
         `import { esmFallbackEnabled, importConfigSource } from ${JSON.stringify(MODULE)};
 
-const loaded = await importConfigSource(${JSON.stringify(join(dir, 'argus.config.ts'))});
+const loaded = await importConfigSource(${JSON.stringify(configPath)});
 console.log('RESULT:' + JSON.stringify(loaded.default));
 console.log('FELL-BACK:' + esmFallbackEnabled());
+${fixture.afterLoad ?? ''}
 `,
       );
 
@@ -256,6 +281,39 @@ console.log('FELL-BACK:' + esmFallbackEnabled());
     SUBPROCESS_TIMEOUT_MS,
   );
 
+  it(
+    'leaves an explicitly CommonJS file beside the config readable through default interop',
+    () => {
+      const run = loadInRealNode({
+        config:
+          "import helper from './helper.cjs';\n" + 'export default { timeout: helper.timeout };\n',
+        files: { 'helper.cjs': 'module.exports = { timeout: 30000 };\n' },
+      });
+
+      expect(run.stdout).toContain('RESULT:{"timeout":30000}');
+      expect(run.status).toBe(0);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
+
+  it(
+    'does not reinterpret an unrelated CommonJS file after loading the config',
+    () => {
+      const run = loadInRealNode({
+        config: 'export default { timeout: 1 };\n',
+        files: { 'later.cjs': 'module.exports = { value: 7 };\n' },
+        afterLoad:
+          "const later = await import('./later.cjs');\n" +
+          "console.log('LATER:' + JSON.stringify(later.default));",
+      });
+
+      expect(run.stdout).toContain('LATER:{"value":7}');
+      expect(run.stdout).toContain('FELL-BACK:false');
+      expect(run.status).toBe(0);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
+
   /**
    * The case that must NOT change. A config written as CommonJS loads on the
    * first attempt today, and the fallback is never reached — so it cannot
@@ -300,6 +358,87 @@ console.log('FELL-BACK:' + esmFallbackEnabled());
 
       expect(run.status).not.toBe(0);
       expect(run.stderr).toContain('boom from config');
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
+
+  it(
+    'does not retry a config that throws a runtime SyntaxError',
+    () => {
+      const run = loadInRealNode({
+        config:
+          "console.log('CONFIG-BODY-RAN');\n" +
+          "JSON.parse('{oops');\n" +
+          'module.exports = { timeout: 1 };\n',
+      });
+
+      expect(run.stdout.match(/^CONFIG-BODY-RAN$/gm)).toHaveLength(1);
+      expect(run.stderr).toContain('SyntaxError');
+      expect(run.status).not.toBe(0);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
+
+  it(
+    'does not retry a runtime SyntaxError that copies Node module-format wording',
+    () => {
+      const run = loadInRealNode({
+        config:
+          "console.log('LOOKALIKE-BODY-RAN');\n" +
+          "throw new SyntaxError('Cannot use import statement outside a module');\n",
+      });
+
+      expect(run.stdout.match(/^LOOKALIKE-BODY-RAN$/gm)).toHaveLength(1);
+      expect(run.status).not.toBe(0);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
+
+  it(
+    'reports a runtime error from the ES module retry',
+    () => {
+      const run = loadInRealNode({
+        config:
+          "throw new Error('REAL_CONFIG_ERROR_MARKER');\n" + 'export default { timeout: 1 };\n',
+      });
+
+      expect(run.stderr).toContain('REAL_CONFIG_ERROR_MARKER');
+      expect(run.status).not.toBe(0);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
+
+  it(
+    'reports a missing dependency from the ES module retry',
+    () => {
+      const run = loadInRealNode({
+        config: "import './missing-helper.js';\nexport default { timeout: 1 };\n",
+      });
+
+      expect(run.stderr).toContain('missing-helper.js');
+      expect(run.stderr).toContain('Cannot find module');
+      expect(run.status).not.toBe(0);
+    },
+    SUBPROCESS_TIMEOUT_MS,
+  );
+
+  it(
+    'keeps a warning listener registered while the config loads',
+    () => {
+      const run = loadInRealNode({
+        extension: 'mts',
+        config:
+          "process.on('warning', (warning) => console.log('CONFIG-LISTENER:' + warning.message));\n" +
+          'export default {};\n',
+        afterLoad:
+          "process.emitWarning('after-load');\n" +
+          'await new Promise((resolve) => setImmediate(resolve));\n' +
+          "console.log('WARNING-LISTENERS:' + process.listeners('warning').length);",
+      });
+
+      expect(run.stdout).toContain('CONFIG-LISTENER:after-load');
+      expect(run.stdout).toContain('WARNING-LISTENERS:2');
+      expect(run.status).toBe(0);
     },
     SUBPROCESS_TIMEOUT_MS,
   );
