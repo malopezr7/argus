@@ -240,11 +240,17 @@ nothing for a polling helper to wait on until Argus supplies its own clock.
 
 ### CI
 
-- [ ] Build on CI. `ci.yml` runs typecheck, Biome and Vitest on `ubuntu-latest`
-      only; `pnpm build` is not exercised.
-- [ ] Run the Hermes fixtures on CI, not just locally. They are gated on a local
-      binary that is not committed, so they skip.
-- [ ] macOS and Linux matrix.
+- [x] Build on CI, and install what it produces. Every pull request packs the
+      tarball and installs it into a scratch project created with `npm init -y`
+      — a CommonJS package, which is where the config loader used to fail — then
+      runs a plain suite, a component suite, and a deliberately failing test to
+      confirm a failure is still reported as one.
+- [x] Run the Hermes fixtures on CI. All 19, including the four component
+      fixtures that were documented as a gate and never actually ran, guarded by
+      a check that fails if a fixture is added without an assertion or asserted
+      after being deleted.
+- [ ] macOS and Linux matrix. CI is `ubuntu-latest` only, so nothing is
+      exercised on the platform most contributors develop on.
 - [x] Release workflow for the npm package. `npm-publish.yml` publishes
       `@arguslab/argus` from CI with signed provenance, authenticated by npm
       trusted publishing over OIDC so no token is stored in the repository.

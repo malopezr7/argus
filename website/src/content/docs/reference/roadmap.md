@@ -142,11 +142,8 @@ helper to wait on until Argus supplies its own clock.
 
 ### CI
 
-- Build on CI. The workflow runs typecheck, Biome and Vitest on `ubuntu-latest` only;
-  `pnpm build` is not exercised.
-- Run the Hermes fixtures there, not just locally. They are gated on a local binary that is
-  not committed, so they skip.
-- macOS and Linux matrix.
+- macOS and Linux matrix. CI is `ubuntu-latest` only, so nothing is exercised on the
+  platform most contributors develop on.
 
 Done: the release workflow for the npm package. `@arguslab/argus` is published from CI with
 signed provenance, authenticated by npm trusted publishing over OIDC so no token is stored
