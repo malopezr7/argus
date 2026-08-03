@@ -14,10 +14,15 @@ updates:
   # and `vitest` are declared in seven of the nine manifests, and without it a
   # single bump would arrive as one pull request per manifest.
   # ---------------------------------------------------------------------------
+  # `/packaging` is the published manifest — the only manifest a user ever
+  # installs. It is not a workspace project, so the glob above does not reach
+  # it, and its dependency ranges were going unwatched precisely because they
+  # are the ones that leave this repository.
   - package-ecosystem: npm
     directories:
       - '/'
       - '/packages/*'
+      - '/packaging'
     schedule:
       interval: weekly
       day: monday

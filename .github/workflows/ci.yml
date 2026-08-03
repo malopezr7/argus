@@ -74,8 +74,13 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Every path handed to expect_exit, so the coverage check at the end
+          # can tell which fixtures nobody asserted.
+          asserted=''
+
           expect_exit() {
             local expected="$1" file="$2" actual=0
+            asserted="$asserted$file"$'\n'
             pnpm argus "$file" > /dev/null 2>&1 || actual=$?
             if [ "$actual" != "$expected" ]; then
               echo "✗ $file — expected exit $expected, got $actual"
@@ -88,9 +93,22 @@ jobs:
           expect_exit 0 examples/matchers.test.ts
           expect_exit 0 examples/jest-api.test.ts
           expect_exit 0 examples/rn-mocks.test.ts
+          expect_exit 0 examples/class-syntax.test.ts
+          expect_exit 0 examples/control-chars.test.ts
+
+          # Real React 19 inside Hermes. The reconciler, `act`, the live query
+          # views and the teardown path are only exercised here: the unit suite
+          # runs React on Node, where a live view and the stale snapshot it
+          # replaced are indistinguishable, and where the teardown loop that
+          # recently span forever terminates.
+          expect_exit 0 examples/component-api.test.tsx
+          expect_exit 0 examples/component-liveness.test.tsx
+          expect_exit 0 examples/component-spike.test.tsx
+          expect_exit 0 examples/component-teardown-throw.test.tsx
 
           # Designed to fail: they prove failures are reported, not swallowed.
           expect_exit 1 examples/math-failing.test.ts
+          expect_exit 1 examples/component-query-failing.test.tsx
 
           # Adversarial: user code trying to forge or hijack the result channel.
           # A zero here would mean the forgery worked.
@@ -101,3 +119,152 @@ jobs:
           expect_exit 1 examples/push-hijack.test.ts
           expect_exit 1 examples/iterator-hijack.test.ts
           expect_exit 2 examples/forge.test.ts
+
+          # A fixture this step does not name is a fixture CI does not run, and
+          # nothing said so out loud — which is how every component fixture sat
+          # unasserted here while looking covered.
+          missing=$(
+            comm -23 \
+              <(find examples -type f \( -name '*.test.ts' -o -name '*.test.tsx' \) | sort) \
+              <(printf '%s' "$asserted" | sort)
+          )
+          if [ -n "$missing" ]; then
+            echo "::error::examples/ holds fixtures that no expect_exit above asserts:"
+            echo "$missing"
+            exit 1
+          fi
+          echo "✓ every fixture in examples/ has an asserted exit code"
+
+      # Everything above runs from inside the workspace, where every dependency
+      # resolves whether the published manifest declares it or not, and where
+      # the runtime assets are found at their source paths rather than their
+      # staged ones. None of it can fail the way an install fails.
+      #
+      # npm-publish.yml does test the real tarball, but it is dispatch-only and
+      # runs at release time, so a change that breaks installation was only ever
+      # discovered while trying to publish. These two steps are that same check,
+      # moved to where the change is still a pull request.
+      - name: Build the package
+        run: pnpm build
+
+      # Deliberately not behind a path filter. It reuses this job's checkout,
+      # toolchain, dependency tree and Hermes binary, so the marginal cost is a
+      # build plus two installs — measured at a few seconds — and what it
+      # guards is not confined to files a filter could name: the runtime asset
+      # paths, the exports map and the optional peers are all reachable from
+      # ordinary source changes.
+      - name: Smoke-test the packed tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$RUNNER_TEMP/pkg"
+          npm pack ./dist --pack-destination "$RUNNER_TEMP/pkg" --json > "$RUNNER_TEMP/pack.json"
+
+          # Read the name npm actually produced rather than reconstructing the
+          # scope-flattening rule for it.
+          tarball=$(PACK_JSON="$RUNNER_TEMP/pack.json" \
+            node -p "JSON.parse(require('node:fs').readFileSync(process.env.PACK_JSON,'utf8'))[0].filename")
+          echo "packed $tarball"
+
+          # Outside the repository on purpose. Inside it, Node and esbuild both
+          # find things the published package does not carry.
+          smoke="$RUNNER_TEMP/smoke"
+          rm -rf "$smoke"
+          mkdir -p "$smoke"
+          cd "$smoke"
+
+          # `npm init --yes` writes "type": "commonjs" explicitly, and that is
+          # the setting a TypeScript config file used to die under — Node read
+          # argus.config.ts as CommonJS and rejected its import statement. A
+          # project created any other way never reaches that path.
+          npm init --yes > /dev/null
+
+          npm install --no-audit --no-fund "$RUNNER_TEMP/pkg/$tarball" > /dev/null
+
+          # react and test-renderer are OPTIONAL peers. Installing the tarball
+          # alone must not pull React in: declaring test-renderer as a plain
+          # dependency would auto-install React for every consumer, including
+          # the ones running a pure-TypeScript suite.
+          if [ -e node_modules/react ]; then
+            echo "::error::installing the tarball pulled in react; it must stay an optional peer."
+            exit 1
+          fi
+          npm install --no-audit --no-fund react@^19 test-renderer@~1.2.0 > /dev/null
+
+          cat > argus.config.ts <<'CONFIG'
+          import { defineConfig } from '@arguslab/argus';
+
+          export default defineConfig({
+            include: ['*.test.ts', '*.test.tsx'],
+            timeout: 30_000,
+          });
+          CONFIG
+
+          cat > smoke.test.ts <<'PLAIN'
+          describe('installed tarball', () => {
+            test('runs a test on the real engine', () => {
+              expect([1, 2, 3].map((n) => n * 2)).toEqual([2, 4, 6]);
+            });
+
+            test('reports a rejected promise', async () => {
+              await expect(Promise.reject(new Error('nope'))).rejects.toThrow('nope');
+            });
+          });
+          PLAIN
+
+          # Reaches runtime/rntl, which is staged two directories away from
+          # runtime/framework because rntl/src imports
+          # ../../framework/src/lifecycle.js. That distance is a packaging
+          # contract, and nothing else checks it against a real install.
+          cat > smoke.test.tsx <<'COMPONENT'
+          import { fireEvent, render, screen } from 'argus';
+          import React from 'react';
+          import { Pressable, Text, View } from 'react-native';
+
+          function Counter() {
+            const [n, setN] = React.useState(0);
+            return (
+              <View>
+                <Text testID="count">{String(n)}</Text>
+                <Pressable testID="inc" onPress={() => setN((v) => v + 1)} />
+              </View>
+            );
+          }
+
+          describe('installed component layer', () => {
+            test('renders React and keeps query results live across updates', () => {
+              render(<Counter />);
+              const count = screen.getByTestId('count');
+
+              fireEvent.press(screen.getByTestId('inc'));
+              fireEvent.press(screen.getByTestId('inc'));
+
+              expect(count.children).toEqual(['2']);
+            });
+          });
+          COMPONENT
+
+          argus="$smoke/node_modules/.bin/argus"
+          export ARGUS_HERMES="$GITHUB_WORKSPACE/.hermes/hermes"
+
+          "$argus" --version
+          # No globs: the config file has to be found and read for this to run
+          # anything at all.
+          "$argus"
+
+          # A runner that cannot report a failure proves nothing by passing.
+          cat > fails.test.ts <<'FAILING'
+          describe('deliberate failure', () => {
+            test('fails', () => {
+              expect(1).toBe(2);
+            });
+          });
+          FAILING
+          status=0
+          "$argus" fails.test.ts > /dev/null 2>&1 || status=$?
+          if [ "$status" != "1" ]; then
+            echo "::error::a failing test exited $status, expected 1."
+            exit 1
+          fi
+          echo "✓ a failing test exits 1"
