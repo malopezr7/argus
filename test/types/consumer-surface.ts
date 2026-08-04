@@ -20,6 +20,16 @@
 
 import { render, screen, waitFor, waitForElementToBeRemoved, within } from 'argus';
 
+declare global {
+  interface ArgusMatchers {
+    toBeWithin(low: number, high: number): void;
+  }
+
+  interface ArgusAsyncMatchers {
+    toBeWithin(low: number, high: number): Promise<void>;
+  }
+}
+
 // A function expression, not an arrow: a custom matcher reads `this` for
 // `isNot` and `equals`, which an arrow cannot bind.
 const toBeWithin = function (
@@ -58,6 +68,11 @@ describe('the surface a user actually touches', () => {
     expect(50).not.toBeWithin(1, 10);
   });
 
+  test('an undeclared matcher remains a compile error', () => {
+    // @ts-expect-error undeclared matcher names must not typecheck
+    expect(1).toBeee(2);
+  });
+
   test('the built-in matchers keep their declared parameters', () => {
     expect(0.1 + 0.2).toBeCloseTo(0.3, 5);
     expect({ a: { b: 1 } }).toHaveProperty(['a', 'b'], 1);
@@ -85,6 +100,7 @@ describe('the surface a user actually touches', () => {
   test('awaited matchers are thenable', async () => {
     await expect(Promise.resolve(1)).resolves.toBe(1);
     await expect(Promise.reject(new Error('no'))).rejects.toThrow('no');
+    await expect(Promise.resolve(5)).resolves.toBeWithin(1, 10);
   });
 
   test('async component utilities and queries are thenable', async () => {

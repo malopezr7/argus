@@ -293,6 +293,14 @@ describe('argus CLI — class syntax on the resolved engine (needs .hermes/herme
   );
 
   gated(
+    'a class with a semicolon inside its leading comment runs -> exit 0',
+    () => {
+      expect(runArgus(['examples/class-comment-semicolon.test.tsx'])).toBe(0);
+    },
+    30_000,
+  );
+
+  gated(
     'every class form reports as a passing test, not an engine failure',
     () => {
       const result = runArgusCapture(['examples/class-syntax.test.ts']);
@@ -301,6 +309,16 @@ describe('argus CLI — class syntax on the resolved engine (needs .hermes/herme
       // The old failure mode. It is an INFRASTRUCTURE failure, so asserting the
       // exit code alone would not distinguish it from an ordinary test failure.
       expect(result.stderr).not.toContain('INFRASTRUCTURE FAILURE');
+    },
+    30_000,
+  );
+});
+
+describe('argus CLI — MessageChannel fidelity (needs .hermes/hermes)', () => {
+  gated(
+    'a plain suite sees no component-only MessageChannel polyfill',
+    () => {
+      expect(runArgus(['examples/message-channel-fidelity.test.tsx'])).toBe(0);
     },
     30_000,
   );

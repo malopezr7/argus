@@ -94,7 +94,9 @@ jobs:
           expect_exit 0 examples/jest-api.test.ts
           expect_exit 0 examples/rn-mocks.test.ts
           expect_exit 0 examples/class-syntax.test.ts
+          expect_exit 0 examples/class-comment-semicolon.test.tsx
           expect_exit 0 examples/control-chars.test.ts
+          expect_exit 0 examples/message-channel-fidelity.test.tsx
 
           # Real React 19 inside Hermes. The reconciler, `act`, the live query
           # views and the teardown path are only exercised here: the unit suite

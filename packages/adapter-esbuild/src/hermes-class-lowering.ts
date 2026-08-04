@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, extname } from 'node:path';
-import { transformAsync } from '@babel/core';
+import { type PluginObject, transformAsync } from '@babel/core';
 import transformClasses from '@babel/plugin-transform-classes';
 import { type Loader, type Plugin, transform } from 'esbuild';
 import { projectTsconfigRaw, type TsconfigRaw } from './project-tsconfig.js';
@@ -28,7 +28,16 @@ import { projectTsconfigRaw, type TsconfigRaw } from './project-tsconfig.js';
 /** Every extension that can hold a class and end up in the bundle. */
 const LOWERABLE = /\.(?:cjs|js|jsx|mjs|cts|mts|ts|tsx)$/;
 
-const CLASS_SYNTAX = /\bclass\b[^;{]*\{/m;
+/**
+ * Fail-safe candidate gate, not a JavaScript parser.
+ *
+ * `onLoad` receives raw contents before esbuild parses them, so no AST signal is
+ * available here without doing the strip transform for every file. Every valid
+ * class has a `class` token followed eventually by `{`; comments and strings can
+ * create false positives, but those only pay the transform cost. A false
+ * negative would send unsupported syntax to legacy Hermes and lose the file.
+ */
+const CLASS_SYNTAX = /\bclass\b[\s\S]*\{/;
 
 /** esbuild loader for a path, by extension. Unknown extensions are plain JS. */
 const LOADERS: Readonly<Record<string, Loader>> = {
@@ -103,15 +112,30 @@ export function hermesClassLowering(options: ClassLoweringOptions): Plugin {
 
         // Stage 2 — Babel lowers the classes and folds stage 1's inline map into
         // its own, so a stack frame still points at the user's original line.
+        let foundClass = false;
+        const markClassSyntax = (): PluginObject => ({
+          visitor: {
+            ClassDeclaration(): void {
+              foundClass = true;
+            },
+            ClassExpression(): void {
+              foundClass = true;
+            },
+          },
+        });
         const lowered = await transformAsync(stripped.code, {
           babelrc: false,
           compact: false,
           configFile: false,
           filename: args.path,
-          plugins: [transformClasses],
+          plugins: [markClassSyntax, transformClasses],
           sourceFileName: args.path,
           sourceMaps: 'inline',
         });
+        // A fail-safe candidate can be a comment or string. Babel's parsed AST
+        // decides whether production output changes; false positives pay CPU
+        // only and fall back to esbuild's normal loader and source map.
+        if (!foundClass) return undefined;
         if (lowered?.code === undefined || lowered.code === null) {
           throw new Error(`Babel produced no output for ${args.path}`);
         }

@@ -22,18 +22,12 @@ describe('Hermes environment polyfill', () => {
     expect(order).toEqual(['sync', 'microtask']);
   });
 
-  it('installs the MessageChannel task primitive React async act requires', async () => {
+  it('does not expose MessageChannel to a plain test environment', async () => {
     Reflect.deleteProperty(globalThis, 'MessageChannel');
     vi.resetModules();
 
     await import('../src/polyfill.js');
 
-    const message = await new Promise<unknown>((resolve) => {
-      const channel = new globalThis.MessageChannel();
-      channel.port1.onmessage = (event) => resolve(event.data);
-      channel.port2.postMessage('ready');
-    });
-
-    expect(message).toBe('ready');
+    expect(globalThis.MessageChannel).toBeUndefined();
   });
 });

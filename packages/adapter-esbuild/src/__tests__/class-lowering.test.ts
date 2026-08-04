@@ -45,6 +45,10 @@ describe('Hermes dependency class lowering', () => {
     expect(hasClassSyntax('var Example = class Example { method() {} };')).toBe(true);
   });
 
+  it('selects a class whose leading comment contains a semicolon', () => {
+    expect(hasClassSyntax('class /* ; */ Foo {}')).toBe(true);
+  });
+
   it('removes class syntax from JavaScript dependencies in node_modules', async () => {
     const bundle = await new EsbuildBundler().bundle({
       testPaths: [FIXTURE_PATH],

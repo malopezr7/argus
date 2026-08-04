@@ -69,23 +69,15 @@ interface ArgusMatchers {
   toHaveLastReturnedWith(value: unknown): void;
   toHaveNthReturnedWith(n: number, value: unknown): void;
   /**
-   * Where matchers registered with `expect.extend` land.
-   *
-   * This was `unknown`, which made `expect.extend` useless from TypeScript: the
-   * matcher registered fine and then `expect(5).toBeWithin(1, 10)` failed to
-   * compile, because you cannot call an `unknown`. A name is only half of a
-   * declaration.
-   *
-   * For precise types on your own matchers, reopen this interface — it is a
-   * global script, so no namespace or module augmentation is needed:
+   * Custom matchers use declaration merging instead of a catch-all key, so a
+   * typo remains a compile error. Reopen this global interface with the matcher
+   * you register through `expect.extend`:
    *
    *   // matchers.d.ts
    *   interface ArgusMatchers {
    *     toBeWithin(low: number, high: number): void;
    *   }
    */
-  // biome-ignore lint/suspicious/noExplicitAny: the escape hatch for expect.extend; `unknown` is not callable and would make every custom matcher a type error
-  [matcher: string]: any;
 }
 
 /**
@@ -137,9 +129,10 @@ interface ArgusAsyncMatchers {
   toHaveReturnedWith(value: unknown): Promise<void>;
   toHaveLastReturnedWith(value: unknown): Promise<void>;
   toHaveNthReturnedWith(n: number, value: unknown): Promise<void>;
-  /** Custom matchers, awaited. See the note on `ArgusMatchers`. */
-  // biome-ignore lint/suspicious/noExplicitAny: the escape hatch for expect.extend; `unknown` is not callable and would make every custom matcher a type error
-  [matcher: string]: any;
+  /**
+   * Reopen this interface too when the custom matcher is used through
+   * `.resolves` or `.rejects`.
+   */
 }
 
 // ---------------------------------------------------------------------------

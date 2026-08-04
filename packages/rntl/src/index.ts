@@ -1,3 +1,4 @@
+import './message-channel.js';
 import React from 'react';
 // Sanctioned cross-package seam: the React-agnostic lifecycle registry remains framework-owned.
 import { registerInternalAfterEach } from '../../framework/src/lifecycle.js';

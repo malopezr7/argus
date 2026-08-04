@@ -48,9 +48,9 @@ const internalAsyncTypes = parse('packages', 'rntl', 'src', 'async.ts');
 /**
  * Every member an interface declares, by name.
  *
- * Index signatures are skipped deliberately: `[key: string]: unknown` is what
- * lets a user's own `expect.extend` matcher typecheck, and it would otherwise
- * make every membership assertion below vacuously true.
+ * Index signatures are skipped deliberately because this helper compares named
+ * members. The internal runtime type still has a dynamic-key implementation
+ * seam; the published interfaces are checked separately to ensure they do not.
  */
 function membersOf(source: ts.SourceFile, interfaceName: string): Set<string> {
   const names = new Set<string>();
@@ -73,6 +73,26 @@ function membersOf(source: ts.SourceFile, interfaceName: string): Set<string> {
 
   if (!found) throw new Error(`${source.fileName} declares no interface named ${interfaceName}`);
   return names;
+}
+
+/** Number of catch-all index signatures declared directly on an interface. */
+function indexSignaturesOf(source: ts.SourceFile, interfaceName: string): number {
+  let count = 0;
+  let found = false;
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isInterfaceDeclaration(node) && node.name.text === interfaceName) {
+      found = true;
+      for (const member of node.members) {
+        if (ts.isIndexSignatureDeclaration(member)) count++;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+
+  if (!found) throw new Error(`${source.fileName} declares no interface named ${interfaceName}`);
+  return count;
 }
 
 /** The type annotation of a `declare const`, as written. */
@@ -193,6 +213,11 @@ describe('the published declarations describe the expect() surface', () => {
     // interface is more than its statics by checking the text carries one.
     expect(publishedGlobals.text).toContain('(actual: unknown): ArgusMatchers;');
     expect(members.size).toBeGreaterThan(0);
+  });
+
+  it('does not accept undeclared matcher names through catch-all index signatures', () => {
+    expect(indexSignaturesOf(publishedGlobals, 'ArgusMatchers')).toBe(0);
+    expect(indexSignaturesOf(publishedGlobals, 'ArgusAsyncMatchers')).toBe(0);
   });
 });
 
