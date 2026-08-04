@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, extname } from 'node:path';
-import { type PluginObject, transformAsync } from '@babel/core';
+import { type FileResult, type PluginObject, transformAsync } from '@babel/core';
 import transformClasses from '@babel/plugin-transform-classes';
 import { type Loader, type Plugin, transform } from 'esbuild';
 import { projectTsconfigRaw, type TsconfigRaw } from './project-tsconfig.js';
@@ -51,8 +51,50 @@ const LOADERS: Readonly<Record<string, Loader>> = {
   '.tsx': 'tsx',
 };
 
+type BabelSourceType = 'commonjs' | 'module' | 'unambiguous';
+
+/** Preserve explicit module kinds; infer ambiguous JavaScript and TypeScript. */
+function babelSourceType(path: string): BabelSourceType {
+  switch (extname(path)) {
+    case '.cjs':
+    case '.cts':
+      return 'commonjs';
+    case '.mjs':
+    case '.mts':
+      return 'module';
+    default:
+      return 'unambiguous';
+  }
+}
+
 export function hasClassSyntax(source: string): boolean {
   return CLASS_SYNTAX.test(source);
+}
+
+/**
+ * Ask esbuild's parser whether `source` contains an actual class AST node.
+ *
+ * Stage 1 already parsed this exact JavaScript successfully. Repeating that
+ * parse with only class support disabled therefore has two outcomes: success
+ * proves the broad text gate matched a comment/string, while failure is treated
+ * conservatively as a real class so Babel's original error remains loud.
+ */
+async function esbuildConfirmsClassSyntax(
+  source: string,
+  sourcefile: string,
+  options: ClassLoweringOptions,
+): Promise<boolean> {
+  try {
+    await transform(source, {
+      loader: 'js',
+      target: options.target,
+      supported: { ...options.supported, class: false },
+      sourcefile,
+    });
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 /**
@@ -123,15 +165,34 @@ export function hermesClassLowering(options: ClassLoweringOptions): Plugin {
             },
           },
         });
-        const lowered = await transformAsync(stripped.code, {
-          babelrc: false,
-          compact: false,
-          configFile: false,
-          filename: args.path,
-          plugins: [markClassSyntax, transformClasses],
-          sourceFileName: args.path,
-          sourceMaps: 'inline',
-        });
+        const sourceType = babelSourceType(args.path);
+        let lowered: FileResult | null;
+        try {
+          lowered = await transformAsync(stripped.code, {
+            babelrc: false,
+            compact: false,
+            configFile: false,
+            filename: args.path,
+            // `.cjs`/`.cts` are CommonJS, `.mjs`/`.mts` are modules, and the
+            // remaining loaders can represent either. Babel's default module
+            // mode is wrong for CommonJS wrapper syntax such as top-level return.
+            sourceType,
+            ...(sourceType === 'unambiguous'
+              ? { parserOpts: { allowReturnOutsideFunction: true } }
+              : {}),
+            plugins: [markClassSyntax, transformClasses],
+            sourceFileName: args.path,
+            sourceMaps: 'inline',
+          });
+        } catch (error) {
+          // Babel does not parse every program esbuild accepts. A broad-gate
+          // false positive must fall back to the normal loader; a genuine class
+          // still fails here rather than reaching legacy Hermes unlowered.
+          if (!(await esbuildConfirmsClassSyntax(stripped.code, args.path, options))) {
+            return undefined;
+          }
+          throw error;
+        }
         // A fail-safe candidate can be a comment or string. Babel's parsed AST
         // decides whether production output changes; false positives pay CPU
         // only and fall back to esbuild's normal loader and source map.

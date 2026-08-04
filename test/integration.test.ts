@@ -269,7 +269,7 @@ describe('argus CLI — result-channel integrity (needs .hermes/hermes)', () => 
       expect(r.stderr).not.toContain('PROTOCOL FAILURE');
       expect(r.stderr).not.toContain('TIMEOUT');
       expect(r.stdout).toContain('MessageChannel hijack');
-      expect(r.stdout).toContain('1 passed, 1 failed, 0 todo, 2 total');
+      expect(r.stdout).toContain('2 passed, 1 failed, 0 todo, 3 total');
     },
     30_000,
   );

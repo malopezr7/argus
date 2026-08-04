@@ -49,6 +49,22 @@ describe('Hermes dependency class lowering', () => {
     expect(hasClassSyntax('class /* ; */ Foo {}')).toBe(true);
   });
 
+  it('ignores false positives in CommonJS, ESM and TypeScript dependency shapes', async () => {
+    const bundle = await bundleFixture('class-gate-shapes-entry.js', 'legacy');
+
+    expect(bundle.code).toContain('cjs-shape');
+    expect(bundle.code).toContain('js-shape');
+    expect(bundle.code).toContain('mjs-shape');
+    expect(bundle.code).toContain('ts-shape');
+  });
+
+  it('lowers a CommonJS class after a top-level early-return guard', async () => {
+    const bundle = await bundleFixture('commonjs-class-return-entry.js', 'legacy');
+
+    expect(bundle.code).toContain('commonjs-class-shape');
+    expect(bundle.code).not.toMatch(CLASS_SYNTAX);
+  });
+
   it('removes class syntax from JavaScript dependencies in node_modules', async () => {
     const bundle = await new EsbuildBundler().bundle({
       testPaths: [FIXTURE_PATH],

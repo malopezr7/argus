@@ -2,9 +2,9 @@
  * Component-only MessageChannel polyfill for React 19 async act.
  *
  * The `argus` facade imports this module as a side effect, so esbuild includes it
- * only when a test imports the component API. Module dependencies initialize
- * before the importing test body, keeping the constructor captured before user
- * code while plain suites retain Hermes' native `undefined` global.
+ * only when a test imports the component API. The module always replaces a
+ * configurable ambient constructor before the importing test body, while plain
+ * suites retain Hermes' native `undefined` global.
  */
 
 interface Port {
@@ -18,7 +18,6 @@ function makePort(): Port {
 
 (() => {
   const g = globalThis as Record<string, unknown>;
-  if (typeof g.MessageChannel !== 'undefined') return;
 
   function ArgusMessageChannel(this: { port1: Port; port2: Port }): void {
     const port1 = makePort();
@@ -37,9 +36,11 @@ function makePort(): Port {
     this.port2 = port2;
   }
 
-  // React resolves MessageChannel lazily after an async act callback settles.
-  // Keep that dependency in this pre-user-code closure: assignment remains a
-  // harmless no-op, while React always receives the captured constructor.
+  // ES modules evaluate once per bundle, so imports already provide idempotency.
+  // Never trust an ambient value here: a setup dependency may have installed a
+  // writable constructor before `argus` initialized. React resolves the global
+  // lazily after an async act callback settles, so replace it unconditionally
+  // with this closure-captured constructor and make later assignment a no-op.
   Object.defineProperty(g, 'MessageChannel', {
     configurable: false,
     enumerable: true,
