@@ -12,6 +12,47 @@ below say plainly which ones do.
 
 Nothing yet.
 
+## [0.2.2] — 2026-08-04
+
+Component tests can now wait for something to happen. Everything here is
+additive — nothing behaves differently than it did in 0.2.1.
+
+### Added
+
+- `waitFor(callback, { timeout, interval })`, which retries until the callback
+  stops throwing, and `waitForElementToBeRemoved` for the opposite.
+- `findBy*` and `findAllBy*` for all five predicates — text, test ID, role,
+  placeholder text and display value — on `screen`, on `within(node)` and on the
+  result of `render()`.
+
+  Standalone Hermes runs timers as a queue rather than a clock: it ignores the
+  delay you pass and fires callbacks in registration order, so no real time
+  passes between them. A millisecond deadline alone would therefore never be
+  reached and a wait would spin until the per-file timeout killed the process,
+  discarding every result in the file. Each wait is bounded by a wall-clock
+  budget *and* a scheduler-turn budget, whichever runs out first. That also means
+  an update scheduled behind a long delay can satisfy a shorter timeout, since
+  the delay is not observed.
+
+- A `MessageChannel` implementation, which React 19 needs to schedule the final
+  flush of an asynchronous `act` and Hermes does not provide.
+
+### Fixed
+
+- Two concurrent waits — `Promise.all` of two `findBy*` queries — used to fail on
+  Hermes V1 while passing on legacy, and passed on legacy only while printing
+  React's overlapping-act warning. A wait started inside another wait's callback
+  broke the outer one, which then reported an element missing that was present.
+- A wait that was never awaited kept polling into the following test and failed
+  it on an unrelated query, attributing the failure to a test that had done
+  nothing wrong.
+- A result arriving after the deadline was accepted rather than rejected.
+- The scheduler reached `MessageChannel` as an ordinary global, so replacing it
+  with something that never delivered made the file exit successfully with no
+  result frame at all — losing every result in it, including tests that had
+  already passed. It is now captured before user code runs and cannot be
+  replaced, and an adversarial fixture pins that.
+
 ## [0.2.1] — 2026-08-03
 
 The engine-selection and syntax fixes below change which Hermes build your tests

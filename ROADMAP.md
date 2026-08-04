@@ -6,7 +6,7 @@ VM, spawned as a subprocess. No device, no emulator, unit-test cost.
 This document tracks what is done, what is next, and what is deliberately deferred.
 It is the single source of truth for project direction.
 
-Status: **`v0.2.1`** — installable from npm as
+Status: **`v0.2.2`** — installable from npm as
 [`@arguslab/argus`](https://www.npmjs.com/package/@arguslab/argus). Pre-1.0: the
 surface is still free to change between minor versions.
 
