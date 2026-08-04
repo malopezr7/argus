@@ -365,6 +365,55 @@ declare module 'argus' {
     changeText(node: HostNode, value: string): void;
   };
 
+  /** Options shared by interactions created with `userEvent.setup()`. */
+  export interface UserEventSetupOptions {
+    /** Requested delay between interaction steps. Defaults to 0 ms. */
+    delay?: number;
+    /** Optional timer advancement hook, matching React Native Testing Library. */
+    advanceTimers?: (delay: number) => Promise<void> | void;
+  }
+
+  export interface UserEventConfig {
+    delay: number;
+    advanceTimers(delay: number): Promise<void> | void;
+  }
+
+  export interface PressOptions {
+    /** Long-press duration in milliseconds. Defaults to 500 ms. */
+    duration?: number;
+  }
+
+  export interface TypeOptions {
+    skipPress?: boolean;
+    submitEditing?: boolean;
+    skipBlur?: boolean;
+  }
+
+  /** Asynchronous, device-shaped component interactions. */
+  export interface UserEventInstance {
+    readonly config: UserEventConfig;
+    press(node: HostNode): Promise<void>;
+    longPress(node: HostNode, options?: PressOptions): Promise<void>;
+    type(node: HostNode, text: string, options?: TypeOptions): Promise<void>;
+    clear(node: HostNode): Promise<void>;
+    paste(node: HostNode, text: string): Promise<void>;
+  }
+
+  /**
+   * React Native Testing Library-shaped realistic interactions.
+   *
+   * Every method returns a promise. Prefer a configured `setup()` instance;
+   * direct methods remain available for compatibility.
+   */
+  export const userEvent: {
+    setup(options?: UserEventSetupOptions): UserEventInstance;
+    press(node: HostNode): Promise<void>;
+    longPress(node: HostNode, options?: PressOptions): Promise<void>;
+    type(node: HostNode, text: string, options?: TypeOptions): Promise<void>;
+    clear(node: HostNode): Promise<void>;
+    paste(node: HostNode, text: string): Promise<void>;
+  };
+
   /**
    * Run `callback` inside React's act scope and flush what it schedules.
    *

@@ -109,6 +109,8 @@ jobs:
           expect_exit 0 examples/component-liveness.test.tsx
           expect_exit 0 examples/component-spike.test.tsx
           expect_exit 0 examples/component-teardown-throw.test.tsx
+          expect_exit 0 examples/component-user-event.test.tsx
+          expect_exit 0 examples/component-user-event-regressions.test.tsx
           expect_exit 0 examples/component-wait-deadline.test.tsx
 
           # Designed to fail: they prove failures are reported, not swallowed.

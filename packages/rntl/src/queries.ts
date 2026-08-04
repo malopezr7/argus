@@ -1,6 +1,7 @@
 import { type WaitForOptions, waitFor } from './async.js';
 import { screen as renderScreen } from './render.js';
 import type { HostNode } from './tree.js';
+import { getDisplayValue } from './user-event.js';
 
 export type QueryMatcher = string | RegExp;
 
@@ -112,7 +113,7 @@ export function makeQueries(resolveRoot: () => HostNode): BoundQueries {
     return all((node) => matches(node.props.placeholder, value));
   }
   function displayValue(value: QueryMatcher): HostNode[] {
-    return all((node) => matches(node.props.value ?? node.props.defaultValue, value));
+    return all((node) => matches(getDisplayValue(node), value));
   }
 
   return {

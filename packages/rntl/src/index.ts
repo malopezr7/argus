@@ -10,6 +10,7 @@ import {
   type RenderResult as RootRenderResult,
   render as renderRoot,
 } from './render.js';
+import { userEvent } from './user-event.js';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -24,7 +25,7 @@ export function render(element: React.ReactElement): RenderResult {
   return bindQueries(renderRoot(element));
 }
 
-export { fireEvent, screen, waitFor, waitForElementToBeRemoved, within };
+export { fireEvent, screen, userEvent, waitFor, waitForElementToBeRemoved, within };
 
 /**
  * Run `callback` inside React's act scope and flush what it queued.
@@ -40,3 +41,10 @@ export type { TestInstance } from 'test-renderer';
 export type { WaitForOptions } from './async.js';
 export type { BoundQueries, QueryMatcher } from './queries.js';
 export type { HostChild, HostNode } from './tree.js';
+export type {
+  PressOptions,
+  TypeOptions,
+  UserEventConfig,
+  UserEventInstance,
+  UserEventSetupOptions,
+} from './user-event.js';

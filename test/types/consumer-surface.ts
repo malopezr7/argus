@@ -18,7 +18,7 @@
  * to catch.
  */
 
-import { render, screen, waitFor, waitForElementToBeRemoved, within } from 'argus';
+import { render, screen, userEvent, waitFor, waitForElementToBeRemoved, within } from 'argus';
 
 declare global {
   interface ArgusMatchers {
@@ -114,5 +114,27 @@ describe('the surface a user actually touches', () => {
     expect(immediate).toBe(0);
     expect(fromWithin).toHaveLength(1);
     expect(removed).toBe(fromScreen);
+  });
+
+  test('userEvent methods expose the documented asynchronous surface', async () => {
+    const node = render({}).root;
+    const user = userEvent.setup({
+      delay: 0,
+      advanceTimers: (delay) => Promise.resolve(delay).then(() => undefined),
+    });
+
+    const pressed: Promise<void> = user.press(node);
+    await pressed;
+    await user.longPress(node, { duration: 500 });
+    await user.type(node, 'abc', { skipPress: true, skipBlur: true, submitEditing: true });
+    await user.clear(node);
+    await user.paste(node, 'text');
+    await userEvent.press(node);
+    await userEvent.longPress(node, { duration: 250 });
+    await userEvent.type(node, 'abc');
+    await userEvent.clear(node);
+    await userEvent.paste(node, 'text');
+
+    expect(user.config.delay).toBe(0);
   });
 });

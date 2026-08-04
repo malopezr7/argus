@@ -44,6 +44,7 @@ const publishedGlobals = parse('packaging', 'argus.d.ts');
 const internalMatcherTypes = parse('packages', 'framework', 'src', 'matcher-types.ts');
 const internalQueryTypes = parse('packages', 'rntl', 'src', 'queries.ts');
 const internalAsyncTypes = parse('packages', 'rntl', 'src', 'async.ts');
+const internalUserEventTypes = parse('packages', 'rntl', 'src', 'user-event.ts');
 
 /**
  * Every member an interface declares, by name.
@@ -281,6 +282,18 @@ describe('the internal and published component types agree', () => {
   it('declares the same wait options on both sides', () => {
     expect([...membersOf(publishedGlobals, 'WaitForOptions')].sort()).toEqual(
       [...membersOf(internalAsyncTypes, 'WaitForOptions')].sort(),
+    );
+  });
+
+  it.each([
+    'UserEventSetupOptions',
+    'UserEventConfig',
+    'UserEventInstance',
+    'TypeOptions',
+    'PressOptions',
+  ])('declares the same %s members on both sides', (interfaceName) => {
+    expect([...membersOf(publishedGlobals, interfaceName)].sort()).toEqual(
+      [...membersOf(internalUserEventTypes, interfaceName)].sort(),
     );
   });
 });

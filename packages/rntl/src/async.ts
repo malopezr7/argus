@@ -21,14 +21,18 @@ type Invocation<T> =
   | { status: 'pending'; state: { current: PendingState<T> } };
 
 interface FlushRequest {
-  interval: number;
+  callback(): void | Promise<void>;
   resolve(): void;
   reject(error: unknown): void;
 }
 
-interface WaitControl {
+export interface AsyncWorkControl {
   cancelled: boolean;
+}
+
+interface WaitControl extends AsyncWorkControl {
   done: Promise<void>;
+  failure?: unknown;
   complete(): void;
 }
 
@@ -36,6 +40,7 @@ const flushRequests: FlushRequest[] = [];
 const activeWaits: WaitControl[] = [];
 let flushInProgress = false;
 let invokeDepth = 0;
+let flushStartQueued = false;
 
 function validateOptions(timeout: number, interval: number): void {
   if (!Number.isFinite(timeout) || timeout < 0) {
@@ -127,11 +132,7 @@ function startNextFlush(): void {
 
   let actResult: PromiseLike<unknown>;
   try {
-    actResult = React.act(async function flushActTurn(): Promise<void> {
-      await new Promise<void>(function schedule(resolve): void {
-        setTimeout(resolve, request.interval);
-      });
-    });
+    actResult = React.act(request.callback);
   } catch (error) {
     settleFlush(request, true, error);
     return;
@@ -147,10 +148,58 @@ function startNextFlush(): void {
   );
 }
 
-function flushTurn(interval: number): Promise<void> {
-  return new Promise<void>(function enqueueFlush(resolve, reject): void {
-    flushRequests[flushRequests.length] = { interval, resolve, reject };
+function queueFlushStart(): void {
+  if (flushStartQueued) return;
+  flushStartQueued = true;
+  Promise.resolve().then(function startQueuedFlush(): void {
+    flushStartQueued = false;
     startNextFlush();
+  });
+}
+
+/** Run one callback in the shared async-act queue used by waits and user interactions. */
+export function runAsyncAct(
+  callback: () => void | Promise<void>,
+  deferStart = false,
+): Promise<void> {
+  return new Promise<void>(function enqueueFlush(resolve, reject): void {
+    flushRequests[flushRequests.length] = { callback, resolve, reject };
+    if (deferStart) queueFlushStart();
+    else startNextFlush();
+  });
+}
+
+/** Register cancellable async work so test teardown can stop and drain it. */
+export function runRegisteredAsyncWork(
+  work: (control: AsyncWorkControl) => Promise<void>,
+): Promise<void> {
+  const control = createWaitControl();
+  registerWait(control);
+
+  let result: Promise<void>;
+  try {
+    result = work(control);
+  } catch (error) {
+    unregisterWait(control, error);
+    return Promise.reject(error);
+  }
+
+  return result.then(
+    function completed(): void {
+      unregisterWait(control);
+    },
+    function failed(error): never {
+      unregisterWait(control, error);
+      throw error;
+    },
+  );
+}
+
+function flushTurn(interval: number): Promise<void> {
+  return runAsyncAct(async function flushActTurn(): Promise<void> {
+    await new Promise<void>(function schedule(resolve): void {
+      setTimeout(resolve, interval);
+    });
   });
 }
 
@@ -172,19 +221,21 @@ function registerWait(control: WaitControl): void {
   activeWaits[activeWaits.length] = control;
 }
 
-function unregisterWait(control: WaitControl): void {
+function unregisterWait(control: WaitControl, failure?: unknown): void {
   for (let i = 0; i < activeWaits.length; i++) {
     if (activeWaits[i] === control) {
       activeWaits.splice(i, 1);
       break;
     }
   }
+  if (failure !== undefined) control.failure = failure;
   control.complete();
 }
 
-/** Cancel and drain waits the test abandoned before its component tree is unmounted. */
+/** Cancel and drain waits or interactions abandoned before the component tree is unmounted. */
 export async function cleanupAsyncWaits(): Promise<void> {
   const waits: WaitControl[] = [];
+  let failure: unknown;
   for (let i = 0; i < activeWaits.length; i++) {
     const control = activeWaits[i];
     control.cancelled = true;
@@ -192,7 +243,9 @@ export async function cleanupAsyncWaits(): Promise<void> {
   }
   for (let i = 0; i < waits.length; i++) {
     await waits[i].done;
+    if (failure === undefined && waits[i].failure !== undefined) failure = waits[i].failure;
   }
+  if (failure !== undefined) throw failure;
 }
 
 function callbackMessage(error: unknown): string {
