@@ -1,6 +1,6 @@
 ---
 title: Async tests
-description: Promises, async matchers, and the one thing standalone Hermes does not give you — timers.
+description: Promises, async matchers, and why standalone Hermes timers are a queue rather than a clock.
 sidebar:
   order: 3
 ---
@@ -62,16 +62,17 @@ describe('with a warm cache', () => {
 });
 ```
 
-## There are no timers
+## The timer queue is not a clock
 
-This is the one that surprises people. **Standalone Hermes has no `setTimeout`,
-`setInterval` or `setImmediate`.**
+This is the one that surprises people. Standalone Hermes exposes `setTimeout` and
+`clearTimeout`, but **ignores the delay argument**. Timers run as a FIFO queue and the VM
+drains pending timers after the script ends. A chain of thousands of
+`setTimeout(callback, 1000)` registrations can therefore finish in almost no wall-clock
+time.
 
-Those are not part of the JavaScript language — they are host APIs. In a browser the
-browser provides them; in Node, Node does; in React Native, the RN runtime does. The bare
-`hermes` VM provides none of them, and Argus deliberately does not invent them, because a
-fake timer that is not the one your app runs on is the exact kind of "close enough" this
-project exists to avoid.
+`setInterval`, `performance`, and the browser's `MessageChannel` are absent. Argus adds a
+minimal `MessageChannel` only so React 19's async `act` can flush work; it does not turn the
+timer queue into a clock.
 
 What the environment does have, installed by the Argus polyfill:
 
@@ -80,16 +81,19 @@ What the environment does have, installed by the Argus polyfill:
 | `console.log` / `info` / `debug` / `warn` / `error` | Built on Hermes' `print`. Output is captured and shown under `[user logs]`. |
 | `queueMicrotask` | Backed by `Promise.resolve().then`. |
 | `global` | Alias of `globalThis`, matching React Native. |
+| `MessageChannel` | Minimal two-port task primitive used by React async `act`. |
+| `setTimeout` / `clearTimeout` | Native FIFO task queue; delay is ignored. |
 | `Promise`, `async` / `await` | Native to the engine. |
 
-So this **does not work**:
+This yields to the timer queue, but does **not** wait 10 ms:
 
 ```ts
-// ✗ ReferenceError: setTimeout is not defined
+const started = Date.now();
 await new Promise((resolve) => setTimeout(resolve, 10));
+// Date.now() - started can still be 0
 ```
 
-And this does:
+Promise microtasks remain available:
 
 ```ts
 // ✓ yields to the microtask queue
@@ -97,13 +101,13 @@ await Promise.resolve();
 await new Promise<void>((resolve) => queueMicrotask(resolve));
 ```
 
-### Testing time-dependent code anyway
+### Testing time-dependent code
 
 Inject the clock instead of reaching for a global one. Code that takes its time source as a
 parameter is testable on any engine, and does not need fake timers on any of them.
 
 ```ts
-// ✗ untestable without timers
+// ✗ coupled to a wall clock the standalone VM does not provide
 export function isExpired(token: Token) {
   return token.expiresAt < Date.now();
 }
@@ -119,10 +123,17 @@ test('detects an expired token', () => {
 ```
 
 For debounce, throttle and retry logic, take the scheduler as a dependency and pass a
-synchronous one in tests.
+synchronous one in tests. A raw `setTimeout` test in Argus can prove task ordering, not
+elapsed-time behaviour from the React Native host.
 
-Fake timers are on the [roadmap](/reference/roadmap/) as part of the component-testing
-work, not as a general polyfill.
+Component polling is the deliberate exception. `waitFor` accepts RNTL-compatible
+`{ timeout, interval }` options, but applies both a real `Date.now()` deadline and a
+scheduler-turn budget derived from `ceil(timeout / interval)`. That second budget prevents
+the zero-delay queue from spinning until the per-file timeout kills the process. See
+[Component testing](/tests/components/#async-queries-and-waits).
+
+Fake timers remain on the [roadmap](/reference/roadmap/); the native FIFO queue is not a
+fake-timer API.
 
 ## Per-file timeout
 
@@ -136,5 +147,5 @@ Exceeding it kills the Hermes process and reports the file as a `timeout` outcom
 code 2. There is no per-test timeout: the unit of isolation is the file, so the unit of
 timeout is too.
 
-A hung promise that never settles will hit this. Because there are no timers, the usual
-cause is awaiting something that nothing will ever resolve.
+A hung promise that never settles will hit this. `waitFor` protects its own callback with
+the dual budget above, but an arbitrary `await` still has no per-test preemption.

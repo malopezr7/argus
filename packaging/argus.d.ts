@@ -268,6 +268,14 @@ declare module 'argus' {
   /** Queries accept an exact string or a regular expression. */
   export type QueryMatcher = string | RegExp;
 
+  /** Millisecond-shaped polling options shared by async component utilities. */
+  export interface WaitForOptions {
+    /** Wall-clock ceiling. Defaults to 1000 ms. */
+    timeout?: number;
+    /** Requested delay between retries. Defaults to 50 ms. */
+    interval?: number;
+  }
+
   /**
    * Queries bound to a subtree.
    *
@@ -281,26 +289,36 @@ declare module 'argus' {
     getAllByText(value: QueryMatcher): HostNode[];
     queryByText(value: QueryMatcher): HostNode | null;
     queryAllByText(value: QueryMatcher): HostNode[];
+    findByText(value: QueryMatcher, options?: WaitForOptions): Promise<HostNode>;
+    findAllByText(value: QueryMatcher, options?: WaitForOptions): Promise<HostNode[]>;
     getByTestId(value: QueryMatcher): HostNode;
     getAllByTestId(value: QueryMatcher): HostNode[];
     queryByTestId(value: QueryMatcher): HostNode | null;
     queryAllByTestId(value: QueryMatcher): HostNode[];
+    findByTestId(value: QueryMatcher, options?: WaitForOptions): Promise<HostNode>;
+    findAllByTestId(value: QueryMatcher, options?: WaitForOptions): Promise<HostNode[]>;
     getByRole(value: QueryMatcher): HostNode;
     getAllByRole(value: QueryMatcher): HostNode[];
     queryByRole(value: QueryMatcher): HostNode | null;
     queryAllByRole(value: QueryMatcher): HostNode[];
+    findByRole(value: QueryMatcher, options?: WaitForOptions): Promise<HostNode>;
+    findAllByRole(value: QueryMatcher, options?: WaitForOptions): Promise<HostNode[]>;
     getByPlaceholderText(value: QueryMatcher): HostNode;
     getAllByPlaceholderText(value: QueryMatcher): HostNode[];
     queryByPlaceholderText(value: QueryMatcher): HostNode | null;
     queryAllByPlaceholderText(value: QueryMatcher): HostNode[];
+    findByPlaceholderText(value: QueryMatcher, options?: WaitForOptions): Promise<HostNode>;
+    findAllByPlaceholderText(value: QueryMatcher, options?: WaitForOptions): Promise<HostNode[]>;
     getByDisplayValue(value: QueryMatcher): HostNode;
     getAllByDisplayValue(value: QueryMatcher): HostNode[];
     queryByDisplayValue(value: QueryMatcher): HostNode | null;
     queryAllByDisplayValue(value: QueryMatcher): HostNode[];
+    findByDisplayValue(value: QueryMatcher, options?: WaitForOptions): Promise<HostNode>;
+    findAllByDisplayValue(value: QueryMatcher, options?: WaitForOptions): Promise<HostNode[]>;
   }
 
   /** What `render` hands back for the tree it just mounted. */
-  export interface RenderResult {
+  export interface RenderResult extends BoundQueries {
     readonly root: HostNode;
     /** Re-render the same root with a new element. */
     rerender(element: unknown): void;
@@ -322,6 +340,25 @@ declare module 'argus' {
 
   /** Queries bound to `node`'s subtree, for scoping a search. */
   export function within(node: HostNode): BoundQueries;
+
+  /**
+   * Retry until `expectation` stops throwing or its returned promise resolves.
+   *
+   * Standalone Hermes does not honor timer delays, so Argus applies both the
+   * requested wall-clock timeout and a derived scheduler-turn budget. The first
+   * exhausted budget rejects with the last callback error plus the budget reason.
+   */
+  export function waitFor<T>(expectation: () => T, options?: WaitForOptions): Promise<Awaited<T>>;
+
+  /** Wait for an initially-present query result or held host element to disappear. */
+  export function waitForElementToBeRemoved<T>(
+    callback: () => T,
+    options?: WaitForOptions,
+  ): Promise<T>;
+  export function waitForElementToBeRemoved<T extends HostNode | readonly HostNode[]>(
+    element: T,
+    options?: WaitForOptions,
+  ): Promise<T>;
 
   /**
    * Dispatch an event to a node's handler and flush the resulting update.

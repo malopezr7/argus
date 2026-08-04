@@ -29,13 +29,13 @@ The runner works and ships. What is missing is test-authoring surface.
 - React Native native mocks: `NativeModules` / `TurboModuleRegistry` shims plus a
   user-facing mock registration API. `argus.fn()` and `argus.spyOn()`.
 - Component testing on real React running inside Hermes, exposed through the
-  virtual `argus` module: `render`, `rerender`, `unmount`, `screen`, `getBy*`,
-  `queryBy*`, `within`, `fireEvent`, `act`.
+  virtual `argus` module: `render`, synchronous and async queries, `waitFor`,
+  `waitForElementToBeRemoved`, `within`, `fireEvent`, `act`.
 - Configuration file — `argus.config.ts` loaded through Node's own type stripping,
   with a validator, a documented precedence order, and zero added dependencies.
   See below.
-- 1140 host-side unit tests across 83 files (2 skipped), plus 19 Hermes fixtures —
-  10 passing, 2 intentionally failing, 7 adversarial.
+- Host-side unit tests plus a separately asserted set of passing, intentionally
+  failing, and adversarial Hermes fixtures.
 - Engine resolution from the React Native install, a provisioning chain ending in
   prebuilt binaries published to GitHub Releases, and bytecode parity with the
   official `hermes-compiler` enforced as a CI gate on every build.
@@ -228,13 +228,10 @@ ask for the release after this one.
       at roughly four times faster on re-runs of a realistic bundle, because
       compilation dominates and the cache absorbs it.
 
-### Component testing — the deferred half
+### Component testing — remaining work
 
-The synchronous surface shipped. The asynchronous one did not, and the reason is
-structural rather than scheduling: the standalone VM has no timers, so there is
-nothing for a polling helper to wait on until Argus supplies its own clock.
-
-- [ ] `waitFor` and `findBy*`.
+- [x] `waitFor`, `waitForElementToBeRemoved`, and `findBy*` / `findAllBy*`,
+      bounded by both wall-clock time and a Hermes-safe scheduler-turn budget.
 - [ ] `userEvent` — the high-level interaction layer.
 - [ ] Fake timers.
 
@@ -245,7 +242,7 @@ nothing for a polling helper to wait on until Argus supplies its own clock.
       — a CommonJS package, which is where the config loader used to fail — then
       runs a plain suite, a component suite, and a deliberately failing test to
       confirm a failure is still reported as one.
-- [x] Run the Hermes fixtures on CI. All 19, including the four component
+- [x] Run the Hermes fixtures on CI. All fixtures, including the component
       fixtures that were documented as a gate and never actually ran, guarded by
       a check that fails if a fixture is added without an assertion or asserted
       after being deleted.

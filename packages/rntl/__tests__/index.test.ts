@@ -6,10 +6,18 @@ import {
   runWith,
   test,
 } from '../../framework/__tests__/run-harness.js';
-import { act, fireEvent, render, screen, within } from '../src/index.js';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  waitForElementToBeRemoved,
+  within,
+} from '../src/index.js';
 
 describe('component facade entry', () => {
-  it('exposes the synchronous facade through one entry', () => {
+  it('exposes the component facade through one entry', () => {
     const result = render(
       React.createElement(
         'Pressable',
@@ -21,6 +29,11 @@ describe('component facade entry', () => {
 
     expect(typeof act).toBe('function');
     expect(typeof fireEvent.press).toBe('function');
+    expect(typeof waitFor).toBe('function');
+    expect(typeof waitForElementToBeRemoved).toBe('function');
+    expect(typeof result.findByText).toBe('function');
+    expect(typeof screen.findByText).toBe('function');
+    expect(result.getByText('entry')).toBe(label);
     expect(within(label.parent ?? label).getByText('entry')).toBe(label);
     result.unmount();
   });

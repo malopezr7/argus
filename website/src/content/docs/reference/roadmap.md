@@ -23,7 +23,8 @@ The runner works and ships. What is missing is test-authoring surface.
 - React Native native mocks: `NativeModules` / `TurboModuleRegistry` shims plus a
   user-facing registration API. `argus.fn()` and `argus.spyOn()`.
 - Component testing on real React inside Hermes: `render`, `rerender`, `unmount`, `screen`,
-  `getBy*`, `queryBy*`, `within`, `fireEvent`, `act`.
+  synchronous queries, `waitFor`, `waitForElementToBeRemoved`, `findBy*` / `findAllBy*`,
+  `within`, `fireEvent`, `act`.
 - Engine and version resolution from the project's own React Native install, with the
   offline [lookup table](/hermes/versions/) as fallback.
 - The Hermes build-and-publish pipeline, gated on bytecode parity with the official
@@ -37,8 +38,8 @@ The runner works and ships. What is missing is test-authoring surface.
   against whichever VMs are present, which is what caught two long-standing errors: legacy
   **runs** `async function` and rejects only the arrow form, and V1 rejects
   `async function*` exactly as legacy does, so it is not a superset.
-- 1140 host-side unit tests across 83 files (2 skipped), plus 19 Hermes fixtures — 10 passing,
-  2 intentionally failing, 7 adversarial.
+- Host-side unit tests plus a separately asserted set of passing, intentionally failing,
+  and adversarial Hermes fixtures.
 
 ## Shipped in v0.1.0 — distribution
 
@@ -130,13 +131,12 @@ installability; all of them are the reason someone would ask for the release aft
   it. Measured at roughly four times faster on re-runs, because compilation dominates and
   the cache absorbs it.
 
-### Component testing — the deferred half
+### Component testing — remaining work
 
-The synchronous surface shipped. The asynchronous one did not, and the reason is structural
-rather than scheduling: the standalone VM has no timers, so there is nothing for a polling
-helper to wait on until Argus supplies its own clock.
+`waitFor`, `waitForElementToBeRemoved`, and `findBy*` / `findAllBy*` now stop on the first
+of two limits: real wall-clock time or a scheduler-turn budget. The second limit is required
+because standalone Hermes exposes timers but ignores their delay.
 
-- `waitFor` and `findBy*`.
 - `userEvent` — the high-level interaction layer.
 - Fake timers.
 

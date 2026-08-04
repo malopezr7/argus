@@ -81,20 +81,22 @@ The standalone VM has no host APIs. This is the single most common source of sur
 
 | Not available | What to do |
 |---|---|
-| `setTimeout`, `setInterval`, `setImmediate` | Inject a scheduler; see [Async tests](/tests/async/#there-are-no-timers) |
+| Real clock-based timers | `setTimeout` is FIFO and ignores delay; inject a scheduler for time semantics. |
 | `fetch`, `XMLHttpRequest` | Inject the transport |
 | `require`, dynamic `import` | Everything is bundled up front |
 | `process`, `fs`, any Node built-in | Host-only; not present in the Hermes realm |
 | `window`, `document` | No DOM, by definition |
 
-Available: `console` (built on `print`), `queueMicrotask`, `global`, `Promise`, and the
-whole JavaScript language for the target engine — including `Intl`, which is built in.
+Available: `console` (built on `print`), `queueMicrotask`, `global`, `Promise`,
+`setTimeout` / `clearTimeout`, and the whole JavaScript language for the target engine —
+including `Intl`, which is built in. `setInterval` and `performance` are absent.
 
 ## Component-testing gaps
 
 Covered in full on [Component testing](/tests/components/#what-is-not-supported):
-`waitFor`, `findBy*`, `userEvent`, fake timers, Suspense guarantees, layout, and native
-platform fidelity beyond the four shim components.
+`userEvent`, fake timers, Suspense guarantees, layout, and native platform fidelity beyond
+the four shim components. `waitFor`, `waitForElementToBeRemoved`, and async queries are
+available with a documented dual-budget timeout model.
 
 Held node references stay live across an update, so a node queried once can be asserted on
 and dispatched into after the tree changes. A node whose element an update removed detaches

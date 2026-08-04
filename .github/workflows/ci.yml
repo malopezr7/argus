@@ -108,6 +108,7 @@ jobs:
 
           # Designed to fail: they prove failures are reported, not swallowed.
           expect_exit 1 examples/math-failing.test.ts
+          expect_exit 1 examples/component-async.test.tsx
           expect_exit 1 examples/component-query-failing.test.tsx
 
           # Adversarial: user code trying to forge or hijack the result channel.

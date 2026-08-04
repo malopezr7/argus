@@ -1,6 +1,6 @@
 ---
 title: Component testing
-description: render, screen, queries, within, fireEvent and act — real React 19 running inside Hermes, synchronously.
+description: render, screen, synchronous and async queries, fireEvent and act — real React 19 running inside Hermes.
 sidebar:
   order: 6
 ---
@@ -10,7 +10,8 @@ import { Aside } from '@astrojs/starlight/components';
 Argus runs **real React** inside the Hermes VM. Not a DOM emulation, not a mocked renderer
 — the actual React 19 reconciler, driven by a test renderer, on the engine your app ships.
 
-The surface is intentionally synchronous and intentionally small.
+The surface is intentionally small. Rendering and events stay synchronous; bounded async
+queries cover state that settles through promises or timers.
 
 It needs React and a renderer. Both are **optional peer dependencies** of Argus, so they
 are not installed for you:
@@ -84,6 +85,7 @@ component tests break in ways that look like Argus bugs.
 const result = render(<Profile user={user} />);
 
 result.root;                 // the rendered host tree
+result.getByText('Profile'); // queries bound to this render
 result.rerender(<Profile user={other} />);
 result.unmount();
 ```
@@ -106,7 +108,7 @@ screen.getByPlaceholderText('Email');
 screen.getByDisplayValue('user@example.com');
 ```
 
-Each of the five predicates comes in four forms:
+Each of the five predicates comes in six forms:
 
 | Form | No match | Multiple matches |
 |---|---|---|
@@ -114,6 +116,8 @@ Each of the five predicates comes in four forms:
 | `getAllBy*` | throws | returns all |
 | `queryBy*` | returns `null` | throws |
 | `queryAllBy*` | returns `[]` | returns all |
+| `findBy*` | waits, then rejects | waits for exactly one |
+| `findAllBy*` | waits, then rejects | waits for one or more |
 
 Use `getBy*` when the element must exist — the throw is a better failure message than a
 `null` dereference three lines later. Use `queryBy*` to assert absence:
@@ -138,6 +142,48 @@ What each predicate looks at:
 | `*ByRole` | `props.accessibilityRole`, falling back to `props.role` |
 | `*ByPlaceholderText` | `props.placeholder` |
 | `*ByDisplayValue` | `props.value`, falling back to `props.defaultValue` |
+
+The same queries are bound to the object returned by `render`, `screen`, and
+`within(node)`. Async queries are `waitFor` plus the corresponding `getBy*` query, so a
+timed-out `findByText` keeps the same `No elements found for text` or
+`Multiple elements found for text` diagnostic.
+
+## Async queries and waits
+
+```tsx
+const result = render(<ProfileLoader />);
+
+const profile = await result.findByText('Ada');
+await waitFor(() => expect(profile.props.accessibilityRole).toBe('header'));
+await waitForElementToBeRemoved(() => screen.getByText('Loading'));
+```
+
+`waitFor(callback, { timeout, interval })`, every `findBy*` / `findAllBy*` query, and
+`waitForElementToBeRemoved` use these defaults:
+
+| Option | Default | Meaning |
+|---|---:|---|
+| `timeout` | `1000` ms | Maximum real wall-clock time |
+| `interval` | `50` ms | Requested delay between retries and the basis for the poll budget |
+
+Like React Native Testing Library, `waitFor` succeeds as soon as the callback stops
+throwing. Any returned value — including `false`, `0`, or `undefined` — is a successful
+result. `waitForElementToBeRemoved` accepts either a callback or a held live node; the
+element must exist before the wait begins.
+
+<Aside type="caution" title="Hermes timers are a queue, not a clock">
+Standalone Hermes exposes `setTimeout`, but both supported engines ignore its delay and
+run timers in registration order. A millisecond-only deadline could therefore execute
+unbounded retries without advancing `Date.now()`, eventually hitting Argus's per-file
+timeout and discarding every result in that file.
+
+Argus applies both the wall-clock `timeout` and a scheduler-turn budget derived from
+`ceil(timeout / interval)`. The first exhausted budget stops the wait, and the error names
+that budget. This is a deliberate divergence from RNTL's timer-only scheduling model.
+</Aside>
+
+Each scheduler turn runs through React's async `act`, so promise- and timer-backed state
+updates are committed before the next query reads the live tree.
 
 ## `within`
 
@@ -187,8 +233,8 @@ act(() => {
 expect(screen.getByText(nextUser.name)).toBeDefined();
 ```
 
-Synchronous only. Async `act` is not supported, because there is nothing asynchronous to
-flush without timers.
+The exported helper remains synchronous. Async query utilities manage their own awaited
+`act` turns; callers do not wrap `findBy*` or `waitFor` themselves.
 
 ## Held nodes stay live
 
@@ -219,16 +265,15 @@ are just no longer required once you upgrade.
 
 ## What is not supported
 
-Deliberately out of scope for this iteration:
+Deliberately out of scope:
 
-- `waitFor`, `findBy*` and every other async query — there are no timers to wait on.
 - `userEvent` — the high-level interaction layer.
 - Fake timers.
 - Suspense guarantees.
 - Layout, measurement, and anything positional.
 - Native platform fidelity beyond the four shim components.
 
-If your assertion needs any of those, it belongs in an on-device test, not here.
+Layout, native behaviour, and Suspense integration still belong in an on-device test.
 
 ## Where this layer lives
 

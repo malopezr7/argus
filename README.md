@@ -343,7 +343,8 @@ describe('cart', () => {
 
 ### Component testing
 
-Real React 19, running on Hermes. The API is synchronous and RNTL-shaped, and it
+Real React 19, running on Hermes. The core API is synchronous and RNTL-shaped,
+with bounded async waits for state that settles through promises or timers. It
 comes from a virtual `'argus'` import — plain unit tests stay React-free:
 
 ```tsx
@@ -362,8 +363,19 @@ fireEvent.press(within(screen.getByTestId('panel')).getByText('Submit'));
 ```
 
 Available: `render`, `rerender`, `unmount`, `screen`, `within`, `fireEvent`,
-`act`, and `getBy*` / `getAllBy*` / `queryBy*` / `queryAllBy*` over text, test
-ID, role, placeholder text and display value.
+`act`, `waitFor`, `waitForElementToBeRemoved`, and the `getBy*` / `getAllBy*` /
+`queryBy*` / `queryAllBy*` / `findBy*` / `findAllBy*` families over text, test
+ID, role, placeholder text and display value. Queries are available on `screen`,
+`within(node)`, and the object returned by `render`.
+
+`waitFor` and the async queries accept `{ timeout, interval }`, defaulting to
+1000 ms and 50 ms. Standalone Hermes exposes `setTimeout`, but treats it as a
+FIFO queue and ignores its delay. Argus therefore applies **two limits**: real
+wall-clock time and a scheduler-turn budget derived from `timeout / interval`.
+Whichever is exhausted first ends the wait, and the failure says which budget
+won. This deliberately differs from RNTL's timer-only deadline so a missing
+element becomes a normal test failure instead of spinning until Argus kills the
+whole file.
 
 Query results are live views of the element, not snapshots. A held node and a
 `within(scope)` handle stay valid across an update: the node reports the current
@@ -374,8 +386,8 @@ are still snapshots; live views land in the next patch release.
 
 ### Not there yet
 
-Snapshots, coverage, watch mode, `waitFor` / `findBy*`, `userEvent` and fake
-timers. The esbuild target, module aliases and the JSX runtime are still fixed,
+Snapshots, coverage, watch mode, `userEvent` and fake timers. The esbuild target,
+module aliases and the JSX runtime are still fixed,
 and a zero-match run exits 2 — there is no `passWithNoTests`. See the
 [roadmap](ROADMAP.md).
 

@@ -136,8 +136,8 @@ silently swallows calls.
   [`argus.mockNativeModule`](/tests/native-modules/); for your own modules, inject the
   dependency rather than rewriting the module graph.
 - **Automatic module mocking.** Same reason.
-- **Fake timers.** Standalone Hermes has no timers to fake — see
-  [Async tests](/tests/async/#there-are-no-timers).
+- **Fake timers.** Hermes' `setTimeout` is a FIFO queue that ignores delay, not a controllable
+  clock — see [Async tests](/tests/async/#the-timer-queue-is-not-a-clock).
 
 ## Design note
 

@@ -75,7 +75,7 @@ it.
 		`.ts` / `.tsx` line you wrote.
 	</Card>
 	<Card title="Component testing on real React" icon="puzzle">
-		`render`, `screen`, `getBy*`, `within`, `fireEvent`, `act` — real React 19 running
+		`render`, `screen`, `getBy*`, `findBy*`, `waitFor`, `fireEvent`, `act` — real React 19 running
 		inside Hermes, not a DOM shim on Node.
 	</Card>
 	<Card title="A hardened result channel" icon="warning">
@@ -95,7 +95,7 @@ it.
 
 :::caution[Status]
 Argus is at **`v0.2.1`** and installable from npm — one package, one binary. Pre-1.0: the
-runner, matchers, mocks, source maps, synchronous component testing and the
+	runner, matchers, mocks, source maps, component testing and the
 [config file](/cli/configuration/) are built and verified, but the surface is still free to
 change between minor versions. Snapshots, coverage and watch mode are not built — see the
 [Roadmap](/reference/roadmap/) for what is landing and

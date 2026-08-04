@@ -18,6 +18,8 @@
  * to catch.
  */
 
+import { render, screen, waitFor, waitForElementToBeRemoved, within } from 'argus';
+
 // A function expression, not an arrow: a custom matcher reads `this` for
 // `isNot` and `equals`, which an arrow cannot bind.
 const toBeWithin = function (
@@ -83,5 +85,18 @@ describe('the surface a user actually touches', () => {
   test('awaited matchers are thenable', async () => {
     await expect(Promise.resolve(1)).resolves.toBe(1);
     await expect(Promise.reject(new Error('no'))).rejects.toThrow('no');
+  });
+
+  test('async component utilities and queries are thenable', async () => {
+    const rendered = render({});
+    const immediate = await waitFor(() => 0, { timeout: 1000, interval: 50 });
+    const fromScreen = await screen.findByText('ready', { timeout: 1000, interval: 50 });
+    const fromRender = await rendered.findByTestId('ready');
+    const fromWithin = await within(fromRender).findAllByRole('button');
+    const removed: typeof fromScreen = await waitForElementToBeRemoved(fromScreen);
+
+    expect(immediate).toBe(0);
+    expect(fromWithin).toHaveLength(1);
+    expect(removed).toBe(fromScreen);
   });
 });

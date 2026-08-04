@@ -42,6 +42,8 @@ function parse(...segments: string[]): ts.SourceFile {
 
 const publishedGlobals = parse('packaging', 'argus.d.ts');
 const internalMatcherTypes = parse('packages', 'framework', 'src', 'matcher-types.ts');
+const internalQueryTypes = parse('packages', 'rntl', 'src', 'queries.ts');
+const internalAsyncTypes = parse('packages', 'rntl', 'src', 'async.ts');
 
 /**
  * Every member an interface declares, by name.
@@ -240,6 +242,20 @@ describe('the internal and published matcher types agree', () => {
   it('declares the same awaited matchers on both sides', () => {
     expect([...membersOf(publishedGlobals, 'ArgusAsyncMatchers')].sort()).toEqual(
       [...membersOf(internalMatcherTypes, 'AsyncMatchers')].sort(),
+    );
+  });
+});
+
+describe('the internal and published component types agree', () => {
+  it('declares every synchronous and asynchronous bound query', () => {
+    expect([...membersOf(publishedGlobals, 'BoundQueries')].sort()).toEqual(
+      [...membersOf(internalQueryTypes, 'BoundQueries')].sort(),
+    );
+  });
+
+  it('declares the same wait options on both sides', () => {
+    expect([...membersOf(publishedGlobals, 'WaitForOptions')].sort()).toEqual(
+      [...membersOf(internalAsyncTypes, 'WaitForOptions')].sort(),
     );
   });
 });

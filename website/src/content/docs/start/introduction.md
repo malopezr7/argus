@@ -51,7 +51,7 @@ buys ergonomics, and stops where the shape would start lying about the engine.
   assertion counting.
 - `argus.fn()`, `argus.spyOn()`, and React Native native-module mocks.
 - Source-map based stack remapping back to your original TypeScript.
-- Synchronous component testing on real React 19 inside Hermes.
+- Synchronous and bounded asynchronous component testing on real React 19 inside Hermes.
 - Hermes provisioning driven by the engine **your** project pins.
 
 ## What it is not
