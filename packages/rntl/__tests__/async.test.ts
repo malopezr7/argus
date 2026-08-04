@@ -1,5 +1,6 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { runInternalAfterEach } from '../../framework/src/lifecycle.js';
 import { render, screen, waitFor, waitForElementToBeRemoved, within } from '../src/index.js';
 
 async function rejectionOf(promise: Promise<unknown>): Promise<Error> {
@@ -22,6 +23,16 @@ describe('component async utilities', () => {
 
     expect(result).toBe(0);
     expect(attempts).toBe(1);
+  });
+
+  it('allows an immediate successful attempt with a zero timeout', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100);
+
+    try {
+      await expect(waitFor(() => 'ready', { timeout: 0 })).resolves.toBe('ready');
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it('reports wall-clock exhaustion and preserves the last callback error', async () => {
@@ -91,6 +102,122 @@ describe('component async utilities', () => {
     } finally {
       result.unmount();
     }
+  });
+
+  it('serializes concurrent queries through one async act scheduler', async () => {
+    function ConcurrentStatus(): React.ReactElement {
+      const [first, setFirst] = React.useState('first pending');
+      const [second, setSecond] = React.useState('second pending');
+      React.useEffect(() => {
+        setTimeout(() => setFirst('first ready'), 1);
+        setTimeout(() => setSecond('second ready'), 1);
+      }, []);
+      return React.createElement(
+        'View',
+        null,
+        React.createElement('Text', null, first),
+        React.createElement('Text', null, second),
+      );
+    }
+
+    const diagnostics: string[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]): void => {
+      diagnostics[diagnostics.length] = args.join(' ');
+    };
+
+    const result = render(React.createElement(ConcurrentStatus));
+    try {
+      const [first, second] = await Promise.all([
+        screen.findByText('first ready'),
+        screen.findByText('second ready'),
+      ]);
+
+      expect(first.type).toBe('Text');
+      expect(second.type).toBe('Text');
+      expect(diagnostics.join('\n')).not.toContain('overlapping act() calls');
+    } finally {
+      console.error = originalError;
+      result.unmount();
+    }
+  });
+
+  it('allows a wait inside another wait callback without overlapping act scopes', async () => {
+    let innerAttempts = 0;
+    const diagnostics: string[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]): void => {
+      diagnostics[diagnostics.length] = args.join(' ');
+    };
+
+    try {
+      const value = await waitFor(
+        async () =>
+          waitFor(
+            () => {
+              innerAttempts++;
+              if (innerAttempts === 1) throw new Error('inner pending');
+              return 'nested ready';
+            },
+            { timeout: 100, interval: 5 },
+          ),
+        { timeout: 100, interval: 5 },
+      );
+
+      expect(value).toBe('nested ready');
+      expect(diagnostics.join('\n')).not.toContain('overlapping act() calls');
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it('cancels and drains an abandoned wait at the test boundary', async () => {
+    render(React.createElement('Text', null, 'first test'));
+    void screen.findByText('never appears', { timeout: 100, interval: 10 });
+
+    expect(await runInternalAfterEach()).toBeUndefined();
+
+    const next = render(React.createElement('Text', null, 'second test'));
+    try {
+      expect(screen.getByText('second test').type).toBe('Text');
+    } finally {
+      next.unmount();
+    }
+  });
+
+  it('rejects a synchronous result produced after the wall-clock deadline', async () => {
+    const error = await rejectionOf(
+      waitFor(
+        () => {
+          const startedAt = Date.now();
+          while (Date.now() - startedAt < 20) {
+            // Deliberately cross the real deadline inside the callback.
+          }
+          return 'late';
+        },
+        { timeout: 5, interval: 1 },
+      ),
+    );
+
+    expect(error.message).toContain('wall-clock budget');
+  });
+
+  it('rejects a promise result produced after the wall-clock deadline', async () => {
+    const error = await rejectionOf(
+      waitFor(
+        () =>
+          Promise.resolve().then(() => {
+            const startedAt = Date.now();
+            while (Date.now() - startedAt < 20) {
+              // Deliberately cross the real deadline in a microtask.
+            }
+            return 'late';
+          }),
+        { timeout: 5, interval: 1 },
+      ),
+    );
+
+    expect(error.message).toContain('wall-clock budget');
   });
 
   it('supports findBy and findAllBy for every query predicate', async () => {

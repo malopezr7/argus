@@ -258,6 +258,21 @@ describe('argus CLI — result-channel integrity (needs .hermes/hermes)', () => 
     },
     30_000,
   );
+
+  gated(
+    'MessageChannel replacement cannot suppress the result frame',
+    () => {
+      const r = runArgusCapture(['examples/message-channel-hijack.test.tsx']);
+
+      expect(r.status).toBe(1);
+      expect(r.stderr).not.toContain('INFRASTRUCTURE FAILURE');
+      expect(r.stderr).not.toContain('PROTOCOL FAILURE');
+      expect(r.stderr).not.toContain('TIMEOUT');
+      expect(r.stdout).toContain('MessageChannel hijack');
+      expect(r.stdout).toContain('1 passed, 1 failed, 0 todo, 2 total');
+    },
+    30_000,
+  );
 });
 
 /**

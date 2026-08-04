@@ -102,9 +102,12 @@ jobs:
           # replaced are indistinguishable, and where the teardown loop that
           # recently span forever terminates.
           expect_exit 0 examples/component-api.test.tsx
+          expect_exit 0 examples/component-abandoned-wait.test.tsx
+          expect_exit 0 examples/component-concurrent-waits.test.tsx
           expect_exit 0 examples/component-liveness.test.tsx
           expect_exit 0 examples/component-spike.test.tsx
           expect_exit 0 examples/component-teardown-throw.test.tsx
+          expect_exit 0 examples/component-wait-deadline.test.tsx
 
           # Designed to fail: they prove failures are reported, not swallowed.
           expect_exit 1 examples/math-failing.test.ts
@@ -119,6 +122,7 @@ jobs:
           expect_exit 1 examples/tojson-hijack.test.ts
           expect_exit 1 examples/push-hijack.test.ts
           expect_exit 1 examples/iterator-hijack.test.ts
+          expect_exit 1 examples/message-channel-hijack.test.tsx
           expect_exit 2 examples/forge.test.ts
 
           # A fixture this step does not name is a fixture CI does not run, and

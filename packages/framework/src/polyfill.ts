@@ -59,7 +59,15 @@ declare function print(message: string): void;
       this.port2 = port2;
     }
 
-    g.MessageChannel = ArgusMessageChannel;
+    // React resolves MessageChannel lazily after an async act callback settles.
+    // Keep that dependency in this pre-user-code closure: assignment remains a
+    // harmless no-op, while React always receives the captured constructor.
+    Object.defineProperty(g, 'MessageChannel', {
+      configurable: false,
+      enumerable: true,
+      get: () => ArgusMessageChannel,
+      set: () => undefined,
+    });
   }
 
   // Minimal `console` built from `print`. Joins args with a space like Node.

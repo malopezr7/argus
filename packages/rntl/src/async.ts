@@ -20,6 +20,23 @@ type Invocation<T> =
   | { status: 'rejected'; error: unknown }
   | { status: 'pending'; state: { current: PendingState<T> } };
 
+interface FlushRequest {
+  interval: number;
+  resolve(): void;
+  reject(error: unknown): void;
+}
+
+interface WaitControl {
+  cancelled: boolean;
+  done: Promise<void>;
+  complete(): void;
+}
+
+const flushRequests: FlushRequest[] = [];
+const activeWaits: WaitControl[] = [];
+let flushInProgress = false;
+let invokeDepth = 0;
+
 function validateOptions(timeout: number, interval: number): void {
   if (!Number.isFinite(timeout) || timeout < 0) {
     throw new TypeError('waitFor timeout must be a finite number greater than or equal to 0');
@@ -27,6 +44,11 @@ function validateOptions(timeout: number, interval: number): void {
   if (!Number.isFinite(interval) || interval <= 0) {
     throw new TypeError('waitFor interval must be a finite number greater than 0');
   }
+}
+
+function resultMissedDeadline(startedAt: number, timeout: number): boolean {
+  const elapsed = Date.now() - startedAt;
+  return elapsed >= timeout && (timeout !== 0 || elapsed > 0);
 }
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
@@ -41,6 +63,7 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
 function invoke<T>(expectation: () => T): Invocation<Awaited<T>> {
   let invocation: Invocation<Awaited<T>> | undefined;
 
+  invokeDepth++;
   try {
     React.act(() => {
       try {
@@ -67,6 +90,9 @@ function invoke<T>(expectation: () => T): Invocation<Awaited<T>> {
     });
   } catch (error) {
     return { status: 'rejected', error };
+  } finally {
+    invokeDepth--;
+    if (invokeDepth === 0) startNextFlush();
   }
 
   return (
@@ -83,12 +109,90 @@ function invoke<T>(expectation: () => T): Invocation<Awaited<T>> {
  * Standalone Hermes treats the delay as FIFO metadata rather than elapsed time.
  * The caller therefore also counts these turns instead of trusting the delay.
  */
-async function flushTurn(interval: number): Promise<void> {
-  await React.act(async function flushActTurn(): Promise<void> {
-    await new Promise<void>(function schedule(resolve): void {
-      setTimeout(resolve, interval);
+function settleFlush(request: FlushRequest, rejected: boolean, error?: unknown): void {
+  flushRequests.splice(0, 1);
+  flushInProgress = false;
+
+  if (rejected) request.reject(error);
+  else request.resolve();
+
+  startNextFlush();
+}
+
+function startNextFlush(): void {
+  if (invokeDepth > 0 || flushInProgress || flushRequests.length === 0) return;
+
+  const request = flushRequests[0];
+  flushInProgress = true;
+
+  let actResult: PromiseLike<unknown>;
+  try {
+    actResult = React.act(async function flushActTurn(): Promise<void> {
+      await new Promise<void>(function schedule(resolve): void {
+        setTimeout(resolve, request.interval);
+      });
     });
+  } catch (error) {
+    settleFlush(request, true, error);
+    return;
+  }
+
+  Promise.resolve(actResult).then(
+    function flushed(): void {
+      settleFlush(request, false);
+    },
+    function flushFailed(error): void {
+      settleFlush(request, true, error);
+    },
+  );
+}
+
+function flushTurn(interval: number): Promise<void> {
+  return new Promise<void>(function enqueueFlush(resolve, reject): void {
+    flushRequests[flushRequests.length] = { interval, resolve, reject };
+    startNextFlush();
   });
+}
+
+function createWaitControl(): WaitControl {
+  let complete: (() => void) | undefined;
+  const done = new Promise<void>(function waitForCompletion(resolve): void {
+    complete = resolve;
+  });
+  return {
+    cancelled: false,
+    done,
+    complete(): void {
+      complete?.();
+    },
+  };
+}
+
+function registerWait(control: WaitControl): void {
+  activeWaits[activeWaits.length] = control;
+}
+
+function unregisterWait(control: WaitControl): void {
+  for (let i = 0; i < activeWaits.length; i++) {
+    if (activeWaits[i] === control) {
+      activeWaits.splice(i, 1);
+      break;
+    }
+  }
+  control.complete();
+}
+
+/** Cancel and drain waits the test abandoned before its component tree is unmounted. */
+export async function cleanupAsyncWaits(): Promise<void> {
+  const waits: WaitControl[] = [];
+  for (let i = 0; i < activeWaits.length; i++) {
+    const control = activeWaits[i];
+    control.cancelled = true;
+    waits[waits.length] = control;
+  }
+  for (let i = 0; i < waits.length; i++) {
+    await waits[i].done;
+  }
 }
 
 function callbackMessage(error: unknown): string {
@@ -146,6 +250,8 @@ export async function waitFor<T>(
   const interval = options.interval ?? DEFAULT_INTERVAL;
   validateOptions(timeout, interval);
 
+  const control = createWaitControl();
+  registerWait(control);
   const startedAt = Date.now();
   const pollLimit = Math.max(1, Math.ceil(timeout / interval));
   let polls = 0;
@@ -154,41 +260,62 @@ export async function waitFor<T>(
   let pending: { current: PendingState<Awaited<T>> } | undefined;
   let needsAttempt = true;
 
-  while (true) {
-    if (pending !== undefined) {
-      if (pending.current.status === 'resolved') return pending.current.value;
-      if (pending.current.status === 'rejected') {
-        lastError = pending.current.error;
-        pending = undefined;
-        needsAttempt = true;
-      }
-    }
+  try {
+    while (true) {
+      if (control.cancelled) return undefined as Awaited<T>;
 
-    if (needsAttempt) {
-      if (attempts > 0 && Date.now() - startedAt >= timeout) {
+      if (pending !== undefined) {
+        if (pending.current.status === 'resolved') {
+          if (resultMissedDeadline(startedAt, timeout)) {
+            throw exhaustedError('wall-clock', lastError, timeout, interval, polls, attempts);
+          }
+          return pending.current.value;
+        }
+        if (pending.current.status === 'rejected') {
+          lastError = pending.current.error;
+          pending = undefined;
+          needsAttempt = true;
+        }
+      }
+
+      if (needsAttempt) {
+        if (attempts > 0 && Date.now() - startedAt >= timeout) {
+          throw exhaustedError('wall-clock', lastError, timeout, interval, polls, attempts);
+        }
+
+        const current = invoke(expectation);
+        attempts++;
+        needsAttempt = false;
+        if (current.status === 'resolved') {
+          if (resultMissedDeadline(startedAt, timeout)) {
+            throw exhaustedError('wall-clock', lastError, timeout, interval, polls, attempts);
+          }
+          return current.value;
+        }
+        if (current.status === 'pending') pending = current.state;
+        else {
+          lastError = current.error;
+          needsAttempt = true;
+        }
+      }
+
+      if (Date.now() - startedAt >= timeout) {
         throw exhaustedError('wall-clock', lastError, timeout, interval, polls, attempts);
       }
-
-      const current = invoke(expectation);
-      attempts++;
-      needsAttempt = false;
-      if (current.status === 'resolved') return current.value;
-      if (current.status === 'pending') pending = current.state;
-      else {
-        lastError = current.error;
-        needsAttempt = true;
+      if (polls >= pollLimit) {
+        throw exhaustedError('poll', lastError, timeout, interval, polls, attempts);
       }
-    }
 
-    if (Date.now() - startedAt >= timeout) {
-      throw exhaustedError('wall-clock', lastError, timeout, interval, polls, attempts);
+      try {
+        await flushTurn(interval);
+      } catch (error) {
+        if (control.cancelled) return undefined as Awaited<T>;
+        throw error;
+      }
+      polls++;
     }
-    if (polls >= pollLimit) {
-      throw exhaustedError('poll', lastError, timeout, interval, polls, attempts);
-    }
-
-    await flushTurn(interval);
-    polls++;
+  } finally {
+    unregisterWait(control);
   }
 }
 

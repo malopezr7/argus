@@ -1,7 +1,7 @@
 import React from 'react';
 // Sanctioned cross-package seam: the React-agnostic lifecycle registry remains framework-owned.
 import { registerInternalAfterEach } from '../../framework/src/lifecycle.js';
-import { waitFor, waitForElementToBeRemoved } from './async.js';
+import { cleanupAsyncWaits, waitFor, waitForElementToBeRemoved } from './async.js';
 import { fireEvent } from './events.js';
 import { type BoundQueries, bindQueries, screen, within } from './queries.js';
 import {
@@ -14,6 +14,7 @@ import {
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
+registerInternalAfterEach(cleanupAsyncWaits);
 registerInternalAfterEach(cleanupActiveRenders);
 
 export interface RenderResult extends RootRenderResult, BoundQueries {}
