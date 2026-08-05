@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import type { BundleInput, Bundler, SealedBundle } from '@arguslab/core';
-import { build } from 'esbuild';
+import { build, type Plugin } from 'esbuild';
 import { hermesClassLowering } from './hermes-class-lowering.js';
 import { projectPackageAliases } from './project-packages.js';
 import { hermesSyntaxPolicy } from './syntax-policy.js';
@@ -23,9 +23,37 @@ const JSX_OPTIONS = {
 
 const ESBUILD_LIVE_BINDING_GETTER = 'get: () => from[key]';
 const HERMES_SAFE_LIVE_BINDING_GETTER = 'get: ((capturedKey) => () => from[capturedKey])(key)';
+const SNAPSHOT_CONFIG_MODULE = 'argus:snapshot-config';
+const SNAPSHOT_CONFIG_NAMESPACE = 'argus-snapshot-config';
 
 function captureCommonJsLiveBindingKeys(code: string): string {
   return code.replaceAll(ESBUILD_LIVE_BINDING_GETTER, HERMES_SAFE_LIVE_BINDING_GETTER);
+}
+
+function jsLiteral(value: unknown): string {
+  return JSON.stringify(value).replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029');
+}
+
+function snapshotConfiguration(input: BundleInput): Plugin | undefined {
+  if (input.snapshotEntries === undefined && input.updateSnapshots === undefined) return undefined;
+  const statePath = join(dirname(input.frameworkPath), 'snapshot', 'state');
+  const contents =
+    `import { configureSnapshots } from ${jsLiteral(statePath)};\n` +
+    `configureSnapshots(${jsLiteral(input.snapshotEntries ?? [])}, ${input.updateSnapshots === true});`;
+  return {
+    name: SNAPSHOT_CONFIG_NAMESPACE,
+    setup(pluginBuild): void {
+      pluginBuild.onResolve({ filter: /^argus:snapshot-config$/ }, () => ({
+        path: SNAPSHOT_CONFIG_MODULE,
+        namespace: SNAPSHOT_CONFIG_NAMESPACE,
+      }));
+      pluginBuild.onLoad({ filter: /.*/, namespace: SNAPSHOT_CONFIG_NAMESPACE }, () => ({
+        contents,
+        loader: 'ts',
+        resolveDir: dirname(input.frameworkPath),
+      }));
+    },
+  };
 }
 
 /**
@@ -70,15 +98,16 @@ export class EsbuildBundler implements Bundler {
       },
       // An engine that parses `class` gets no Babel pass at all, so its bundle
       // is the code the user wrote rather than a rewrite of it.
-      plugins: policy.lowerClasses
-        ? [
-            hermesClassLowering({
+      plugins: [
+        snapshotConfiguration(input),
+        policy.lowerClasses
+          ? hermesClassLowering({
               target: policy.target,
               supported: policy.supported,
               jsx: JSX_OPTIONS,
-            }),
-          ]
-        : [],
+            })
+          : undefined,
+      ].filter((plugin): plugin is Plugin => plugin !== undefined),
       legalComments: 'none',
     });
     // Select by explicit suffix (esbuild output ordering is not contractual).
@@ -113,6 +142,9 @@ function generateVirtualEntry(input: BundleInput, resultNonce: string): string {
   return [
     ...input.polyfillPaths.map(imp),
     `import { run } from ${JSON.stringify(input.frameworkPath)};`,
+    ...(input.snapshotEntries === undefined && input.updateSnapshots === undefined
+      ? []
+      : [`import ${JSON.stringify(SNAPSHOT_CONFIG_MODULE)};`]),
     ...input.testPaths.map(imp),
     `run(${JSON.stringify(resultNonce)});`,
   ].join('\n');

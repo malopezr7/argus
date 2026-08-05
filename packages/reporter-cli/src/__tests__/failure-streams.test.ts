@@ -30,6 +30,8 @@ function failingResult(): RunResult {
     ],
     totals: { passed: 0, failed: 1, skipped: 0, todo: 0, total: 1 },
     durationMs: 3,
+    snap: [],
+    snapFiltered: true,
   };
 }
 

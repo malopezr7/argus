@@ -9,6 +9,8 @@ const passed = (): RunOutcome => ({
     suites: [],
     totals: { passed: 1, failed: 0, skipped: 0, todo: 0, total: 1 },
     durationMs: 1,
+    snap: [],
+    snapFiltered: true,
   },
   userLogs: [],
 });
@@ -19,6 +21,8 @@ const failed = (): RunOutcome => ({
     suites: [],
     totals: { passed: 0, failed: 1, skipped: 0, todo: 0, total: 1 },
     durationMs: 1,
+    snap: [],
+    snapFiltered: true,
   },
   userLogs: [],
 });

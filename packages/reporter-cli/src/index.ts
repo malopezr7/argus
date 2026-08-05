@@ -129,6 +129,38 @@ export function renderSessionSummary(session: SessionResult): void {
     `\n${total} files: ${fileParts.join(', ')}` +
       `\n${testsTotal} tests: ${testsPassed} passed, ${testsFailed} failed, ${testsTodo} todo\n`,
   );
+
+  const snapshotCounts = {
+    matched: 0,
+    added: 0,
+    updated: 0,
+    failed: 0,
+    removed: 0,
+    obsolete: 0,
+    discarded: 0,
+  };
+  for (const { outcome } of session.files) {
+    if (outcome.kind !== 'passed' && outcome.kind !== 'failed') continue;
+    for (const snapshot of outcome.result.snap) {
+      if (snapshot.status !== 'unchecked') snapshotCounts[snapshot.status]++;
+    }
+  }
+  const snapshotTotal =
+    snapshotCounts.matched +
+    snapshotCounts.added +
+    snapshotCounts.updated +
+    snapshotCounts.failed +
+    snapshotCounts.removed +
+    snapshotCounts.obsolete +
+    snapshotCounts.discarded;
+  if (snapshotTotal > 0) {
+    process.stdout.write(
+      `${snapshotTotal} snapshots: ${snapshotCounts.matched} matched, ${snapshotCounts.added} added, ` +
+        `${snapshotCounts.updated} updated, ${snapshotCounts.failed} failed, ` +
+        `${snapshotCounts.removed} removed, ${snapshotCounts.obsolete} obsolete, ` +
+        `${snapshotCounts.discarded} discarded\n`,
+    );
+  }
 }
 
 function renderResult(result: RunResult): void {

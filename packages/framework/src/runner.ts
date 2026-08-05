@@ -36,6 +36,12 @@ import {
 import { runInternalAfterEach } from './lifecycle.js';
 import { resetAssertions, verifyAssertions } from './matchers.js';
 import { autoResetMocks } from './mock-fn.js';
+import {
+  beginSnapshotRun,
+  beginSnapshotTest,
+  finishSnapshotRun,
+  finishSnapshotTest,
+} from './snapshot/state.js';
 
 // ---------------------------------------------------------------------------
 // Result types — the runner's output contract.
@@ -57,6 +63,8 @@ export interface RunResult {
   suites: SuiteResult[];
   totals: Totals;
   durationMs: number;
+  snap?: string;
+  snapFiltered?: boolean;
 }
 export type Totals = {
   passed: number;
@@ -114,6 +122,14 @@ export function createRunner(now: () => number): Runner {
     }
 
     // --- normal execution ---
+    let fullName = '';
+    for (let i = 0; i < chain.length; i++) {
+      if (fullName.length > 0) fullName += ' ';
+      fullName += chain[i].name;
+    }
+    if (fullName.length > 0) fullName += ' ';
+    fullName += t.name;
+    beginSnapshotTest(fullName);
     resetAssertions();
     autoResetMocks();
 
@@ -126,6 +142,7 @@ export function createRunner(now: () => number): Runner {
       let msg =
         aeErr !== undefined ? `${beErr.message}; afterEach: ${aeErr.message}` : beErr.message;
       if (internalErr !== undefined) msg += `; internal afterEach: ${internalErr.message}`;
+      finishSnapshotTest(false);
       return {
         name: t.name,
         status: 'failed',
@@ -149,6 +166,7 @@ export function createRunner(now: () => number): Runner {
 
     if (testErr !== undefined) {
       totals.failed++;
+      finishSnapshotTest(false);
       const extra = aeErr !== undefined ? ` (afterEach: ${aeErr.message})` : '';
       const internalExtra =
         internalErr !== undefined ? ` (internal afterEach: ${internalErr.message})` : '';
@@ -162,6 +180,7 @@ export function createRunner(now: () => number): Runner {
     }
     if (aeErr !== undefined) {
       totals.failed++;
+      finishSnapshotTest(false);
       return {
         name: t.name,
         status: 'failed',
@@ -174,6 +193,7 @@ export function createRunner(now: () => number): Runner {
     }
     if (internalErr !== undefined) {
       totals.failed++;
+      finishSnapshotTest(false);
       return {
         name: t.name,
         status: 'failed',
@@ -184,6 +204,7 @@ export function createRunner(now: () => number): Runner {
     }
     if (assertErr !== undefined) {
       totals.failed++;
+      finishSnapshotTest(false);
       return {
         name: t.name,
         status: 'failed',
@@ -193,6 +214,7 @@ export function createRunner(now: () => number): Runner {
     }
 
     totals.passed++;
+    finishSnapshotTest(true);
     return { name: t.name, status: 'passed', durationMs: now() - t0 };
   }
 
@@ -339,6 +361,7 @@ export function createRunner(now: () => number): Runner {
 
   async function runRoot(): Promise<RunResult> {
     const start = now();
+    beginSnapshotRun();
     const totals: Totals = { passed: 0, failed: 0, skipped: 0, todo: 0, total: 0 };
     const rootNodes = getRootChildren();
     // Pass-1: compute file-global hasOnly (skipping effectively-skipped subtrees)
@@ -351,7 +374,10 @@ export function createRunner(now: () => number): Runner {
         suites[suites.length] = await runSuite(node, totals, [], hasOnly, false, false);
       }
     }
-    return { suites, totals, durationMs: now() - start };
+    const snapshot = finishSnapshotRun(
+      hasOnly || totals.failed > 0 || totals.skipped > 0 || totals.todo > 0,
+    );
+    return { suites, totals, durationMs: now() - start, ...snapshot };
   }
 
   return { runRoot };

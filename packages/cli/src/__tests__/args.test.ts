@@ -190,6 +190,22 @@ describe('parseCliArgs — --provision', () => {
   });
 });
 
+describe('parseCliArgs — --update / -u', () => {
+  it('is false when absent', () => {
+    expect(parseCliArgs([]).update).toBe(false);
+  });
+
+  it('accepts both long and short forms', () => {
+    expect(parseCliArgs(['--update']).update).toBe(true);
+    expect(parseCliArgs(['-u']).update).toBe(true);
+  });
+
+  it('documents snapshot update semantics', () => {
+    expect(USAGE).toContain('--update');
+    expect(USAGE).toContain('-u');
+  });
+});
+
 describe('usage documents the provisioning surface', () => {
   it('mentions --engine and --provision', () => {
     expect(USAGE).toContain('--engine');

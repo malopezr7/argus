@@ -57,6 +57,8 @@ async function makeToatalWorker(
         suites: [],
         totals: { passed: 1, failed: 0, skipped: 0, todo: 0, total: 1 },
         durationMs: 0,
+        snap: [],
+        snapFiltered: true,
       },
       userLogs: [],
     };

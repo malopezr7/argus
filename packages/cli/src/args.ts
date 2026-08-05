@@ -11,6 +11,7 @@ Usage:
 Options:
   -t, --timeout <ms>         Per-file Hermes timeout in ms (default: 10000)
   -c, --concurrency <n>      Max files to run in parallel (default: CPU-based, capped at 8; 1 = sequential)
+  -u, --update               Update mismatched snapshots and prune obsolete entries after safe runs
       --config <path>        Config file to use, instead of searching for one
       --hermes <path>        Hermes binary path (overrides ARGUS_HERMES)
       --engine <name>        Hermes engine to target: legacy or v1 (default: the engine your react-native version ships)
@@ -80,6 +81,8 @@ export interface CliArgs {
   help: boolean;
   /** True when `--version` was passed. */
   version: boolean;
+  /** True when `--update` / `-u` was passed. */
+  update: boolean;
   concurrency?: number;
 }
 
@@ -93,6 +96,7 @@ interface RawValues {
   provision?: boolean;
   help?: boolean;
   version?: boolean;
+  update?: boolean;
 }
 
 interface OptionSpec {
@@ -121,6 +125,7 @@ const OPTIONS = {
   hermes: { type: 'string' },
   engine: { type: 'string' },
   provision: { type: 'boolean' },
+  update: { type: 'boolean', short: 'u' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean' },
 } as const satisfies Record<string, OptionSpec>;
@@ -328,6 +333,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
     ...(values.provision === undefined ? {} : { provision: values.provision }),
     help: values.help ?? false,
     version: values.version ?? false,
+    update: values.update ?? false,
   };
 }
 

@@ -194,6 +194,10 @@ export function makeAsyncMatchers(
         m.toMatch(pattern);
       });
     },
+    toMatchSnapshot(): Promise<void> {
+      incAssertionCount();
+      return Promise.reject(new Error('toMatchSnapshot() does not support .resolves or .rejects'));
+    },
     toContain(item: unknown): Promise<void> {
       return build(function applySync(m) {
         m.toContain(item);

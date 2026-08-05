@@ -1,0 +1,65 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`snapshot parity captures snapshot primordials before user code evaluates: primordial pollution 1`] = `{
+  "array": [
+    1,
+  ],
+  "exponent": 1e21,
+  "line": "line\\u2028separator",
+  "map": Map {
+    "key" => "value",
+  },
+  "set": Set {
+    "value",
+  },
+}`;
+
+exports[`snapshot parity serializes a component HostNode without a synthetic wrapper: component 1`] = `<View
+  accessibilityRole="summary"
+  testID="snapshot-root"
+>
+  <Text>
+    "Same bytes on both engines"
+  </Text>
+</View>`;
+
+exports[`snapshot parity serializes canonical values 1`] = `{
+  "keys": {
+    "10": 2,
+    "2": 1,
+    "a": 3,
+    "z": 4,
+  },
+  "map": Map {
+    "a" => 1,
+    "z" => 2,
+  },
+  "numbers": [
+    -0,
+    1.5,
+    1e-7,
+    0.000001,
+    1e21,
+    5e-324,
+    1.7976931348623157e308,
+    -9007199254740991,
+    9007199254740991,
+    NaN,
+    Infinity,
+    -Infinity,
+  ],
+  "set": Set {
+    "a",
+    "z",
+  },
+  "text": "Hermes",
+}`;
+
+exports[`snapshot parity stays deterministic when Array.prototype.sort is poisoned: sort pollution 1`] = `{
+  "a": 1,
+  "set": Set {
+    "a",
+    "z",
+  },
+  "z": 2,
+}`;

@@ -371,6 +371,14 @@ describe('argus matchers integration (needs .hermes/hermes)', () => {
     },
     30_000,
   );
+
+  gated(
+    'committed snapshot fixture passes without -u',
+    () => {
+      expect(runArgus(['examples/snapshots.test.ts'])).toBe(0);
+    },
+    30_000,
+  );
 });
 
 // ---------------------------------------------------------------------------

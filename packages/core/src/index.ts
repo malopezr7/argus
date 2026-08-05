@@ -92,6 +92,8 @@ export type {
   RunResult,
   SealedBundle,
   SessionResult,
+  SnapshotRecord,
+  SnapshotStatus,
   Suite,
   TestCase,
 } from './domain/types.js';

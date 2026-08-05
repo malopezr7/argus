@@ -30,6 +30,18 @@ function bundleAliasFixture() {
   });
 }
 
+function bundleSnapshotFixture() {
+  return new EsbuildBundler().bundle({
+    testPaths: [resolve(FIXTURES, 'snapshot-order-fixture.ts')],
+    frameworkPath: resolve(FIXTURES, 'snapshot-framework', 'index'),
+    componentPath: COMPONENT_PATH,
+    polyfillPaths: [],
+    engine: 'legacy',
+    snapshotEntries: [['config ` ${ 1', 'line\u2028value']],
+    updateSnapshots: true,
+  });
+}
+
 describe('EsbuildBundler component support', () => {
   it('compiles automatic development JSX and keeps the react-native alias', async () => {
     const bundle = await bundleFixture('component-jsx-fixture.tsx');
@@ -51,5 +63,16 @@ describe('EsbuildBundler component support', () => {
 
     expect(bundle.code).toContain('capturedKey');
     expect(bundle.code).not.toContain('get: () => from[key]');
+  });
+
+  it('evaluates a separate snapshot configuration module before user tests', async () => {
+    const bundle = await bundleSnapshotFixture();
+
+    Function(bundle.code)();
+
+    expect((globalThis as Record<string, unknown>).__argusSnapshotOrder).toBe(
+      `${JSON.stringify([['config ` ${ 1', 'line\u2028value']])}:true:config:test:run`,
+    );
+    delete (globalThis as Record<string, unknown>).__argusSnapshotOrder;
   });
 });

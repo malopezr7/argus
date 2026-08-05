@@ -60,7 +60,18 @@ export function parseHermesOutput(output: EngineOutput, resultNonce: string): Ru
   if (!isRunResult(payload.result)) {
     return { kind: 'protocol-failure', reason: 'malformed-json', rawStdout: output.stdout };
   }
-  const result = payload.result;
+  const snap = parseSnapshots(payload.snap);
+  if (snap === undefined) {
+    return { kind: 'protocol-failure', reason: 'malformed-json', rawStdout: output.stdout };
+  }
+  if (payload.snapFiltered !== undefined && typeof payload.snapFiltered !== 'boolean') {
+    return { kind: 'protocol-failure', reason: 'malformed-json', rawStdout: output.stdout };
+  }
+  const result: RunResult = {
+    ...payload.result,
+    snap,
+    snapFiltered: payload.snapFiltered ?? true,
+  };
   return result.totals.failed > 0
     ? { kind: 'failed', result, userLogs }
     : { kind: 'passed', result, userLogs };
@@ -71,6 +82,8 @@ interface ResultEnvelope {
   ok: boolean;
   result?: unknown;
   error?: { message?: string; stack?: string };
+  snap?: unknown;
+  snapFiltered?: unknown;
 }
 
 function isObject(x: unknown): x is Record<string, unknown> {
@@ -112,10 +125,40 @@ function isSuiteShape(x: unknown): boolean {
   return true;
 }
 
-function isRunResult(x: unknown): x is RunResult {
+function isRunResult(x: unknown): x is Omit<RunResult, 'snap' | 'snapFiltered'> {
   if (!isObject(x)) return false;
   if (typeof x.durationMs !== 'number' || !Number.isFinite(x.durationMs)) return false;
   if (!isTotals(x.totals)) return false;
   if (!Array.isArray(x.suites) || !x.suites.every(isSuiteShape)) return false;
   return true;
+}
+
+function hasC0(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    if (value.charCodeAt(i) < 0x20) return true;
+  }
+  return false;
+}
+
+function parseSnapshots(value: unknown): RunResult['snap'] | undefined {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return undefined;
+
+  const seen = new Set<string>();
+  const result: RunResult['snap'] = [];
+  for (let i = 0; i < value.length; i++) {
+    const item = value[i];
+    if (!isObject(item)) return undefined;
+    if (typeof item.key !== 'string' || hasC0(item.key)) return undefined;
+    if (typeof item.value !== 'string' || typeof item.passed !== 'boolean') return undefined;
+    if (seen.has(item.key)) return undefined;
+    seen.add(item.key);
+    result.push({
+      key: item.key,
+      value: item.value,
+      testPassed: item.passed,
+      status: 'unchecked',
+    });
+  }
+  return result;
 }

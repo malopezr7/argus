@@ -85,7 +85,7 @@ export async function run(nonce: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function serOkEnvelope(result: RunResult): string {
-  return `{"v":1,"ok":true,"result":${serResult(result)}}`;
+  return `{"v":1,"ok":true,"result":${serResult(result)}${result.snap === undefined ? '' : `,"snap":${result.snap}`}${result.snapFiltered === undefined ? '' : `,"snapFiltered":${result.snapFiltered}`}}`;
 }
 
 function serErrEnvelope(message: string, stack: string | undefined): string {

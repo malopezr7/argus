@@ -120,6 +120,8 @@ function makeResult(overrides: Partial<TestCase> = {}): RunResult {
     ],
     totals: { passed: 0, failed: 1, skipped: 0, todo: 0, total: 1 },
     durationMs: 0,
+    snap: [],
+    snapFiltered: true,
   };
 }
 

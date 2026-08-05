@@ -38,6 +38,47 @@ describe('parseHermesOutput', () => {
   it('clean exit + valid frame, no failures -> passed', () => {
     const o = parseHermesOutput(out({ stdout: frame(NONCE, okEnvelope(0)) }), NONCE);
     expect(o.kind).toBe('passed');
+    expect(o.kind === 'passed' && o.result.snap).toEqual([]);
+    expect(o.kind === 'passed' && o.result.snapFiltered).toBe(true);
+  });
+
+  it('merges optional snapshot envelope fields into mandatory RunResult fields', () => {
+    const payload = okEnvelope(0) as Record<string, unknown>;
+    payload.snap = [{ key: 'suite test 1', value: '"value"', passed: true }];
+    payload.snapFiltered = false;
+
+    const o = parseHermesOutput(out({ stdout: frame(NONCE, payload) }), NONCE);
+
+    expect(o.kind).toBe('passed');
+    expect(o.kind === 'passed' && o.result.snap).toEqual([
+      {
+        key: 'suite test 1',
+        value: '"value"',
+        testPassed: true,
+        status: 'unchecked',
+      },
+    ]);
+    expect(o.kind === 'passed' && o.result.snapFiltered).toBe(false);
+  });
+
+  it.each([
+    [[{ key: 'x', value: 'y' }]],
+    [[{ key: 'x', value: 'y', passed: 'yes' }]],
+    [[{ key: 'bad\u0000key', value: 'y', passed: true }]],
+    [
+      [
+        { key: 'duplicate', value: 'a', passed: true },
+        { key: 'duplicate', value: 'b', passed: true },
+      ],
+    ],
+  ])('rejects malformed snapshot wire entries %#', (snap) => {
+    const payload = okEnvelope(0) as Record<string, unknown>;
+    payload.snap = snap;
+    payload.snapFiltered = false;
+
+    const o = parseHermesOutput(out({ stdout: frame(NONCE, payload) }), NONCE);
+
+    expect(o.kind).toBe('protocol-failure');
   });
 
   it('clean exit + valid frame, with failures -> failed', () => {

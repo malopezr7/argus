@@ -30,6 +30,7 @@ import { errMsg } from './errors.js';
 import { resolveFrameworkPaths } from './paths.js';
 import { mapPool } from './pool.js';
 import { provisionHermes } from './provision/provision.js';
+import { loadSnapshotFile, reconcileSnapshotFile } from './snapshots.js';
 import { resolvePackageVersion } from './version.js';
 
 async function main(): Promise<void> {
@@ -152,6 +153,9 @@ async function main(): Promise<void> {
    */
   async function runFile(file: string): Promise<RunOutcome> {
     try {
+      const loadedSnapshots = await loadSnapshotFile(file).catch((e) => {
+        throw Object.assign(new Error(errMsg(e)), { stage: 'snapshot' });
+      });
       const bundle = await bundler
         .bundle({
           testPaths: [file],
@@ -167,6 +171,8 @@ async function main(): Promise<void> {
           // with per-package React versions, `root: 'packages/app'` must
           // resolve that package's React. Node still walks up to a hoisted one.
           projectDir: settings.root,
+          snapshotEntries: Object.entries(loadedSnapshots.entries),
+          updateSnapshots: parsed.update,
         })
         .catch((e) => {
           throw Object.assign(new Error(errMsg(e)), { stage: 'bundle' });
@@ -179,11 +185,20 @@ async function main(): Promise<void> {
       const outcome = parseHermesOutput(output, bundle.resultNonce);
       if (outcome.kind === 'passed' || outcome.kind === 'failed') {
         const result = await remapStacks(outcome.result, bundle.map);
+        await reconcileSnapshotFile({
+          loaded: loadedSnapshots,
+          result,
+          update: parsed.update,
+        }).catch((e) => {
+          throw Object.assign(new Error(errMsg(e)), { stage: 'snapshot' });
+        });
         return { ...outcome, result };
       }
       return outcome;
     } catch (e) {
-      const stage = (e as { stage?: string }).stage === 'bundle' ? 'bundle' : 'spawn';
+      const taggedStage = (e as { stage?: string }).stage;
+      const stage =
+        taggedStage === 'bundle' ? 'bundle' : taggedStage === 'snapshot' ? 'snapshot' : 'spawn';
       return {
         kind: 'infrastructure-failure',
         stage,

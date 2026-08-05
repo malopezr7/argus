@@ -52,6 +52,7 @@ interface ArgusMatchers {
   toBeLessThanOrEqual(n: number): void;
   toBeCloseTo(expected: number, numDigits?: number): void;
   toMatch(pattern: string | RegExp): void;
+  toMatchSnapshot(hint?: string): void;
   toContain(item: unknown): void;
   toContainEqual(item: unknown): void;
   toHaveLength(n: number): void;
@@ -113,6 +114,7 @@ interface ArgusAsyncMatchers {
   toBeLessThanOrEqual(n: number): Promise<void>;
   toBeCloseTo(expected: number, numDigits?: number): Promise<void>;
   toMatch(pattern: string | RegExp): Promise<void>;
+  toMatchSnapshot(hint?: string): Promise<void>;
   toContain(item: unknown): Promise<void>;
   toContainEqual(item: unknown): Promise<void>;
   toHaveLength(n: number): Promise<void>;

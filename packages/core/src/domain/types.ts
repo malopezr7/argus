@@ -56,6 +56,10 @@ export interface BundleInput {
    * Optional: absent means the bundler falls back to the working directory.
    */
   projectDir?: string;
+  /** Existing snapshot key/body pairs injected before user test modules evaluate. */
+  snapshotEntries?: Array<readonly [key: string, value: string]>;
+  /** Whether mismatched snapshots are accepted for host-side update. */
+  updateSnapshots?: boolean;
 }
 
 /**
@@ -193,6 +197,24 @@ export interface Suite {
   tests: TestCase[];
 }
 
+export type SnapshotStatus =
+  | 'unchecked'
+  | 'matched'
+  | 'added'
+  | 'updated'
+  | 'failed'
+  | 'discarded'
+  | 'obsolete'
+  | 'removed';
+
+/** One snapshot assertion emitted by Hermes and reconciled on the host. */
+export interface SnapshotRecord {
+  key: string;
+  value: string;
+  testPassed: boolean;
+  status: SnapshotStatus;
+}
+
 /** The test outcome emitted by a framework run that actually executed. */
 export interface RunResult {
   /** All top-level suites. */
@@ -207,6 +229,10 @@ export interface RunResult {
   };
   /** Total duration measured inside Hermes. */
   durationMs: number;
+  /** Snapshot assertions exercised by this file. Old wire envelopes default to an empty list. */
+  snap: SnapshotRecord[];
+  /** Whether failures, skips, todos, or focus made obsolete pruning unsafe. */
+  snapFiltered: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +240,14 @@ export interface RunResult {
 // ---------------------------------------------------------------------------
 
 /** Stage at which an infrastructure (non-test) failure occurred. */
-export type InfraStage = 'discover' | 'transform' | 'bundle' | 'provision' | 'spawn' | 'engine';
+export type InfraStage =
+  | 'discover'
+  | 'transform'
+  | 'bundle'
+  | 'provision'
+  | 'spawn'
+  | 'engine'
+  | 'snapshot';
 
 /** Why the stdout result protocol could not be honoured. */
 export type ProtocolFailureReason = 'missing-frame' | 'multiple-frames' | 'malformed-json';

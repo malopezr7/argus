@@ -52,6 +52,7 @@ import {
 } from './expect-state.js';
 import type { AsyncMatchers, Matchers } from './matcher-types.js';
 import { show } from './show.js';
+import { matchSnapshot } from './snapshot/state.js';
 
 export { resetAssertions, verifyAssertions } from './expect-state.js';
 export type { AsyncMatchers, Matchers } from './matcher-types.js';
@@ -269,6 +270,10 @@ export function makeMatchers(actual: unknown, negated: boolean): Matchers {
         () => `expect(${show(actual)}).toMatch(${show(pattern)})`,
         () => `expect(${show(actual)}).not.toMatch(${show(pattern)})`,
       );
+    },
+
+    toMatchSnapshot(hint?: string): void {
+      matchSnapshot(actual, hint, negated);
     },
 
     toContain(item: unknown): void {
