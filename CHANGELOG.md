@@ -10,6 +10,54 @@ below say plainly which ones do.
 
 ## [Unreleased]
 
+## [0.2.4] — 2026-08-05
+
+Snapshot testing. Additive — nothing behaves differently than it did in 0.2.3.
+
+### Added
+
+- `expect(value).toMatchSnapshot(hint?)`, with the snapshot file kept beside the
+  test in `__snapshots__/<file>.snap` and `-u` / `--update` to rewrite it, as
+  Jest does. Works on supported plain values and on component trees — a
+  `render()` result, `screen.root`, or anything a query returns.
+
+  ```ts
+  test('formats a receipt', () => {
+    expect(formatReceipt(order)).toMatchSnapshot();
+  });
+  ```
+
+  Obsolete entries are reported, and pruned under `-u` only when the file passed
+  cleanly and ran every test — a filtered or failing run cannot delete a
+  snapshot it never had the chance to exercise.
+
+### How it works, and why it matters
+
+Test code runs inside Hermes, which has no filesystem, so the comparison cannot
+happen where the value lives. Hermes serialises the entries a run exercised and
+sends them back through the result channel; the host reads the file, compares,
+writes what is missing, prunes what is obsolete, and counts. Stored snapshots
+reach the VM through a separate virtual module imported before the test modules,
+so configuration is sealed before any test evaluates.
+
+The serialiser is written for this rather than borrowed. Output has to be
+byte-identical between runs **and between engines** — a snapshot that passes on
+legacy and fails on V1 would be precisely the divergence Argus exists to remove
+— so ordering is explicit and a value outside the supported subset throws rather
+than degrading to a lossy label that would silently freeze the wrong thing.
+
+Emission holds the same line as the result channel: snapshot bodies are
+interpolated already serialised, so the code producing them uses index loops,
+own-property access and captured string primordials. A hostile test cannot forge
+a snapshot entry any more than it can forge a result.
+
+### Not included
+
+`toMatchInlineSnapshot`, property matchers, custom serialisers, and
+`toThrowErrorMatchingSnapshot`. Inline snapshots need host-side rewriting of
+your source files, which is a different kind of change and deserves its own
+decision.
+
 ## [0.2.3] — 2026-08-05
 
 Interactions and time. Everything here is additive — nothing behaves differently
