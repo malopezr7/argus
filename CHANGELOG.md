@@ -10,21 +10,85 @@ below say plainly which ones do.
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-08-05
+
+Interactions and time. Everything here is additive — nothing behaves differently
+than it did in 0.2.2.
+
 ### Added
+
+- `userEvent`, matching `@testing-library/react-native` 14: `setup`, `press`,
+  `longPress`, `type`, `clear` and `paste`.
+
+  `fireEvent.press` calls `onPress` and stops. A real press is a sequence, so a
+  component that only sets `onPressIn`, or that tracks pressed state across in
+  and out, cannot be exercised with it at all. Typing is worse: `changeText`
+  fires once with the whole string, while a user produces focus, then events per
+  character, then submit or blur — so anything validating per keystroke behaves
+  nothing like it does on a device.
+
+  `fireEvent` is unchanged and remains the low-level escape hatch. `scrollTo` is
+  deliberately absent: approximating momentum and content offsets would be
+  inventing an API rather than matching one.
 
 - Jest-shaped fake timers on the `argus` namespace: manually controlled timeout
   and interval queues, fake `Date`, system-time changes, pending-timer controls,
-  and synchronous or promise-aware time advancement. This is a fidelity fix:
-  standalone Hermes ignores timer delays, while a React Native device does not.
+  and synchronous or promise-aware time advancement.
+
+  This is a fidelity fix, which is the opposite of the usual argument for fake
+  timers. Standalone Hermes ignores the delay you pass to `setTimeout` and fires
+  callbacks in registration order, so a 300 ms debounce runs after a single
+  scheduler turn — a test asserting nothing has happened yet passes for the
+  wrong reason, and one asserting it has passes where a device would not. A
+  controlled clock is closer to the device than the engine's own timer.
+
+  The API follows Jest 30, measured against it rather than reconstructed. Where
+  exact parity is impossible it is documented instead of approximated: legacy
+  Hermes reports no engine queue and exposes no microtask drain, so the async
+  advance yields through a bounded number of real scheduler turns rather than
+  promising unlimited settling. `waitFor` does not auto-advance the fake clock
+  the way RNTL does under Jest, because the waits deliberately hold real timer
+  primordials — without that, installing fake timers would hang the file.
 
 ### Fixed
 
-- Component `waitFor` / `findBy*` scheduling and deadline budgets now use timer
-  and clock references captured before user code can install fake timers.
-  Direct `userEvent` calls use the same real-scheduler fallback, while
-  `userEvent.setup({ advanceTimers: argus.advanceTimersByTime })` still drives
-  interaction delays through the fake clock. Neither path can strand the file's
-  result frame.
+- Component waits and `userEvent` now hold timer and clock references captured
+  before user code can install fake timers. Without that, a direct `userEvent`
+  call under fake timers waited on a timer that would never fire: the VM exited
+  with no result frame and the entire file was discarded, including tests that
+  had already passed.
+
+- `MessageChannel` was installed on every run, but no Hermes engine provides it,
+  so a suite that never touched components saw a global that does not exist on a
+  device. It now loads with the component API. Its installation is unconditional
+  again, because a guard that skipped installing when something was already
+  there let a setup module leave a replaceable one in place — the exact hijack
+  the adversarial fixture exists to catch.
+
+- The published type declarations accepted any matcher name through an index
+  signature, so `expect(1).toBeee(2)` type-checked and failed at runtime. Custom
+  matchers are still supported through declaration merging.
+
+- Class detection missed a class whose leading comment contained a semicolon,
+  which reached the legacy engine untransformed and killed the file. The gate is
+  now deliberately permissive and confirmed by parsing before anything is
+  rewritten — and a file the parser cannot read is passed through rather than
+  failed, since a false positive should only cost time.
+
+- `waitForElementToBeRemoved` could not observe a render root unmounting, so
+  passing `render().root` — which the types advertise — timed out instead of
+  resolving.
+
+- Interactions abandoned mid-flight leaked into the following test. On legacy a
+  failing assertion inside such a handler vanished and the file went green; on
+  V1 the still-open act scope deferred later renders and unrelated tests failed
+  on elements that were present.
+
+- Presses ignored `pointerEvents`, invoking handlers on elements a device would
+  never deliver a touch to; skipped the touch-responder path entirely; used a
+  hardcoded duration where the configured delay belongs; stopped at the first
+  disabled ancestor instead of continuing to the enabled one; and rejected a
+  one-character braced token instead of typing it literally.
 
 ## [0.2.2] — 2026-08-04
 
