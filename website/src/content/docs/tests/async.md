@@ -103,37 +103,70 @@ await new Promise<void>((resolve) => queueMicrotask(resolve));
 
 ### Testing time-dependent code
 
-Inject the clock instead of reaching for a global one. Code that takes its time source as a
-parameter is testable on any engine, and does not need fake timers on any of them.
+Use `argus.useFakeTimers()` when elapsed time is the behaviour under test. This is the
+opposite of the usual trade-off: on standalone Hermes, a fake clock is **more faithful** to
+a React Native device than the native timer queue because it observes the delay explicitly.
 
 ```ts
-// ✗ coupled to a wall clock the standalone VM does not provide
-export function isExpired(token: Token) {
-  return token.expiresAt < Date.now();
-}
+describe('debounce', () => {
+  afterEach(() => argus.useRealTimers());
 
-// ✓ testable everywhere
-export function isExpired(token: Token, now: number) {
-  return token.expiresAt < now;
-}
+  test('waits for its delay', () => {
+    argus.useFakeTimers({ now: 1000 });
+    let fired = false;
+    setTimeout(() => { fired = true; }, 300);
 
-test('detects an expired token', () => {
-  expect(isExpired({ expiresAt: 100 }, 200)).toBe(true);
+    expect(fired).toBe(false);
+    argus.advanceTimersByTime(299);
+    expect(fired).toBe(false);
+    argus.advanceTimersByTime(1);
+    expect(fired).toBe(true);
+  });
 });
 ```
 
-For debounce, throttle and retry logic, take the scheduler as a dependency and pass a
-synchronous one in tests. A raw `setTimeout` test in Argus can prove task ordering, not
-elapsed-time behaviour from the React Native host.
+The supported Jest-shaped controls are:
 
-Component polling is the deliberate exception. `waitFor` accepts RNTL-compatible
+| Method | Behaviour |
+|---|---|
+| `useFakeTimers({ now, timerLimit })` | Installs a fresh fake `Date`, timeout and interval clock. |
+| `useRealTimers()` | Restores globals captured before user code ran. |
+| `advanceTimersByTime(ms)` | Runs every timer due in the interval, including newly scheduled ones. |
+| `advanceTimersByTimeAsync(ms)` | Drains promise callbacks on V1; grants 100 captured real scheduler turns between timers on legacy. |
+| `runAllTimers()` | Recursively drains timers, bounded by `timerLimit` (default `100000`). |
+| `runOnlyPendingTimers()` | Runs through the latest due time pending when the call began, including new timers due inside that window. |
+| `clearAllTimers()` | Clears timers and resets fake time to its installation value. |
+| `getTimerCount()` | Counts pending fake timeouts and intervals. |
+| `setSystemTime(now?)` | Moves `Date` without changing remaining timer delays; omitted `now` means epoch `0`. |
+| `getRealSystemTime()` | Reads real wall time while `Date.now()` is fake. |
+
+Fake timers remain active across tests in the file, matching Jest. Argus does not reset them
+automatically; use `afterEach(() => argus.useRealTimers())` for test-local clocks. Calling
+`useFakeTimers()` again discards pending fake timers and installs a fresh clock.
+
+Hermes V1 exposes an engine promise queue, so one captured real scheduler turn drains a
+finite promise chain before the next fake timer. Legacy Hermes uses a Promise polyfill that
+may advance only one chained callback per scheduler turn and exposes no queue-drain
+primitive. Argus therefore grants 100 captured real turns between timers. This covers
+ordinary chains but cannot equal Jest's unbounded Node microtask drain beyond that explicit
+limit; await or split exceptionally deep promise work instead.
+
+`queueMicrotask` remains real. Standalone Hermes has no `performance`, animation-frame,
+idle-callback, or immediate APIs to fake. Argus also omits Jest's automatic advancement,
+`doNotFake`, and legacy-timer modes: partial or native-clock advancement would reintroduce
+the standalone VM's zero-delay behaviour instead of fixing it.
+
+Dependency-injected clocks remain useful for domain logic. Fake timers cover code whose
+contract is the global React Native timer API, especially debounce, throttle and retry code.
+
+Component polling uses a separate real scheduler. `waitFor` accepts RNTL-compatible
 `{ timeout, interval }` options, but applies both a real `Date.now()` deadline and a
 scheduler-turn budget derived from `ceil(timeout / interval)`. That second budget prevents
 the zero-delay queue from spinning until the per-file timeout kills the process. See
 [Component testing](/tests/components/#async-queries-and-waits).
 
-Fake timers remain on the [roadmap](/reference/roadmap/); the native FIFO queue is not a
-fake-timer API.
+Those internal timer and `Date.now` references are captured before user code runs, so fake
+system time cannot freeze or instantly exhaust a wait's own safety budget.
 
 ## Per-file timeout
 

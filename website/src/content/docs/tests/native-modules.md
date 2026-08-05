@@ -91,6 +91,6 @@ This shim covers native-module **infrastructure**, not the React Native JavaScri
 `AppState`, `Dimensions`, `Animated`, `Linking`, `AsyncStorage` and friends are not
 implemented.
 
-When your code depends on one of those, the productive move is the same as with timers:
-take it as a dependency instead of importing it deep in the call stack, and pass a fake in
-tests. Code written that way is testable on every runner, not just this one.
+When your code depends on one of those, take it as a dependency instead of importing it
+deep in the call stack, and pass a fake in tests. Code written that way is testable on every
+runner, not just this one.

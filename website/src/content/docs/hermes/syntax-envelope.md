@@ -21,8 +21,9 @@ blocks, `async` arrow functions, `for await…of` and `WeakRef`. Write modern Ty
 generators fail there exactly as they do on legacy, with the same
 `async generators are unsupported`. esbuild lowers them for you on both engines.
 
-The other real constraint is **host APIs, not syntax** — the standalone VM has no timers, no
-`fetch`, no `require`. See [Async tests](/tests/async/#there-are-no-timers).
+The other real constraint is **host APIs, not syntax** — the standalone VM's timer queue
+ignores delays, and it has no `fetch` or `require`. See
+[Async tests](/tests/async/#the-timer-queue-is-not-a-clock).
 
 ## On the legacy engine
 

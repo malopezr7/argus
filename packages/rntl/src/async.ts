@@ -1,4 +1,5 @@
 import React from 'react';
+import { capturedDateNow, capturedSetTimeout } from '../../framework/src/fake-timers.js';
 import type { HostNode } from './tree.js';
 
 const DEFAULT_TIMEOUT = 1000;
@@ -52,7 +53,7 @@ function validateOptions(timeout: number, interval: number): void {
 }
 
 function resultMissedDeadline(startedAt: number, timeout: number): boolean {
-  const elapsed = Date.now() - startedAt;
+  const elapsed = capturedDateNow() - startedAt;
   return elapsed >= timeout && (timeout !== 0 || elapsed > 0);
 }
 
@@ -198,7 +199,7 @@ export function runRegisteredAsyncWork(
 function flushTurn(interval: number): Promise<void> {
   return runAsyncAct(async function flushActTurn(): Promise<void> {
     await new Promise<void>(function schedule(resolve): void {
-      setTimeout(resolve, interval);
+      capturedSetTimeout(resolve, interval);
     });
   });
 }
@@ -305,7 +306,7 @@ export async function waitFor<T>(
 
   const control = createWaitControl();
   registerWait(control);
-  const startedAt = Date.now();
+  const startedAt = capturedDateNow();
   const pollLimit = Math.max(1, Math.ceil(timeout / interval));
   let polls = 0;
   let attempts = 0;
@@ -332,7 +333,7 @@ export async function waitFor<T>(
       }
 
       if (needsAttempt) {
-        if (attempts > 0 && Date.now() - startedAt >= timeout) {
+        if (attempts > 0 && capturedDateNow() - startedAt >= timeout) {
           throw exhaustedError('wall-clock', lastError, timeout, interval, polls, attempts);
         }
 
@@ -340,7 +341,9 @@ export async function waitFor<T>(
         attempts++;
         needsAttempt = false;
         if (current.status === 'resolved') {
-          if (resultMissedDeadline(startedAt, timeout)) {
+          // A zero timeout still permits the mandatory first synchronous attempt.
+          // Reading a real clock around that callback may cross a millisecond boundary.
+          if (timeout !== 0 && resultMissedDeadline(startedAt, timeout)) {
             throw exhaustedError('wall-clock', lastError, timeout, interval, polls, attempts);
           }
           return current.value;
@@ -352,7 +355,7 @@ export async function waitFor<T>(
         }
       }
 
-      if (Date.now() - startedAt >= timeout) {
+      if (capturedDateNow() - startedAt >= timeout) {
         throw exhaustedError('wall-clock', lastError, timeout, interval, polls, attempts);
       }
       if (polls >= pollLimit) {

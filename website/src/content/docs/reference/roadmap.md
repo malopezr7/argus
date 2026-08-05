@@ -131,14 +131,14 @@ installability; all of them are the reason someone would ask for the release aft
   it. Measured at roughly four times faster on re-runs, because compilation dominates and
   the cache absorbs it.
 
-### Component testing — remaining work
+### Component testing
 
 `waitFor`, `waitForElementToBeRemoved`, and `findBy*` / `findAllBy*` now stop on the first
 of two limits: real wall-clock time or a scheduler-turn budget. The second limit is required
 because standalone Hermes exposes timers but ignores their delay.
 
-- `userEvent` — the high-level interaction layer.
-- Fake timers.
+Done: `userEvent` and fake timers with an explicit clock. Fake timers are a fidelity fix on
+standalone Hermes: unlike the native FIFO queue, they preserve elapsed-time semantics.
 
 ### CI
 

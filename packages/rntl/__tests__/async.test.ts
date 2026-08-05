@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { runInternalAfterEach } from '../../framework/src/lifecycle.js';
 import { render, screen, waitFor, waitForElementToBeRemoved, within } from '../src/index.js';
 
@@ -26,35 +26,27 @@ describe('component async utilities', () => {
   });
 
   it('allows an immediate successful attempt with a zero timeout', async () => {
-    const now = vi.spyOn(Date, 'now').mockReturnValue(100);
-
-    try {
-      await expect(waitFor(() => 'ready', { timeout: 0 })).resolves.toBe('ready');
-    } finally {
-      now.mockRestore();
-    }
+    await expect(waitFor(() => 'ready', { timeout: 0 })).resolves.toBe('ready');
   });
 
   it('reports wall-clock exhaustion and preserves the last callback error', async () => {
-    const now = vi.spyOn(Date, 'now').mockReturnValueOnce(100).mockReturnValue(110);
+    const error = await rejectionOf(
+      waitFor(
+        () => {
+          const startedAt = Date.now();
+          while (Date.now() - startedAt < 10) {
+            // Cross the captured real deadline before reporting the last error.
+          }
+          throw new Error('condition is still false');
+        },
+        { timeout: 5, interval: 1 },
+      ),
+    );
 
-    try {
-      const error = await rejectionOf(
-        waitFor(
-          () => {
-            throw new Error('condition is still false');
-          },
-          { timeout: 5, interval: 1 },
-        ),
-      );
-
-      expect(error.message).toContain('condition is still false');
-      expect(error.message).toContain('wall-clock budget');
-      expect(error.message).toContain('timeout: 5 ms');
-      expect(error.message).toContain('interval: 1 ms');
-    } finally {
-      now.mockRestore();
-    }
+    expect(error.message).toContain('condition is still false');
+    expect(error.message).toContain('wall-clock budget');
+    expect(error.message).toContain('timeout: 5 ms');
+    expect(error.message).toContain('interval: 1 ms');
   });
 
   it('bounds a callback promise that never settles', async () => {
@@ -306,6 +298,76 @@ describe('component async utilities', () => {
       await expect(waitForElementToBeRemoved(held)).resolves.toBe(held);
       await expect(waitForElementToBeRemoved(held)).rejects.toThrow('already removed');
     } finally {
+      result.unmount();
+    }
+  });
+
+  it('uses its captured scheduler when a test replaces global setTimeout', async () => {
+    const host = globalThis as typeof globalThis & { setTimeout: typeof setTimeout };
+    const originalSetTimeout = host.setTimeout;
+    let attempts = 0;
+    host.setTimeout = function blockedTimer(): never {
+      throw new Error('the fake test timer must not drive waitFor');
+    } as typeof setTimeout;
+
+    try {
+      await expect(
+        waitFor(
+          () => {
+            attempts++;
+            if (attempts === 1) throw new Error('not ready');
+            return 'ready';
+          },
+          { timeout: 100, interval: 1 },
+        ),
+      ).resolves.toBe('ready');
+    } finally {
+      host.setTimeout = originalSetTimeout;
+    }
+  });
+
+  it('keeps its wall-clock budget independent from a replaced Date.now', async () => {
+    const originalDateNow = Date.now;
+    let fakeNow = 0;
+    let attempts = 0;
+    Date.now = (): number => fakeNow;
+
+    try {
+      await expect(
+        waitFor(
+          () => {
+            attempts++;
+            if (attempts === 1) {
+              fakeNow = 1_000_000;
+              throw new Error('not ready');
+            }
+            return 'ready';
+          },
+          { timeout: 100, interval: 1 },
+        ),
+      ).resolves.toBe('ready');
+    } finally {
+      Date.now = originalDateNow;
+    }
+  });
+
+  it('keeps findBy queries and MessageChannel on the captured scheduler', async () => {
+    const host = globalThis as typeof globalThis & { setTimeout: typeof setTimeout };
+    const originalSetTimeout = host.setTimeout;
+    const result = render(React.createElement('Text', null, 'pending'));
+    host.setTimeout = function blockedTimer(): never {
+      throw new Error('the fake test timer must not drive findBy');
+    } as typeof setTimeout;
+
+    try {
+      Promise.resolve().then(() => result.rerender(React.createElement('Text', null, 'ready')));
+      await expect(
+        screen.findByText('ready', { timeout: 100, interval: 1 }),
+      ).resolves.toMatchObject({
+        type: 'Text',
+      });
+    } finally {
+      host.setTimeout = originalSetTimeout;
       result.unmount();
     }
   });

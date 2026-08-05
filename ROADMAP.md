@@ -30,7 +30,8 @@ The runner works and ships. What is missing is test-authoring surface.
   user-facing mock registration API. `argus.fn()` and `argus.spyOn()`.
 - Component testing on real React running inside Hermes, exposed through the
   virtual `argus` module: `render`, synchronous and async queries, `waitFor`,
-  `waitForElementToBeRemoved`, `within`, `fireEvent`, `act`.
+  `waitForElementToBeRemoved`, `within`, `fireEvent`, `userEvent`, `act`.
+- Jest-shaped fake timers with explicit clock control, fake `Date`, and intervals.
 - Configuration file — `argus.config.ts` loaded through Node's own type stripping,
   with a validator, a documented precedence order, and zero added dependencies.
   See below.
@@ -232,8 +233,8 @@ ask for the release after this one.
 
 - [x] `waitFor`, `waitForElementToBeRemoved`, and `findBy*` / `findAllBy*`,
       bounded by both wall-clock time and a Hermes-safe scheduler-turn budget.
-- [ ] `userEvent` — the high-level interaction layer.
-- [ ] Fake timers.
+- [x] `userEvent` — the high-level interaction layer.
+- [x] Fake timers.
 
 ### CI
 

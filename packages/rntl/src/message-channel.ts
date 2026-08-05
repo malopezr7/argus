@@ -1,3 +1,5 @@
+import { capturedSetTimeout } from '../../framework/src/fake-timers.js';
+
 /**
  * Component-only MessageChannel polyfill for React 19 async act.
  *
@@ -23,12 +25,12 @@ function makePort(): Port {
     const port1 = makePort();
     const port2 = makePort();
     port1.postMessage = function postToPort2(value): void {
-      setTimeout(function deliver(): void {
+      capturedSetTimeout(function deliver(): void {
         port2.onmessage?.({ data: value });
       }, 0);
     };
     port2.postMessage = function postToPort1(value): void {
-      setTimeout(function deliver(): void {
+      capturedSetTimeout(function deliver(): void {
         port1.onmessage?.({ data: value });
       }, 0);
     };

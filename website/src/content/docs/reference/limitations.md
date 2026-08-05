@@ -50,7 +50,6 @@ Notably absent, and staying absent:
 - **The `jest` global.** `globalThis.jest` is `undefined`. A namespace implementing
   two-thirds of Jest is worse than none: copied code would appear to work until it reached
   the missing third.
-- **Fake timers.** The standalone VM has no timers to fake.
 
 ### A React Native runtime
 
@@ -81,7 +80,7 @@ The standalone VM has no host APIs. This is the single most common source of sur
 
 | Not available | What to do |
 |---|---|
-| Real clock-based timers | `setTimeout` is FIFO and ignores delay; inject a scheduler for time semantics. |
+| Real clock-based timers | Native `setTimeout` is FIFO and ignores delay; use `argus.useFakeTimers()` for explicit time semantics. |
 | `fetch`, `XMLHttpRequest` | Inject the transport |
 | `require`, dynamic `import` | Everything is bundled up front |
 | `process`, `fs`, any Node built-in | Host-only; not present in the Hermes realm |
@@ -89,13 +88,14 @@ The standalone VM has no host APIs. This is the single most common source of sur
 
 Available: `console` (built on `print`), `queueMicrotask`, `global`, `Promise`,
 `setTimeout` / `clearTimeout`, and the whole JavaScript language for the target engine —
-including `Intl`, which is built in. `setInterval` and `performance` are absent.
+including `Intl`, which is built in. Native `setInterval` and `performance` are absent;
+fake-timer mode supplies controlled `setInterval` / `clearInterval`.
 
 ## Component-testing gaps
 
 Covered in full on [Component testing](/tests/components/#what-is-not-supported):
-`userEvent`, fake timers, Suspense guarantees, layout, and native platform fidelity beyond
-the four shim components. `waitFor`, `waitForElementToBeRemoved`, and async queries are
+Suspense guarantees, layout, and native platform fidelity beyond the four shim components.
+`userEvent`, fake timers, `waitFor`, `waitForElementToBeRemoved`, and async queries are
 available with a documented dual-budget timeout model.
 
 Held node references stay live across an update, so a node queried once can be asserted on

@@ -10,7 +10,21 @@ below say plainly which ones do.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- Jest-shaped fake timers on the `argus` namespace: manually controlled timeout
+  and interval queues, fake `Date`, system-time changes, pending-timer controls,
+  and synchronous or promise-aware time advancement. This is a fidelity fix:
+  standalone Hermes ignores timer delays, while a React Native device does not.
+
+### Fixed
+
+- Component `waitFor` / `findBy*` scheduling and deadline budgets now use timer
+  and clock references captured before user code can install fake timers.
+  Direct `userEvent` calls use the same real-scheduler fallback, while
+  `userEvent.setup({ advanceTimers: argus.advanceTimersByTime })` still drives
+  interaction delays through the fake clock. Neither path can strand the file's
+  result frame.
 
 ## [0.2.2] — 2026-08-04
 

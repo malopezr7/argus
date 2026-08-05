@@ -185,6 +185,26 @@ that budget. This is a deliberate divergence from RNTL's timer-only scheduling m
 Each scheduler turn runs through React's async `act`, so promise- and timer-backed state
 updates are committed before the next query reads the live tree.
 
+With `argus.useFakeTimers()` active, waits and `findBy*` still use their captured real
+scheduler and real wall-clock safety budget.
+
+<Aside type="caution" title="waitFor does not advance fake time">
+Unlike RNTL running under Jest, Argus does not auto-advance the fake clock while polling.
+A condition driven only by a fake timeout will exhaust its wait even though sibling tests
+and the file result remain intact. Advance the clock explicitly before waiting or from the
+action that schedules the condition when porting such a suite.
+</Aside>
+
+Direct `userEvent` methods use a captured real-scheduler fallback, so enabling fake timers
+cannot strand an interaction. To make interaction delays advance the fake clock instead,
+wire the existing RNTL-compatible hook directly:
+
+```tsx
+argus.useFakeTimers();
+const user = userEvent.setup({ advanceTimers: argus.advanceTimersByTime });
+await user.press(screen.getByText('Submit'));
+```
+
 ## `within`
 
 Scopes queries to a subtree — the fix for "two elements have the same label".
@@ -267,8 +287,6 @@ are just no longer required once you upgrade.
 
 Deliberately out of scope:
 
-- `userEvent` — the high-level interaction layer.
-- Fake timers.
 - Suspense guarantees.
 - Layout, measurement, and anything positional.
 - Native platform fidelity beyond the four shim components.

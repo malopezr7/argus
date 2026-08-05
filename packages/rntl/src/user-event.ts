@@ -1,3 +1,4 @@
+import { capturedSetTimeout } from '../../framework/src/fake-timers.js';
 import { type AsyncWorkControl, runAsyncAct, runRegisteredAsyncWork } from './async.js';
 import { isPointerEventEnabled } from './pointer-events.js';
 import type { HostNode } from './tree.js';
@@ -7,12 +8,12 @@ type EventHandler = (payload?: unknown) => unknown;
 
 export interface UserEventSetupOptions {
   delay?: number;
-  advanceTimers?: (delay: number) => Promise<void> | void;
+  advanceTimers?: (delay: number) => Promise<unknown> | unknown;
 }
 
 export interface UserEventConfig {
   delay: number;
-  advanceTimers(delay: number): Promise<void> | void;
+  advanceTimers(delay: number): Promise<unknown> | unknown;
 }
 
 export interface TypeOptions {
@@ -36,6 +37,8 @@ export interface UserEventInstance {
 
 const inputValues = new WeakMap<HostNode, string>();
 
+function noTimerAdvancement(): void {}
+
 function isDisabled(node: HostNode): boolean {
   const state = node.props.accessibilityState as { disabled?: unknown } | null | undefined;
   return (
@@ -47,9 +50,11 @@ function isDisabled(node: HostNode): boolean {
 
 function wait(config: UserEventConfig, duration?: number): Promise<void> {
   const delay = duration ?? config.delay;
+  const scheduleTimer =
+    config.advanceTimers === noTimerAdvancement ? capturedSetTimeout : setTimeout;
   return Promise.all([
     new Promise<void>(function schedule(resolve): void {
-      setTimeout(resolve, delay);
+      scheduleTimer(resolve, delay);
     }),
     Promise.resolve(config.advanceTimers(delay)),
   ]).then(function waited(): void {});
@@ -426,7 +431,7 @@ function completeInteraction(
 export function setup(options: UserEventSetupOptions = {}): UserEventInstance {
   const config: UserEventConfig = {
     delay: options.delay ?? 0,
-    advanceTimers: options.advanceTimers ?? function advanceTimers(): void {},
+    advanceTimers: options.advanceTimers ?? noTimerAdvancement,
   };
   return {
     config,

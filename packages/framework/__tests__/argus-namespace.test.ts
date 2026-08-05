@@ -16,6 +16,16 @@ describe('installArgusNamespace', () => {
     expect(typeof argus.spyOn).toBe('function');
     expect(typeof argus.mockNativeModule).toBe('function');
     expect(typeof argus.resetNativeModules).toBe('function');
+    expect(typeof argus.useFakeTimers).toBe('function');
+    expect(typeof argus.useRealTimers).toBe('function');
+    expect(typeof argus.advanceTimersByTime).toBe('function');
+    expect(typeof argus.advanceTimersByTimeAsync).toBe('function');
+    expect(typeof argus.runAllTimers).toBe('function');
+    expect(typeof argus.runOnlyPendingTimers).toBe('function');
+    expect(typeof argus.clearAllTimers).toBe('function');
+    expect(typeof argus.getTimerCount).toBe('function');
+    expect(typeof argus.setSystemTime).toBe('function');
+    expect(typeof argus.getRealSystemTime).toBe('function');
     expect(g.jest).toBeUndefined();
   });
 

@@ -164,6 +164,13 @@ interface ArgusMockFn {
   mockRestore?: () => ArgusMockFn;
 }
 
+interface ArgusFakeTimersConfig {
+  /** Initial fake epoch. Defaults to the real `Date.now()` when fake timers are installed. */
+  now?: number | Date;
+  /** Maximum callbacks one drain operation may run. Defaults to 100,000. */
+  timerLimit?: number;
+}
+
 interface ArgusNamespace {
   /** Create a mock function, optionally backed by an implementation. */
   fn(impl?: (...args: unknown[]) => unknown): ArgusMockFn;
@@ -173,6 +180,26 @@ interface ArgusNamespace {
   mockNativeModule(name: string, factory: () => unknown): void;
   /** Drop every registered native-module fake. */
   resetNativeModules(): void;
+  /** Replace Date and timer globals with a manually controlled clock. */
+  useFakeTimers(config?: ArgusFakeTimersConfig): ArgusNamespace;
+  /** Restore the timer globals captured before user code ran. */
+  useRealTimers(): ArgusNamespace;
+  /** Advance fake time and run every timer due within that interval. */
+  advanceTimersByTime(ms: number): ArgusNamespace;
+  /** Advance fake time; V1 drains promises while legacy grants 100 real turns between timers. */
+  advanceTimersByTimeAsync(ms: number): Promise<void>;
+  /** Run pending timers recursively until none remain or timerLimit is reached. */
+  runAllTimers(): ArgusNamespace;
+  /** Run through the latest due time pending at the start, including new timers inside it. */
+  runOnlyPendingTimers(): ArgusNamespace;
+  /** Remove pending timers and reset fake time to its installation value. */
+  clearAllTimers(): ArgusNamespace;
+  /** Number of pending fake timeouts and intervals. */
+  getTimerCount(): number;
+  /** Change fake wall time without changing the remaining delay of pending timers. */
+  setSystemTime(now?: number | Date): ArgusNamespace;
+  /** Read the real wall clock even while Date is fake. */
+  getRealSystemTime(): number;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,12 +397,12 @@ declare module 'argus' {
     /** Requested delay between interaction steps. Defaults to 0 ms. */
     delay?: number;
     /** Optional timer advancement hook, matching React Native Testing Library. */
-    advanceTimers?: (delay: number) => Promise<void> | void;
+    advanceTimers?: (delay: number) => Promise<unknown> | unknown;
   }
 
   export interface UserEventConfig {
     delay: number;
-    advanceTimers(delay: number): Promise<void> | void;
+    advanceTimers(delay: number): Promise<unknown> | unknown;
   }
 
   export interface PressOptions {

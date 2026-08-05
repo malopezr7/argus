@@ -339,7 +339,40 @@ describe('cart', () => {
 | Extension | `expect.extend`, assertion counting |
 | Mocks | `argus.fn()`, `argus.spyOn()`, `toHaveBeenCalled*` |
 | Native modules | `argus.mockNativeModule(name, factory)`, `argus.resetNativeModules()` |
+| Time | `argus.useFakeTimers()`, manual advancement, fake `Date` and intervals |
 | Failures | Stacks source-mapped back to your TypeScript |
+
+### Fake timers
+
+Standalone Hermes timers are a FIFO queue, not a clock: `setTimeout(fn, 300)`
+runs without waiting 300 ms. Fake timers are therefore a **fidelity fix**, not
+just a testing convenience — explicit fake time is closer to a React Native
+device than the standalone VM's native timer queue.
+
+```ts
+describe('debounce', () => {
+  afterEach(() => argus.useRealTimers());
+
+  test('waits 300 ms', () => {
+    argus.useFakeTimers();
+    let fired = false;
+    setTimeout(() => { fired = true; }, 300);
+
+    expect(fired).toBe(false);
+    argus.advanceTimersByTime(299);
+    expect(fired).toBe(false);
+    argus.advanceTimersByTime(1);
+    expect(fired).toBe(true);
+  });
+});
+```
+
+The Jest-shaped surface is `useFakeTimers({ now, timerLimit })`,
+`useRealTimers`, `advanceTimersByTime` / `advanceTimersByTimeAsync`,
+`runAllTimers`, `runOnlyPendingTimers`, `clearAllTimers`, `getTimerCount`,
+`setSystemTime`, and `getRealSystemTime`. Fake-timer state persists across tests
+until explicitly restored, matching Jest; use `afterEach` when only some tests in
+a file need it. Calling `useFakeTimers` again installs a fresh clock.
 
 ### Component testing
 
@@ -362,7 +395,7 @@ render(
 fireEvent.press(within(screen.getByTestId('panel')).getByText('Submit'));
 ```
 
-Available: `render`, `rerender`, `unmount`, `screen`, `within`, `fireEvent`,
+Available: `render`, `rerender`, `unmount`, `screen`, `within`, `fireEvent`, `userEvent`,
 `act`, `waitFor`, `waitForElementToBeRemoved`, and the `getBy*` / `getAllBy*` /
 `queryBy*` / `queryAllBy*` / `findBy*` / `findAllBy*` families over text, test
 ID, role, placeholder text and display value. Queries are available on `screen`,
@@ -386,7 +419,7 @@ are still snapshots; live views land in the next patch release.
 
 ### Not there yet
 
-Snapshots, coverage, watch mode, `userEvent` and fake timers. The esbuild target,
+Snapshots, coverage and watch mode. The esbuild target,
 module aliases and the JSX runtime are still fixed,
 and a zero-match run exits 2 — there is no `passWithNoTests`. See the
 [roadmap](ROADMAP.md).

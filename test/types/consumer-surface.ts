@@ -97,6 +97,23 @@ describe('the surface a user actually touches', () => {
     spy.mockRestore?.();
   });
 
+  test('fake timers expose the documented clock controls', async () => {
+    argus.useFakeTimers({ now: new Date(0), timerLimit: 1000 });
+    const handle = setTimeout(() => undefined, 10);
+
+    argus.advanceTimersByTime(5).runOnlyPendingTimers().clearAllTimers();
+    await argus.advanceTimersByTimeAsync(5);
+    argus.runAllTimers();
+    argus.setSystemTime(100);
+    const count: number = argus.getTimerCount();
+    const realNow: number = argus.getRealSystemTime();
+    clearTimeout(handle);
+    argus.useRealTimers();
+
+    expect(count).toBe(0);
+    expect(realNow).toBeGreaterThan(0);
+  });
+
   test('awaited matchers are thenable', async () => {
     await expect(Promise.resolve(1)).resolves.toBe(1);
     await expect(Promise.reject(new Error('no'))).rejects.toThrow('no');

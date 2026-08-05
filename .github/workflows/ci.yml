@@ -112,6 +112,7 @@ jobs:
           expect_exit 0 examples/component-user-event.test.tsx
           expect_exit 0 examples/component-user-event-regressions.test.tsx
           expect_exit 0 examples/component-wait-deadline.test.tsx
+          expect_exit 0 examples/fake-timers.test.tsx
 
           # Designed to fail: they prove failures are reported, not swallowed.
           expect_exit 1 examples/math-failing.test.ts

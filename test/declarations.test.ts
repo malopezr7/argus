@@ -45,6 +45,7 @@ const internalMatcherTypes = parse('packages', 'framework', 'src', 'matcher-type
 const internalQueryTypes = parse('packages', 'rntl', 'src', 'queries.ts');
 const internalAsyncTypes = parse('packages', 'rntl', 'src', 'async.ts');
 const internalUserEventTypes = parse('packages', 'rntl', 'src', 'user-event.ts');
+const internalFakeTimerTypes = parse('packages', 'framework', 'src', 'fake-timers.ts');
 
 /**
  * Every member an interface declares, by name.
@@ -249,6 +250,12 @@ describe('the published declarations describe the argus namespace', () => {
     expect(published(spy)).not.toContain('mockRestore');
     expect(declared.has('mockRestore')).toBe(true);
     expect(typeof target.method).toBe('function');
+  });
+
+  it('declares the same fake-timer configuration as the runtime', () => {
+    expect([...membersOf(publishedGlobals, 'ArgusFakeTimersConfig')].sort()).toEqual(
+      [...membersOf(internalFakeTimerTypes, 'FakeTimersConfig')].sort(),
+    );
   });
 });
 
