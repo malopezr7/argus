@@ -26,9 +26,11 @@ export type HostChild = HostNode | string;
 /**
  * A rendered host element.
  *
- * The properties are `readonly` because they are getters onto the fiber: a write
- * cannot reach React, and Hermes discards it without complaining. Declaring them
- * writable would invite assignments that silently do nothing.
+ * The properties are `readonly` because Argus exposes getter-only views of
+ * `test-renderer`'s mutable host-instance object. React's reconciler updates that
+ * object in `commitUpdate`; a write to this wrapper cannot reach it, and Hermes
+ * discards the assignment without complaining. Declaring the properties writable
+ * would invite assignments that silently do nothing.
  */
 export interface HostNode {
   readonly type: string;

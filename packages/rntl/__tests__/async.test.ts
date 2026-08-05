@@ -302,6 +302,16 @@ describe('component async utilities', () => {
     }
   });
 
+  it('distinguishes a live empty render root from its unmounted state', async () => {
+    const result = render(React.createElement(React.Fragment));
+    const root = result.root;
+
+    const removal = waitForElementToBeRemoved(root, { timeout: 100, interval: 10 });
+    result.unmount();
+
+    await expect(removal).resolves.toBe(root);
+  });
+
   it('uses its captured scheduler when a test replaces global setTimeout', async () => {
     const host = globalThis as typeof globalThis & { setTimeout: typeof setTimeout };
     const originalSetTimeout = host.setTimeout;

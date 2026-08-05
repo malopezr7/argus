@@ -49,6 +49,16 @@ describe('component async testing', () => {
     expect(screen.queryByText('loading')).toBe(null);
   });
 
+  test('waitForElementToBeRemoved observes a held render root unmount', async () => {
+    const result = render(<Text>root child</Text>);
+    const root = result.root;
+
+    const removal = waitForElementToBeRemoved(root, { timeout: 100, interval: 10 });
+    result.unmount();
+
+    expect(await removal).toBe(root);
+  });
+
   test('slow synchronous work exhausts the wall-clock budget', async () => {
     let message = '';
     try {

@@ -31,8 +31,9 @@ export { fireEvent, screen, userEvent, waitFor, waitForElementToBeRemoved, withi
  * Run `callback` inside React's act scope and flush what it queued.
  *
  * The wrapper stays because `React.act` returns a thenable the synchronous API
- * has no use for. It does not refresh anything: host nodes read through to the
- * fiber, so the flushed tree is already visible.
+ * has no use for. It does not refresh anything: host nodes read the mutable
+ * host-instance objects maintained by `test-renderer`, so the flushed tree is
+ * already visible.
  */
 export function act(callback: () => void): void {
   React.act(callback);

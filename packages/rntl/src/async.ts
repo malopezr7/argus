@@ -1,5 +1,6 @@
 import React from 'react';
 import { capturedDateNow, capturedSetTimeout } from '../../framework/src/fake-timers.js';
+import { isDetachedRenderRoot } from './render.js';
 import type { HostNode } from './tree.js';
 
 const DEFAULT_TIMEOUT = 1000;
@@ -384,7 +385,7 @@ function isHostNode(value: unknown): value is HostNode {
 }
 
 function isDetached(node: HostNode): boolean {
-  return node.type !== '' && node.parent === null;
+  return isDetachedRenderRoot(node) || (node.type !== '' && node.parent === null);
 }
 
 function isRemoved(value: unknown): boolean {

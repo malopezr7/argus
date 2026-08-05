@@ -272,8 +272,10 @@ declare module 'argus' {
    * an update is safe — every property reads the current render, so a retained
    * handle fires the current handler and reports the current props.
    *
-   * The properties are `readonly` because they read through to React: a write
-   * cannot reach it, and would be discarded without an error.
+   * The properties are `readonly` because Argus exposes getter-only views of
+   * `test-renderer`'s mutable host-instance object. React's reconciler updates
+   * that object; a write to the Argus wrapper cannot reach it and would be
+   * discarded without an error.
    */
   export interface HostNode {
     readonly type: string;

@@ -23,9 +23,25 @@ interface ActiveRender {
   detached: HostNode | null;
 }
 
+/**
+ * Root shape cannot signal detachment: live containers also have `type === ''`
+ * and `parent === null`. Only the unmount path adds roots to this identity set.
+ */
+const detachedRoots = new WeakSet<HostNode>();
+
+function markDetachedRoot(root: HostNode): HostNode {
+  detachedRoots.add(root);
+  return root;
+}
+
+/** Whether `root` belongs to a render whose unmount path has started. */
+export function isDetachedRenderRoot(root: HostNode): boolean {
+  return detachedRoots.has(root);
+}
+
 /** The tree of an unmounted root: nothing, in the shape of an empty container. */
 function detachedRoot(): HostNode {
-  return { type: '', props: {}, parent: null, children: [] };
+  return markDetachedRoot({ type: '', props: {}, parent: null, children: [] });
 }
 
 export interface RenderResult {
@@ -49,12 +65,14 @@ function remove(record: ActiveRender): void {
 
 function unmountRecord(record: ActiveRender): void {
   if (!record.mounted) return;
+  const liveRoot = hostNode(record.renderer.container);
   // Detach BEFORE unmounting. `test-renderer` clears its container as soon as
   // `unmount()` is called, while React flushes the cleanup effects after it
   // returns — so a cleanup effect that reads a root would hit the cleared
   // container. Flipping first means it reads the detached tree instead of
   // throwing, and re-entrant unmounts hit the guard above.
   record.mounted = false;
+  markDetachedRoot(liveRoot);
   record.detached = detachedRoot();
   try {
     React.act(() => record.renderer.unmount());
