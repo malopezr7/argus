@@ -20,7 +20,7 @@
     "@arguslab/core": "workspace:*",
     "@babel/core": "^8.0.1",
     "@babel/plugin-transform-classes": "^8.0.1",
-    "esbuild": "^0.28.0"
+    "esbuild": "^0.28.2"
   },
   "devDependencies": {
     "typescript": "^6.0.0",
