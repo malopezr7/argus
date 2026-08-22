@@ -17,6 +17,8 @@ honour it rather than installing a global pnpm:
 ```bash
 corepack enable
 pnpm install
+./scripts/fetch-dev-hermes.sh
+pnpm argus examples/math.test.ts
 ```
 
 Use `pnpm` for everything. Not `npm`, not `npx`, not `yarn`, not `bun` — the
@@ -40,14 +42,42 @@ out of a `react-native` install, and this repo deliberately has none — so ther
 is no pin, no cache key, and nothing to download. A fresh clone running
 `pnpm argus` gets exit 2 and a message ending `no engine resolved`.
 
-So step 1 is the contributor's path. Get a binary once and point at it:
+So step 1 is the contributor's path, unless you drop a binary at
+`./.hermes/hermes` (gitignored), which is then picked up with no flag at all.
+`scripts/fetch-dev-hermes.sh` does that from the published prebuilt
+[`hermes-bin-v250829098.0.16`](https://github.com/malopezr7/argus/releases/tag/hermes-bin-v250829098.0.16):
+
+| Your machine | Asset |
+| --- | --- |
+| macOS arm64 | `hermes-250829098.0.16-darwin-arm64.tar.gz` |
+| macOS x64 | `hermes-250829098.0.16-darwin-x64.tar.gz` |
+| Linux x64 | `hermes-250829098.0.16-linux-x64.tar.gz` |
+| Linux arm64 | `hermes-250829098.0.16-linux-arm64.tar.gz` |
+
+The script downloads the matching archive, checks it against the `.sha256`
+sitting next to it on the release, and installs `hermes` into `.hermes/`.
+Windows is not supported.
+
+To do it by hand (darwin-arm64 shown):
+
+```bash
+curl -fsSL -O https://github.com/malopezr7/argus/releases/download/hermes-bin-v250829098.0.16/hermes-250829098.0.16-darwin-arm64.tar.gz
+curl -fsSL -O https://github.com/malopezr7/argus/releases/download/hermes-bin-v250829098.0.16/hermes-250829098.0.16-darwin-arm64.tar.gz.sha256
+shasum -a 256 -c hermes-250829098.0.16-darwin-arm64.tar.gz.sha256
+mkdir -p .hermes
+tar -xzf hermes-250829098.0.16-darwin-arm64.tar.gz -C .hermes hermes
+chmod +x .hermes/hermes
+```
+
+Linux archives currently need **glibc 2.38+** (Ubuntu 24.04 and newer). Ubuntu
+22.04, Debian 12, Amazon Linux 2023 and RHEL 9 will not start the published
+binary; see the README. musl (Alpine) never will.
+
+Get a binary once and point at it if you would rather not use `.hermes/`:
 
 ```bash
 ARGUS_HERMES=/path/to/hermes pnpm argus examples/math.test.ts
 ```
-
-Or drop it at `./.hermes/hermes`, which is gitignored and then picked up with no
-flag at all. That is what the commands further down assume.
 
 Every run prints which one it used:
 
