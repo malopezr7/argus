@@ -45,8 +45,8 @@ The runner works and ships. What is missing is test-authoring surface.
 ### Configuration — shipped in v0.2.0
 
 Globs, ignores, timeout, concurrency and engine selection were hardcoded or
-reachable only as flags. That blocked everything in v0.2.0, because snapshots,
-coverage and watch all need somewhere to be configured.
+reachable only as flags. That blocked everything in v0.2.0, because coverage
+and watch (and later snapshots) all need somewhere to be configured.
 
 Config resolution, first match wins and configs are never merged:
 
@@ -220,8 +220,8 @@ ask for the release after this one.
 
 ### Snapshots, coverage, watch
 
-- [ ] **Snapshots** — `toMatchSnapshot()`, external `.snap` files, `--update`,
-      obsolete detection and safe pruning. Design work is complete.
+- [x] **Snapshots** — `toMatchSnapshot()`, external `.snap` files, `-u` /
+      `--update`, obsolete detection and safe pruning. Shipped in v0.2.4.
 - [ ] **Coverage** — provider selection, thresholds, reporters.
 - [ ] **Watch mode** — file watching, re-run on change, interactive filtering via
       raw keypress handling. Worth splitting compile from execute here:
